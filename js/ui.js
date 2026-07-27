@@ -10,8 +10,12 @@ import { fmtTime, clamp, dist } from './utils.js';
 const HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'A', 'S', 'D', 'F', 'G', 'H', 'Z', 'X', 'C', 'V', 'B', 'N'];
 const MARKET_RATE = { sell: 0.8, buy: 1.4 };
 
-/** Elementos con los que se interactúa y sobre los que no debe moverse la cámara. */
-const CONTROL_SELECTOR = 'button, select, input, a, #minimap-panel, #commands, #queue, #sel-list, .overlay, .panel';
+/**
+ * Elementos que se pulsan o se arrastran: mientras el puntero esté encima no se
+ * desplaza la cámara, aunque esté pegado al borde. Sólo los controles en sí,
+ * no los paneles que los contienen: el fondo de una barra sigue desplazando.
+ */
+const CONTROL_SELECTOR = 'button, select, input, a, #minimap, .overlay, .panel';
 
 function isControl(target) {
   return !!(target && target.closest && target.closest(CONTROL_SELECTOR));
@@ -125,6 +129,7 @@ export class UI {
       this.touchMode = false; // hay ratón de verdad: vuelve el desplazamiento por el borde
       this.mouse = {
         x, y,
+        wx: e.clientX, wy: e.clientY, // coordenadas de ventana, para el borde de pantalla
         inside: x >= 0 && y >= 0 && x <= rect.width && y <= rect.height,
         // Sobre un control no se desplaza la cámara, para poder pulsarlo tranquilamente.
         onControl: isControl(e.target),
@@ -867,10 +872,11 @@ export class UI {
   }
 
   /**
-   * Desplazamiento por el borde de la pantalla. La zona activa no acaba en el
-   * lienzo: se prolonga por encima de la barra superior y por debajo de la
-   * inferior, de modo que pasarse de largo no interrumpe el movimiento. Sobre
-   * un control (botones, minimapa, panel de órdenes) no se desplaza nada.
+   * Desplazamiento por el borde de la pantalla, como en un juego a pantalla
+   * completa: lo que dispara el movimiento es el borde de la ventana, no el del
+   * lienzo, así que llevar el ratón al tope de la pantalla siempre funciona
+   * aunque encima haya una barra del HUD. Sólo se detiene si el puntero está
+   * justo sobre un control que se pueda pulsar o arrastrar.
    */
   edgeScroll(dt) {
     const r = this.r;
@@ -883,14 +889,13 @@ export class UI {
 
     const mo = this.mouse;
     if (mo && !mo.out && !mo.onControl && !this.drag && !this.panning && !this.touchMode) {
-      const m = 22;
-      const inX = mo.x >= -4 && mo.x <= r.w + 4;
-      const inY = mo.y >= -this.barTop() && mo.y <= r.h + this.barBottom();
-      if (inX && inY) {
-        if (mo.x < m) dx -= 1;
-        else if (mo.x > r.w - m) dx += 1;
-        if (mo.y < m) dy -= 1;            // incluye toda la barra superior
-        else if (mo.y > r.h - m) dy += 1; // incluye toda la barra inferior
+      const m = 26;
+      const W = window.innerWidth, H = window.innerHeight;
+      if (mo.wx >= 0 && mo.wx <= W && mo.wy >= 0 && mo.wy <= H) {
+        if (mo.wx < m) dx -= 1;
+        else if (mo.wx > W - m) dx += 1;
+        if (mo.wy < m) dy -= 1;
+        else if (mo.wy > H - m) dy += 1;
       }
     }
     if (dx || dy) {
@@ -898,16 +903,5 @@ export class UI {
       r.cam.x += dx * sp; r.cam.y += dy * sp * 0.6;
       r.clampCam();
     }
-  }
-
-  /** Alto de la barra superior, para saber hasta dónde llega la zona de borde. */
-  barTop() {
-    const el = document.getElementById('topbar');
-    return el ? el.getBoundingClientRect().height : 44;
-  }
-
-  barBottom() {
-    const el = document.getElementById('bottombar');
-    return el ? el.getBoundingClientRect().height : 178;
   }
 }
