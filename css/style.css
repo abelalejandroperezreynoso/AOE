@@ -222,6 +222,27 @@ body.cursor-attack #game { cursor: cell; }
 
 .right-group { display: flex; align-items: center; gap: 8px; }
 .tbtn { padding: 5px 11px; font-size: 13px; }
+.tbtn.icon { padding: 5px 8px; display: flex; align-items: center; }
+
+/* Icono de pantalla completa: cuatro esquinas que se invierten al activarla. */
+.fs-icon {
+  width: 15px; height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
+}
+.fs-shrink { display: none; }
+body.is-fullscreen .fs-expand { display: none; }
+body.is-fullscreen .fs-shrink { display: inline; }
+
+.fs-toggle {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 14px;
+}
+.fs-toggle .fs-icon { width: 16px; height: 16px; }
 .tbtn.active { background: linear-gradient(180deg, #a8862c, #6d5314); color: #251b09; font-weight: bold; }
 .clock { font-variant-numeric: tabular-nums; color: #cbb68c; font-size: 14px; min-width: 44px; text-align: right; }
 
