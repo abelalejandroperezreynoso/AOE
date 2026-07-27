@@ -2,7 +2,7 @@
 
 import { Game } from './game.js';
 import { Renderer } from './render.js';
-import { UI } from './ui.js';
+import { UI, toggleFullscreen, fullscreenSupported, syncFullscreenUi } from './ui.js';
 import { AI } from './ai.js';
 import { Audio } from './audio.js';
 
@@ -69,6 +69,18 @@ el('btn-start').onclick = () => {
     seed,
   });
 };
+
+// Pantalla completa desde el menú, para empezar ya sin los menús del navegador.
+const fsMenuBtn = el('btn-fullscreen-menu');
+if (!fullscreenSupported()) {
+  fsMenuBtn.classList.add('hidden');
+} else {
+  fsMenuBtn.onclick = () => { const p = toggleFullscreen(); if (p && p.catch) p.catch(() => {}); };
+  for (const ev of ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']) {
+    document.addEventListener(ev, syncFullscreenUi);
+  }
+  syncFullscreenUi();
+}
 
 function hash(str) {
   let h = 2166136261;

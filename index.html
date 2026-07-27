@@ -49,6 +49,13 @@
     </div>
 
     <button id="btn-start" class="primary">Comenzar partida</button>
+    <button id="btn-fullscreen-menu" class="secondary fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
+      <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+        <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+      </svg>
+      <span class="fs-label">Pantalla completa</span>
+    </button>
 
     <div class="menu-help">
       <h3>Cómo se juega</h3>
@@ -90,6 +97,12 @@
     <div class="right-group">
       <button id="idle-villager" class="tbtn" title="Seleccionar aldeano ocioso [.]">Ociosos: 0</button>
       <button id="btn-speed" class="tbtn" title="Velocidad del juego">Vel. <span id="speed-label">1x</span></button>
+      <button id="btn-fullscreen" class="tbtn icon" title="Pantalla completa [F11]" aria-label="Pantalla completa" aria-pressed="false">
+        <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
+          <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+          <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+        </svg>
+      </button>
       <button id="btn-help" class="tbtn" title="Ayuda [F1]">?</button>
       <span id="clock" class="clock">0:00</span>
       <button id="btn-menu" class="tbtn" title="Menú [Esc]">☰</button>
@@ -127,6 +140,7 @@
       <tr><td>Espacio</td><td>Centrar la cámara en la selección</td></tr>
       <tr><td>Supr</td><td>Eliminar lo seleccionado</td></tr>
       <tr><td>P / Esc</td><td>Pausa y menú</td></tr>
+      <tr><td>F11 o el botón ⛶</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
     </table>
     <h2>Consejos</h2>
