@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Age of Realms II · Estrategia medieval en tiempo real</title>
+<meta name="description" content="Juego de estrategia en tiempo real medieval, inspirado en los clásicos: recolecta recursos, avanza de edad y conquista a tus rivales. Funciona en el navegador, sin instalación.">
+<meta name="theme-color" content="#1a1410">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
+</head>
+<body>
+
+<!-- ---------- Menú principal ---------- -->
+<div id="main-menu" class="overlay">
+  <div class="menu-card">
+    <h1>Age of <span>Realms</span> II</h1>
+    <p class="subtitle">Estrategia medieval en tiempo real · homenaje a los clásicos del género</p>
+
+    <div class="options">
+      <label>
+        <span>Rivales</span>
+        <select id="opt-opponents">
+          <option value="1" selected>1 rival</option>
+          <option value="2">2 rivales</option>
+          <option value="3">3 rivales</option>
+        </select>
+      </label>
+      <label>
+        <span>Dificultad</span>
+        <select id="opt-difficulty">
+          <option value="easy">Fácil</option>
+          <option value="normal" selected>Moderado</option>
+          <option value="hard">Difícil</option>
+        </select>
+      </label>
+      <label>
+        <span>Tamaño del mapa</span>
+        <select id="opt-size">
+          <option value="48">Pequeño</option>
+          <option value="64" selected>Mediano</option>
+          <option value="80">Grande</option>
+        </select>
+      </label>
+      <label>
+        <span>Semilla del mapa</span>
+        <input id="opt-seed" type="text" inputmode="numeric" placeholder="aleatoria">
+      </label>
+    </div>
+
+    <button id="btn-start" class="primary">Comenzar partida</button>
+
+    <div class="menu-help">
+      <h3>Cómo se juega</h3>
+      <ul>
+        <li><b>Clic izquierdo</b> selecciona · <b>clic derecho</b> da órdenes (mover, recolectar, atacar, construir).</li>
+        <li>Envía aldeanos a los <b>árboles, bayas, ovejas, oro y piedra</b>; construye almacenes cerca para no perder tiempo.</li>
+        <li>Construye <b>casas</b> para subir el límite de población y <b>cuarteles</b> para crear ejército.</li>
+        <li>Avanza de <b>edad</b> desde el Centro urbano para desbloquear unidades y mejoras.</li>
+        <li>Gana destruyendo todo lo que tengan tus rivales.</li>
+      </ul>
+      <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios. Todo el arte se genera por código.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ---------- Pantalla de carga ---------- -->
+<div id="loading" class="overlay hidden">
+  <div class="loader">
+    <div class="spinner"></div>
+    <p id="loading-text">Generando el mundo...</p>
+  </div>
+</div>
+
+<!-- ---------- Juego ---------- -->
+<div id="app" class="hidden">
+  <canvas id="game"></canvas>
+
+  <div id="topbar">
+    <div class="res-group">
+      <div class="res" title="Comida"><i class="dot food"></i><span id="res-food">0</span></div>
+      <div class="res" title="Madera"><i class="dot wood"></i><span id="res-wood">0</span></div>
+      <div class="res" title="Oro"><i class="dot gold"></i><span id="res-gold">0</span></div>
+      <div class="res" title="Piedra"><i class="dot stone"></i><span id="res-stone">0</span></div>
+      <div class="res" title="Población"><i class="dot pop"></i><span id="res-pop">0/0</span></div>
+    </div>
+    <div class="center-group">
+      <span id="age-label">Edad Oscura</span>
+    </div>
+    <div class="right-group">
+      <button id="idle-villager" class="tbtn" title="Seleccionar aldeano ocioso [.]">Ociosos: 0</button>
+      <button id="btn-speed" class="tbtn" title="Velocidad del juego">Vel. <span id="speed-label">1x</span></button>
+      <button id="btn-help" class="tbtn" title="Ayuda [F1]">?</button>
+      <span id="clock" class="clock">0:00</span>
+      <button id="btn-menu" class="tbtn" title="Menú [Esc]">☰</button>
+    </div>
+  </div>
+
+  <div id="notifications"></div>
+
+  <div id="bottombar">
+    <div id="minimap-panel">
+      <canvas id="minimap"></canvas>
+      <div class="mm-hint">Clic: mover la vista · Clic derecho: enviar unidades</div>
+    </div>
+    <div id="selection-panel">
+      <div id="sel-info"></div>
+      <div id="sel-list"></div>
+      <div id="queue"></div>
+    </div>
+    <div id="commands"></div>
+  </div>
+
+  <div id="tooltip" class="hidden"></div>
+
+  <div id="help-panel" class="panel hidden">
+    <h2>Controles</h2>
+    <table>
+      <tr><td>Clic izquierdo</td><td>Seleccionar (arrastra para selección múltiple)</td></tr>
+      <tr><td>Clic derecho</td><td>Mover, recolectar, atacar o construir</td></tr>
+      <tr><td>Doble clic</td><td>Seleccionar todas las unidades del mismo tipo en pantalla</td></tr>
+      <tr><td>Mayús + clic</td><td>Añadir o quitar de la selección</td></tr>
+      <tr><td>WASD / flechas / borde</td><td>Mover la cámara</td></tr>
+      <tr><td>Rueda del ratón</td><td>Acercar y alejar</td></tr>
+      <tr><td>Ctrl + 0-9 / 0-9</td><td>Guardar y recuperar grupos de control</td></tr>
+      <tr><td>.</td><td>Ir al siguiente aldeano ocioso</td></tr>
+      <tr><td>Espacio</td><td>Centrar la cámara en la selección</td></tr>
+      <tr><td>Supr</td><td>Eliminar lo seleccionado</td></tr>
+      <tr><td>P / Esc</td><td>Pausa y menú</td></tr>
+      <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
+    </table>
+    <h2>Consejos</h2>
+    <ul>
+      <li>No dejes nunca al Centro urbano sin crear aldeanos: la economía lo es todo.</li>
+      <li>Construye el molino y los campamentos junto a los recursos para acortar los viajes.</li>
+      <li>Los lanceros destrozan a la caballería; los guerrilleros, a los arqueros.</li>
+      <li>Las granjas dan comida infinita mientras tengas madera para reconstruirlas.</li>
+    </ul>
+    <button id="btn-help-close" class="primary">Cerrar</button>
+  </div>
+
+  <div id="pause-menu" class="overlay hidden">
+    <div class="menu-card small">
+      <h2>Pausa</h2>
+      <label class="vol">Volumen
+        <input id="volume" type="range" min="0" max="1" step="0.05" value="0.35">
+      </label>
+      <button id="btn-resume" class="primary">Continuar</button>
+      <button id="btn-restart" class="secondary">Nueva partida</button>
+      <button id="btn-resign" class="danger">Rendirse</button>
+    </div>
+  </div>
+
+  <div id="end-screen" class="overlay hidden">
+    <div class="menu-card">
+      <h2 id="end-title">Victoria</h2>
+      <div id="end-body"></div>
+      <button id="btn-restart2" class="primary">Jugar otra vez</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

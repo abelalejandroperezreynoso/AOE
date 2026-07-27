@@ -1,0 +1,713 @@
+// Estado global de la partida y bucle de simulación.
+
+import {
+  UNITS, BUILDINGS, TECHS, UPGRADES, AGES, RESOURCES, PLAYER_COLORS,
+  GATHER_RATE, DIFFICULTIES,
+} from './config.js';
+import { GameMap } from './map.js';
+import { Player, Unit, Building, Projectile } from './entities.js';
+import { clamp, dist, Rng } from './utils.js';
+import { nearestFree, ringTiles } from './path.js';
+
+// --- Efectos visuales -------------------------------------------------------
+
+class Fx {
+  constructor() { this.parts = []; this.texts = []; this.decals = []; }
+
+  spawn(x, y, n, opts) {
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const s = (opts.speed || 1) * (0.4 + Math.random() * 0.8);
+      this.parts.push({
+        x, y, z: opts.z ?? 0.3,
+        vx: Math.cos(a) * s, vy: Math.sin(a) * s, vz: opts.vz ?? (0.6 + Math.random()),
+        life: opts.life || 0.6, max: opts.life || 0.6,
+        color: opts.color, size: opts.size || 2.5, grav: opts.grav ?? 3,
+      });
+    }
+  }
+
+  blood(x, y) { this.spawn(x, y, 6, { color: '#a01f1f', speed: 1.2, life: 0.5, size: 2.4 }); }
+  puff(x, y, n = 8) { this.spawn(x, y, n, { color: '#d8ccae', speed: 1.0, life: 0.8, size: 4, grav: 1.2 }); }
+  spark(x, y) { this.spawn(x, y, 4, { color: '#ffd98a', speed: 1.6, life: 0.3, size: 2 }); }
+  debris(x, y, n = 16) { this.spawn(x, y, n, { color: '#7a6a52', speed: 1.8, life: 1.2, size: 3.4, grav: 4 }); }
+
+  floatText(x, y, text, kind) {
+    this.texts.push({ x, y, text, kind, life: 1.4, max: 1.4 });
+  }
+
+  decal(x, y, kind) {
+    this.decals.push({ x, y, kind, life: kind === 'rubble' ? 30 : 14, max: kind === 'rubble' ? 30 : 14 });
+    if (this.decals.length > 220) this.decals.shift();
+  }
+
+  update(dt) {
+    for (let i = this.parts.length - 1; i >= 0; i--) {
+      const p = this.parts[i];
+      p.life -= dt;
+      if (p.life <= 0) { this.parts.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.z += p.vz * dt; p.vz -= p.grav * dt;
+      if (p.z < 0) { p.z = 0; p.vz *= -0.3; p.vx *= 0.5; p.vy *= 0.5; }
+    }
+    for (let i = this.texts.length - 1; i >= 0; i--) {
+      const t = this.texts[i];
+      t.life -= dt;
+      if (t.life <= 0) this.texts.splice(i, 1);
+    }
+    for (let i = this.decals.length - 1; i >= 0; i--) {
+      const d = this.decals[i];
+      d.life -= dt;
+      if (d.life <= 0) this.decals.splice(i, 1);
+    }
+  }
+}
+
+// --- Juego ------------------------------------------------------------------
+
+export class Game {
+  constructor(opts) {
+    this.opts = opts;
+    this.seed = opts.seed >>> 0;
+    this.rng = new Rng(this.seed);
+    this.difficulty = DIFFICULTIES[opts.difficulty] || DIFFICULTIES.normal;
+    this.playerCount = 1 + opts.opponents;
+    this.map = new GameMap(opts.mapSize, this.seed, this.playerCount);
+    this.players = [];
+    this.units = new Set();
+    this.buildings = new Set();
+    this.projectiles = [];
+    this.fx = new Fx();
+    this.time = 0;
+    this.speed = 1;
+    this.paused = false;
+    this.over = null;
+    this.selection = [];
+    this.groups = {};
+    this.placing = null;
+    this.cellSize = 2;
+    this.gridW = Math.ceil(this.map.size / this.cellSize);
+    this.grid = new Array(this.gridW * this.gridW);
+    for (let i = 0; i < this.grid.length; i++) this.grid[i] = [];
+    this.fogVisible = new Uint8Array(this.map.size * this.map.size);
+    this.fogExplored = new Uint8Array(this.map.size * this.map.size);
+    this.fogCd = 0;
+    this.byId = new Map();
+
+    for (let i = 0; i < this.playerCount; i++) {
+      const human = i === 0;
+      const p = new Player(i, i, human, human ? 'Tú' : `Rival ${i}`);
+      this.players.push(p);
+    }
+    this.human = this.players[0];
+    this.setupStart();
+  }
+
+  // --- Preparación ----------------------------------------------------------
+
+  setupStart() {
+    this.map.starts.forEach((s, i) => {
+      if (i >= this.players.length) return;
+      const p = this.players[i];
+      const tc = this.createBuilding('towncenter', p, s.x - 1, s.y - 1, true);
+      if (tc) tc.rally = { x: s.x + 2.5, y: s.y + 2.5 };
+      for (let k = 0; k < 3; k++) {
+        const a = (k / 3) * Math.PI * 2 + 0.7;
+        const px = s.x + 1 + Math.cos(a) * 3, py = s.y + 1 + Math.sin(a) * 3;
+        this.createUnit('villager', p, px, py);
+      }
+      const sc = this.createUnit('scout', p, s.x + 1.5, s.y + 3.5);
+      if (sc && !p.isHuman) sc.task = null;
+    });
+    this.updateFog(true);
+  }
+
+  // --- Fábrica de entidades -------------------------------------------------
+
+  createUnit(type, player, x, y) {
+    const free = nearestFree(this.map, Math.floor(x), Math.floor(y), 14);
+    if (!free) return null;
+    const u = new Unit(type, player.id, free.x + 0.5, free.y + 0.5).init(player);
+    this.units.add(u);
+    player.units.add(u);
+    this.byId.set(u.id, u);
+    return u;
+  }
+
+  canPlace(type, tx, ty, player) {
+    const B = BUILDINGS[type];
+    const s = B.size;
+    if (B.req && !player.hasBuilding(B.req)) return false;
+    for (let y = ty; y < ty + s; y++) {
+      for (let x = tx; x < tx + s; x++) {
+        if (!this.map.isBuildable(x, y)) return false;
+        if (this.map.nodeIndexAt(x, y) >= 0) return false;
+      }
+    }
+    return true;
+  }
+
+  createBuilding(type, player, tx, ty, instant = false) {
+    const B = BUILDINGS[type];
+    const s = B.size;
+    if (tx < 0 || ty < 0 || tx + s > this.map.size || ty + s > this.map.size) return null;
+    const b = new Building(type, player.id, tx, ty, player);
+    for (let y = ty; y < ty + s; y++) {
+      for (let x = tx; x < tx + s; x++) {
+        this.map.occupied[this.map.idx(x, y)] = b.id;
+        const n = this.map.nodeAtTile(x, y);
+        if (n) this.map.removeNode(n);
+      }
+    }
+    // Desaloja a quien quedase dentro de la huella: si no, quedaría atrapado.
+    for (const u of this.units) {
+      if (u.x < tx || u.x >= tx + s || u.y < ty || u.y >= ty + s) continue;
+      const free = nearestFree(this.map, Math.floor(u.x), Math.floor(u.y), 10);
+      if (free) { u.x = free.x + 0.5; u.y = free.y + 0.5; u.path = null; u.repathCd = 0; }
+    }
+    this.buildings.add(b);
+    player.buildings.add(b);
+    this.byId.set(b.id, b);
+    if (instant) {
+      b.built = true; b.progress = 1; b.hp = b.maxHp;
+      this.onBuildingComplete(b);
+    }
+    return b;
+  }
+
+  onBuildingComplete(b) {
+    if (this.human.id === b.owner) this.updateFog(true);
+  }
+
+  killUnit(u, from) {
+    if (u.dead) return;
+    u.dead = true;
+    this.units.delete(u);
+    this.players[u.owner].units.delete(u);
+    this.players[u.owner].stats.unitsLost++;
+    if (from && from.owner !== undefined) this.players[from.owner].stats.kills++;
+    this.byId.delete(u.id);
+    this.fx.blood(u.x, u.y);
+    this.fx.decal(u.x, u.y, 'blood');
+    const i = this.selection.indexOf(u);
+    if (i >= 0) this.selection.splice(i, 1);
+    if (u.owner === this.human.id && this.audio) this.audio.play('die');
+    this.checkDefeat(this.players[u.owner]);
+  }
+
+  killBuilding(b, from) {
+    if (b.dead) return;
+    b.dead = true;
+    this.buildings.delete(b);
+    this.players[b.owner].buildings.delete(b);
+    if (from && from.owner !== undefined) this.players[from.owner].stats.kills++;
+    this.byId.delete(b.id);
+    for (let y = b.ty; y < b.ty + b.size; y++) {
+      for (let x = b.tx; x < b.tx + b.size; x++) {
+        if (this.map.occupied[this.map.idx(x, y)] === b.id) this.map.occupied[this.map.idx(x, y)] = 0;
+      }
+    }
+    this.fx.debris(b.cx, b.cy, 10 + b.size * 6);
+    this.fx.decal(b.cx, b.cy, 'rubble');
+    if (this.audio) this.audio.play('collapse');
+    // Los aldeanos que trabajaban aquí quedan libres.
+    for (const u of this.units) {
+      if (u.task && u.task.target === b) u.task = null;
+    }
+    const i = this.selection.indexOf(b);
+    if (i >= 0) this.selection.splice(i, 1);
+    this.checkDefeat(this.players[b.owner]);
+  }
+
+  checkDefeat(p) {
+    if (p.defeated) return;
+    if (p.buildings.size > 0) return;
+    let hasVil = false;
+    for (const u of p.units) if (u.type === 'villager') { hasVil = true; break; }
+    if (hasVil) return;
+    p.defeated = true;
+    if (this.ui) this.ui.notify(`${p.name} ha sido derrotado.`, p.isHuman ? 'bad' : 'good');
+    this.checkVictory();
+  }
+
+  checkVictory() {
+    if (this.over) return;
+    const alive = this.players.filter((p) => !p.defeated);
+    if (this.human.defeated) this.endGame(false);
+    else if (alive.length === 1 && alive[0] === this.human) this.endGame(true);
+  }
+
+  endGame(won) {
+    this.over = { won, time: this.time };
+    if (this.ui) this.ui.showEnd(won);
+  }
+
+  // --- Consultas espaciales -------------------------------------------------
+
+  rebuildGrid() {
+    for (let i = 0; i < this.grid.length; i++) if (this.grid[i].length) this.grid[i].length = 0;
+    for (const u of this.units) {
+      const cx = clamp((u.x / this.cellSize) | 0, 0, this.gridW - 1);
+      const cy = clamp((u.y / this.cellSize) | 0, 0, this.gridW - 1);
+      this.grid[cy * this.gridW + cx].push(u);
+    }
+  }
+
+  unitsNear(x, y, r) {
+    const out = [];
+    const c0 = clamp(((x - r) / this.cellSize) | 0, 0, this.gridW - 1);
+    const c1 = clamp(((x + r) / this.cellSize) | 0, 0, this.gridW - 1);
+    const r0 = clamp(((y - r) / this.cellSize) | 0, 0, this.gridW - 1);
+    const r1 = clamp(((y + r) / this.cellSize) | 0, 0, this.gridW - 1);
+    const r2 = r * r;
+    for (let cy = r0; cy <= r1; cy++) {
+      for (let cx = c0; cx <= c1; cx++) {
+        for (const u of this.grid[cy * this.gridW + cx]) {
+          const dx = u.x - x, dy = u.y - y;
+          if (dx * dx + dy * dy <= r2) out.push(u);
+        }
+      }
+    }
+    return out;
+  }
+
+  walkable(x, y, unit) {
+    const m = this.map;
+    if (x < 0.2 || y < 0.2 || x > m.size - 0.2 || y > m.size - 0.2) return false;
+    return m.isPassable(x | 0, y | 0);
+  }
+
+  edgeDist(a, b) {
+    if (b.kind === 'building') {
+      const dx = Math.max(0, Math.abs(a.x - b.cx) - b.size / 2);
+      const dy = Math.max(0, Math.abs(a.y - b.cy) - b.size / 2);
+      return Math.max(0, Math.hypot(dx, dy) - (a.radius || 0.3));
+    }
+    return Math.max(0, dist(a.x, a.y, b.x, b.y) - (a.radius || 0.3) - (b.radius || 0.3));
+  }
+
+  isEnemy(ownerA, ownerB) { return ownerA !== ownerB; }
+
+  findEnemyNear(owner, x, y, r, unitsOnly = false) {
+    let best = null, bestD = Infinity;
+    for (const u of this.unitsNear(x, y, r)) {
+      if (u.owner === owner || u.dead) continue;
+      const d = dist(x, y, u.x, u.y);
+      // Prioriza unidades militares sobre civiles.
+      const score = d - (u.isMilitary ? 1.5 : 0);
+      if (score < bestD) { bestD = score; best = u; }
+    }
+    if (best || unitsOnly) return best;
+    for (const b of this.buildings) {
+      if (b.owner === owner || b.dead) continue;
+      const d = this.edgeDist({ x, y, radius: 0 }, b);
+      if (d < r && d < bestD) { bestD = d; best = b; }
+    }
+    return best;
+  }
+
+  findEnemiesNear(owner, x, y, r, count) {
+    const list = [];
+    for (const u of this.unitsNear(x, y, r)) {
+      if (u.owner === owner || u.dead) continue;
+      list.push({ u, d: dist(x, y, u.x, u.y) - (u.isMilitary ? 2 : 0) });
+    }
+    list.sort((a, b) => a.d - b.d);
+    return list.slice(0, count).map((e) => e.u);
+  }
+
+  /** Recurso más cercano del tipo pedido (búsqueda en espiral). */
+  findResourceNear(x, y, res, radius, player) {
+    const m = this.map;
+    const sx = Math.floor(x), sy = Math.floor(y);
+    let best = null, bestD = Infinity;
+    if (res === 'food' && player) {
+      for (const b of player.buildings) {
+        if (b.type !== 'farm' || !b.built || b.farmAmount <= 0) continue;
+        const d = dist(x, y, b.cx, b.cy);
+        if (d < bestD && d < radius) { bestD = d; best = b; }
+      }
+    }
+    for (let r = 1; r <= radius; r++) {
+      if (best && bestD < r - 1) break;
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+          const n = m.nodeAtTile(sx + dx, sy + dy);
+          if (!n || !n.alive || n.res !== res || n.amount <= 0) continue;
+          const d = dist(x, y, n.x + 0.5, n.y + 0.5);
+          if (d < bestD) { bestD = d; best = n; }
+        }
+      }
+    }
+    return best;
+  }
+
+  findDropoff(player, res, x, y) {
+    let best = null, bestD = Infinity;
+    for (const b of player.buildings) {
+      if (!b.built || b.dead) continue;
+      const d = BUILDINGS[b.type].dropoff;
+      if (!d || !d.includes(res)) continue;
+      const dd = dist(x, y, b.cx, b.cy);
+      if (dd < bestD) { bestD = dd; best = b; }
+    }
+    return best;
+  }
+
+  gatherInfo(target) {
+    if (target.kind === 'building') {
+      return { res: 'food', rate: 'farm', x: target.cx, y: target.cy, amount: target.farmAmount || 0 };
+    }
+    return { res: target.res, rate: target.rate, x: target.x + 0.5, y: target.y + 0.5, amount: target.amount };
+  }
+
+  consumeResource(target, amount) {
+    if (target.kind === 'building') target.farmAmount -= amount;
+    else target.amount -= amount;
+  }
+
+  depleteResource(target) {
+    if (target.kind === 'building') {
+      target.farmAmount = 0;
+      this.killBuilding(target, null);
+    } else if (target.alive) {
+      const wasTree = target.kind === 'tree';
+      this.map.removeNode(target);
+      if (wasTree) this.fx.decal(target.x + 0.5, target.y + 0.5, 'stump');
+      else this.fx.puff(target.x + 0.5, target.y + 0.5, 5);
+    }
+  }
+
+  // --- Combate --------------------------------------------------------------
+
+  attackStats(src) {
+    if (src.kind === 'building') {
+      const p = this.players[src.owner];
+      return {
+        attack: p.buildingStat(src.type, 'attack'),
+        pierce: !!BUILDINGS[src.type].pierce,
+        bonus: null,
+        ranged: true,
+      };
+    }
+    const p = this.players[src.owner];
+    const def = UNITS[src.type];
+    return {
+      attack: p.stat(src.type, 'attack'),
+      pierce: !!def.pierce,
+      bonus: def.bonus || null,
+      ranged: p.stat(src.type, 'range') > 1.6,
+      splash: def.splash || 0,
+    };
+  }
+
+  armorOf(target, pierce) {
+    if (target.kind === 'building') {
+      const B = BUILDINGS[target.type];
+      return pierce ? (B.pArmor ?? 4) : (B.armor ?? 0);
+    }
+    return this.players[target.owner].stat(target.type, pierce ? 'pArmor' : 'armor');
+  }
+
+  computeDamage(src, target) {
+    const s = this.attackStats(src);
+    let dmg = s.attack;
+    if (s.bonus) {
+      const classes = target.kind === 'building'
+        ? ['building'] : UNITS[target.type].armorClasses;
+      for (const c of classes) if (s.bonus[c]) dmg += s.bonus[c];
+    }
+    dmg -= this.armorOf(target, s.pierce);
+    return Math.max(1, dmg);
+  }
+
+  launchAttack(src, target) {
+    const s = this.attackStats(src);
+    if (s.ranged) {
+      this.spawnProjectile(src, target, 0);
+    } else {
+      this.applyDamage(src, target, this.computeDamage(src, target));
+      this.fx.spark(target.x ?? target.cx, target.y ?? target.cy);
+      if (this.audio && (src.owner === this.human.id || target.owner === this.human.id)) {
+        this.audio.play('hit');
+      }
+    }
+  }
+
+  spawnProjectile(src, target, delay) {
+    const def = src.kind === 'building' ? BUILDINGS[src.type] : UNITS[src.type];
+    const boulder = def.splash > 0;
+    const dmg = this.computeDamage(src, target);
+    const p = new Projectile(src.owner, src, target, dmg, {
+      splash: def.splash || 0,
+      kindOf: boulder ? 'boulder' : 'arrow',
+      delay,
+      z: src.kind === 'building' ? 1.2 + src.size * 0.25 : 0.55,
+    });
+    p.src = src;
+    this.projectiles.push(p);
+    if (this.audio && src.owner === this.human.id) this.audio.play(boulder ? 'catapult' : 'bow');
+  }
+
+  projectileHit(p) {
+    const x = p.px ?? p.tx, y = p.py ?? p.ty;
+    if (p.splash > 0) {
+      this.fx.spawn(x, y, 14, { color: '#c8a464', speed: 2.2, life: 0.6, size: 3.5 });
+      if (this.audio) this.audio.play('impact');
+      for (const u of this.unitsNear(x, y, p.splash)) {
+        const falloff = 1 - dist(x, y, u.x, u.y) / (p.splash + 0.3);
+        if (falloff <= 0) continue;
+        u.takeDamage(Math.max(1, p.damage * falloff), this, p.src);
+      }
+      for (const b of this.buildings) {
+        if (this.edgeDist({ x, y, radius: 0 }, b) <= p.splash) {
+          b.takeDamage(p.damage * 0.6, this, p.src);
+        }
+      }
+      return;
+    }
+    if (p.target && !p.target.dead) {
+      this.applyDamage(p.src, p.target, p.damage);
+      this.fx.spark(x, y);
+    }
+  }
+
+  applyDamage(src, target, dmg) {
+    if (!target || target.dead) return;
+    target.takeDamage(dmg, this, src);
+  }
+
+  // --- Órdenes del jugador --------------------------------------------------
+
+  commandMove(units, x, y, attackMove = false) {
+    const list = units.filter((u) => u.kind === 'unit');
+    if (!list.length) return;
+    const spots = this.formationSpots(x, y, list.length);
+    list.forEach((u, i) => {
+      const s = spots[i] || { x, y };
+      u.stopTask();
+      u.task = { type: attackMove ? 'attackmove' : 'move', x: s.x, y: s.y };
+      u.carryTarget = null;
+    });
+  }
+
+  formationSpots(x, y, n) {
+    if (n === 1) return [{ x, y }];
+    const out = [];
+    const cols = Math.ceil(Math.sqrt(n));
+    const gap = 0.95;
+    for (let i = 0; i < n; i++) {
+      const r = Math.floor(i / cols), c = i % cols;
+      const ox = (c - (cols - 1) / 2) * gap;
+      const oy = (r - (Math.ceil(n / cols) - 1) / 2) * gap;
+      const px = clamp(x + ox, 1, this.map.size - 2);
+      const py = clamp(y + oy, 1, this.map.size - 2);
+      out.push({ x: px, y: py });
+    }
+    return out;
+  }
+
+  commandTarget(units, target) {
+    for (const u of units) {
+      if (u.kind !== 'unit') continue;
+      u.stopTask();
+      if (target.kind === 'building') {
+        if (target.owner === u.owner) {
+          if (!target.built && u.type === 'villager') u.task = { type: 'build', target };
+          else if (target.type === 'farm' && u.type === 'villager') u.task = { type: 'gather', target };
+          else if (target.hp < target.maxHp && u.type === 'villager') u.task = { type: 'build', target };
+          else u.task = { type: 'move', x: target.cx, y: target.cy };
+        } else {
+          u.task = { type: 'attack', target };
+        }
+      } else if (target.kind === 'unit') {
+        if (target.owner === u.owner) u.task = { type: 'move', x: target.x, y: target.y };
+        else u.task = { type: 'attack', target };
+      } else {
+        // Nodo de recursos.
+        if (u.type === 'villager') u.task = { type: 'gather', target };
+        else u.task = { type: 'move', x: target.x + 0.5, y: target.y + 0.5 };
+      }
+    }
+  }
+
+  /** Cola de producción. Devuelve un mensaje de error o null. */
+  queueUnit(building, type, player) {
+    const def = UNITS[type];
+    if (!def) return 'Unidad desconocida';
+    if (player.age < def.age) return `Requiere la ${AGES[def.age].name}`;
+    if (!player.canAfford(def.cost)) return 'Recursos insuficientes';
+    if (building.queue.length >= 12) return 'Cola llena';
+    player.pay(def.cost);
+    building.queue.push({ kind: 'unit', key: type, progress: 0, time: def.time });
+    return null;
+  }
+
+  queueTech(building, key, player) {
+    const t = TECHS[key];
+    if (!t) return 'Tecnología desconocida';
+    if (player.techs.has(key)) return 'Ya investigada';
+    if (player.age < t.age) return `Requiere la ${AGES[t.age].name}`;
+    if (t.requires && !player.techs.has(t.requires)) return `Requiere ${TECHS[t.requires].name}`;
+    if (building.queue.some((q) => q.key === key)) return 'Ya está en cola';
+    if (!player.canAfford(t.cost)) return 'Recursos insuficientes';
+    player.pay(t.cost);
+    building.queue.push({ kind: 'tech', key, progress: 0, time: t.time });
+    return null;
+  }
+
+  queueUpgrade(building, key, player) {
+    const up = UPGRADES[key];
+    if (!up) return 'Mejora desconocida';
+    if (player.techs.has(key)) return 'Ya investigada';
+    if (player.age < up.age) return `Requiere la ${AGES[up.age].name}`;
+    if (building.queue.some((q) => q.key === key)) return 'Ya está en cola';
+    if (!player.canAfford(up.cost)) return 'Recursos insuficientes';
+    player.pay(up.cost);
+    building.queue.push({ kind: 'upgrade', key, progress: 0, time: up.time });
+    return null;
+  }
+
+  queueAge(building, player) {
+    const next = player.age + 1;
+    if (next >= AGES.length) return 'Ya estás en la Edad Imperial';
+    const age = AGES[next];
+    const req = player.countBuildings((b) => b.built && BUILDINGS[b.type].age <= player.age
+      && !['house', 'farm', 'wall', 'towncenter'].includes(b.type));
+    if (req < age.reqBuildings) return `Necesitas ${age.reqBuildings} edificios de la edad actual`;
+    if (building.queue.some((q) => q.kind === 'age')) return 'Ya estás avanzando';
+    if (!player.canAfford(age.cost)) return 'Recursos insuficientes';
+    player.pay(age.cost);
+    building.queue.push({ kind: 'age', key: next, progress: 0, time: age.time });
+    return null;
+  }
+
+  cancelQueueItem(building, index) {
+    const item = building.queue[index];
+    if (!item) return;
+    const player = this.players[building.owner];
+    const cost = item.kind === 'unit' ? UNITS[item.key].cost
+      : item.kind === 'tech' ? TECHS[item.key].cost
+        : item.kind === 'upgrade' ? UPGRADES[item.key].cost
+          : AGES[item.key].cost;
+    player.refund(cost);
+    building.queue.splice(index, 1);
+  }
+
+  spawnUnitFrom(building, type) {
+    const player = this.players[building.owner];
+    const spots = ringTiles(this.map, building.tx, building.ty, building.size, building.size, 1);
+    let spot = spots.length ? spots[(Math.random() * spots.length) | 0] : null;
+    if (!spot) spot = nearestFree(this.map, building.tx, building.ty + building.size, 12);
+    if (!spot) return null;
+    const u = this.createUnit(type, player, spot.x + 0.5, spot.y + 0.5);
+    if (!u) return null;
+    if (building.rally) {
+      if (building.rally.target && !building.rally.target.dead) {
+        this.commandTarget([u], building.rally.target);
+      } else {
+        u.task = { type: 'move', x: building.rally.x, y: building.rally.y };
+      }
+    }
+    return u;
+  }
+
+  /** Coloca un edificio y manda a construir a los aldeanos seleccionados. */
+  placeBuilding(type, tx, ty, player, builders) {
+    if (!this.canPlace(type, tx, ty, player)) return 'No se puede construir aquí';
+    const cost = BUILDINGS[type].cost;
+    if (player.age < BUILDINGS[type].age) return `Requiere la ${AGES[BUILDINGS[type].age].name}`;
+    if (!player.canAfford(cost)) return 'Recursos insuficientes';
+    player.pay(cost);
+    const b = this.createBuilding(type, player, tx, ty, false);
+    if (!b) { player.refund(cost); return 'No se puede construir aquí'; }
+    const vs = (builders || []).filter((u) => u.kind === 'unit' && u.type === 'villager' && !u.dead);
+    for (const v of vs) { v.stopTask(); v.task = { type: 'build', target: b }; }
+    if (!vs.length) {
+      // Sin aldeanos seleccionados, busca al más cercano que esté libre.
+      let best = null, bestD = Infinity;
+      for (const u of player.units) {
+        if (u.type !== 'villager') continue;
+        const d = dist(u.x, u.y, b.cx, b.cy);
+        if (d < bestD) { bestD = d; best = u; }
+      }
+      if (best) { best.stopTask(); best.task = { type: 'build', target: b }; }
+    }
+    return null;
+  }
+
+  // --- Niebla de guerra -----------------------------------------------------
+
+  updateFog(force = false) {
+    const S = this.map.size;
+    this.fogVisible.fill(0);
+    const reveal = (cx, cy, r) => {
+      const x0 = Math.max(0, Math.floor(cx - r)), x1 = Math.min(S - 1, Math.ceil(cx + r));
+      const y0 = Math.max(0, Math.floor(cy - r)), y1 = Math.min(S - 1, Math.ceil(cy + r));
+      const r2 = r * r;
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) {
+          const dx = x + 0.5 - cx, dy = y + 0.5 - cy;
+          if (dx * dx + dy * dy <= r2) {
+            const i = y * S + x;
+            this.fogVisible[i] = 1;
+            this.fogExplored[i] = 1;
+          }
+        }
+      }
+    };
+    const p = this.human;
+    for (const u of p.units) reveal(u.x, u.y, UNITS[u.type].los);
+    for (const b of p.buildings) reveal(b.cx, b.cy, BUILDINGS[b.type].los);
+    this.fogVersion = (this.fogVersion || 0) + 1;
+  }
+
+  isVisible(tx, ty) {
+    if (tx < 0 || ty < 0 || tx >= this.map.size || ty >= this.map.size) return false;
+    return this.fogVisible[ty * this.map.size + tx] === 1;
+  }
+
+  isExplored(tx, ty) {
+    if (tx < 0 || ty < 0 || tx >= this.map.size || ty >= this.map.size) return false;
+    return this.fogExplored[ty * this.map.size + tx] === 1;
+  }
+
+  // --- Bucle ----------------------------------------------------------------
+
+  update(dt) {
+    if (this.paused || this.over) return;
+    dt *= this.speed;
+    this.time += dt;
+    this.rebuildGrid();
+
+    for (const u of this.units) u.update(this, dt);
+    for (const b of this.buildings) b.update(this, dt);
+
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const p = this.projectiles[i];
+      p.update(this, dt);
+      if (p.dead) this.projectiles.splice(i, 1);
+    }
+
+    this.fx.update(dt);
+
+    this.fogCd -= dt;
+    if (this.fogCd <= 0) { this.fogCd = 0.2; this.updateFog(); }
+
+    if (this.ai) this.ai.update(dt);
+  }
+
+  // Utilidades para la interfaz.
+  idleVillagers() {
+    const out = [];
+    for (const u of this.human.units) if (u.type === 'villager' && !u.task) out.push(u);
+    return out;
+  }
+
+  militaryCount(player) {
+    let n = 0;
+    for (const u of player.units) if (u.isMilitary) n++;
+    return n;
+  }
+}

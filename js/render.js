@@ -1,0 +1,618 @@
+// Renderizador isométrico sobre canvas 2D.
+
+import { TILE_W, TILE_H, UNITS, BUILDINGS, PLAYER_COLORS } from './config.js';
+import { unitSprite, buildingSprite, resourceSprite, makeCanvas, HW, HH } from './sprites.js';
+import { clamp, dist } from './utils.js';
+
+const Z_PX = 18; // píxeles de altura por unidad de "z" en el mundo
+
+export class Renderer {
+  constructor(canvas, game) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d', { alpha: false });
+    this.game = game;
+    this.cam = { x: 0, y: 0, zoom: 1 };
+    this.minZoom = 0.42; this.maxZoom = 2.0;
+    this.fog = makeCanvas(64, 64);
+    this.fogCtx = this.fog.getContext('2d');
+    this.fogBlur = makeCanvas(64, 64);
+    this.fogBlurCtx = this.fogBlur.getContext('2d');
+    this.fogScale = 5;
+    this.fogMargin = 8;
+    this.fogKey = '';
+    this.hover = null;
+    this.showHealth = false;
+    this.resize();
+  }
+
+  resize() {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    this.canvas.width = Math.max(1, Math.round(w * dpr));
+    this.canvas.height = Math.max(1, Math.round(h * dpr));
+    this.dpr = dpr;
+    this.w = w; this.h = h;
+    const fw = Math.ceil(w / this.fogScale) + this.fogMargin * 2;
+    const fh = Math.ceil(h / this.fogScale) + this.fogMargin * 2;
+    this.fog.width = fw; this.fog.height = fh;
+    this.fogBlur.width = fw; this.fogBlur.height = fh;
+    this.fogKey = '';
+  }
+
+  // --- Conversión de coordenadas -------------------------------------------
+
+  worldToCanvas(u, v) {
+    return [this.game.map.originX + (u - v) * HW, (u + v) * HH];
+  }
+
+  canvasToWorld(mx, my) {
+    const a = (mx - this.game.map.originX) / HW;
+    const b = my / HH;
+    return [(a + b) / 2, (b - a) / 2];
+  }
+
+  worldToScreen(u, v) {
+    const [mx, my] = this.worldToCanvas(u, v);
+    return [(mx - this.cam.x) * this.cam.zoom + this.w / 2, (my - this.cam.y) * this.cam.zoom + this.h / 2];
+  }
+
+  screenToWorld(sx, sy) {
+    const mx = (sx - this.w / 2) / this.cam.zoom + this.cam.x;
+    const my = (sy - this.h / 2) / this.cam.zoom + this.cam.y;
+    return this.canvasToWorld(mx, my);
+  }
+
+  centerOn(u, v) {
+    const [mx, my] = this.worldToCanvas(u, v);
+    this.cam.x = mx; this.cam.y = my;
+    this.clampCam();
+  }
+
+  clampCam() {
+    const m = this.game.map;
+    const pad = 200;
+    this.cam.x = clamp(this.cam.x, -pad, m.size * TILE_W + pad);
+    this.cam.y = clamp(this.cam.y, -pad, m.size * TILE_H + TILE_H + pad);
+    this.cam.zoom = clamp(this.cam.zoom, this.minZoom, this.maxZoom);
+  }
+
+  visibleTileBounds(pad = 3) {
+    const corners = [
+      this.screenToWorld(0, 0), this.screenToWorld(this.w, 0),
+      this.screenToWorld(0, this.h), this.screenToWorld(this.w, this.h),
+    ];
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const [u, v] of corners) {
+      x0 = Math.min(x0, u); x1 = Math.max(x1, u);
+      y0 = Math.min(y0, v); y1 = Math.max(y1, v);
+    }
+    const S = this.game.map.size;
+    return {
+      x0: clamp(Math.floor(x0) - pad, 0, S - 1), x1: clamp(Math.ceil(x1) + pad, 0, S - 1),
+      y0: clamp(Math.floor(y0) - pad, 0, S - 1), y1: clamp(Math.ceil(y1) + pad, 0, S - 1),
+    };
+  }
+
+  // --- Dibujo ---------------------------------------------------------------
+
+  render(dt) {
+    const g = this.game, ctx = this.ctx;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.fillStyle = '#0d1410';
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    const z = this.cam.zoom;
+    ctx.save();
+    ctx.setTransform(this.dpr * z, 0, 0, this.dpr * z,
+      this.dpr * (this.w / 2 - this.cam.x * z), this.dpr * (this.h / 2 - this.cam.y * z));
+
+    // Terreno estático.
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(g.map.canvas, 0, 0);
+
+    const b = this.visibleTileBounds();
+    this.drawDecals(ctx, b);
+    this.drawSelectionMarkers(ctx);
+    this.drawEntities(ctx, b);
+    this.drawParticles(ctx);
+    this.drawPlacement(ctx);
+    ctx.restore();
+
+    this.drawFog(ctx);
+    this.drawFloatingText(ctx);
+    this.drawHud(ctx);
+  }
+
+  drawDecals(ctx, b) {
+    for (const d of this.game.fx.decals) {
+      if (d.x < b.x0 || d.x > b.x1 || d.y < b.y0 || d.y > b.y1) continue;
+      if (!this.game.isExplored(d.x | 0, d.y | 0)) continue;
+      const [mx, my] = this.worldToCanvas(d.x, d.y);
+      const a = Math.min(1, d.life / 3) * 0.55;
+      if (d.kind === 'blood') {
+        ctx.fillStyle = `rgba(90,20,18,${a})`;
+        ctx.beginPath(); ctx.ellipse(mx, my, 9, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+      } else if (d.kind === 'rubble') {
+        ctx.fillStyle = `rgba(60,52,40,${a})`;
+        ctx.beginPath(); ctx.ellipse(mx, my, 26, 13, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `rgba(110,98,78,${a})`;
+        for (let i = 0; i < 7; i++) {
+          const ang = i * 1.7, r = 6 + (i % 3) * 6;
+          ctx.fillRect(mx + Math.cos(ang) * r - 2, my + Math.sin(ang) * r * 0.5 - 2, 5, 4);
+        }
+      } else if (d.kind === 'stump') {
+        const s = resourceSprite('stump', 0);
+        ctx.globalAlpha = Math.min(1, d.life / 3);
+        ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  drawSelectionMarkers(ctx) {
+    const g = this.game;
+    for (const e of g.selection) {
+      if (e.dead) continue;
+      const col = PLAYER_COLORS[g.players[e.owner].colorIdx].light;
+      ctx.strokeStyle = col; ctx.lineWidth = 2;
+      if (e.kind === 'unit') {
+        const [mx, my] = this.worldToCanvas(e.x, e.y);
+        ctx.beginPath();
+        ctx.ellipse(mx, my, 13 * (e.radius / 0.3), 6.5 * (e.radius / 0.3), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        const s = e.size;
+        const pts = [[0, 0], [s, 0], [s, s], [0, s]].map(([u, v]) => this.worldToCanvas(e.tx + u, e.ty + v));
+        ctx.beginPath();
+        ctx.moveTo(pts[0][0], pts[0][1]);
+        for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.closePath(); ctx.stroke();
+      }
+    }
+    // Punto de reunión del edificio seleccionado.
+    const sel = g.selection[0];
+    if (sel && sel.kind === 'building' && sel.rally && sel.owner === g.human.id) {
+      const r = sel.rally;
+      const [mx, my] = this.worldToCanvas(r.x, r.y);
+      ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx, my - 22); ctx.stroke();
+      ctx.fillStyle = '#e0b52c';
+      ctx.beginPath();
+      ctx.moveTo(mx, my - 22); ctx.lineTo(mx + 13, my - 18); ctx.lineTo(mx, my - 13);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+
+  drawEntities(ctx, b) {
+    const g = this.game;
+    const list = [];
+
+    // Recursos del mapa visibles.
+    const m = g.map;
+    for (let y = b.y0; y <= b.y1; y++) {
+      for (let x = b.x0; x <= b.x1; x++) {
+        const n = m.nodeAtTile(x, y);
+        if (!n || !n.alive) continue;
+        if (!g.isExplored(x, y)) continue;
+        list.push({ d: x + y, t: 'node', e: n });
+      }
+    }
+    for (const bd of g.buildings) {
+      if (bd.cx < b.x0 - 4 || bd.cx > b.x1 + 4 || bd.cy < b.y0 - 4 || bd.cy > b.y1 + 4) continue;
+      const mine = bd.owner === g.human.id;
+      if (!mine && !g.isExplored(bd.cx | 0, bd.cy | 0)) continue;
+      list.push({ d: bd.cx + bd.cy, t: 'building', e: bd });
+    }
+    for (const u of g.units) {
+      if (u.x < b.x0 - 2 || u.x > b.x1 + 2 || u.y < b.y0 - 2 || u.y > b.y1 + 2) continue;
+      const mine = u.owner === g.human.id;
+      if (!mine && !g.isVisible(u.x | 0, u.y | 0)) continue;
+      list.push({ d: u.x + u.y, t: 'unit', e: u });
+    }
+    for (const p of g.projectiles) {
+      if (p.px === undefined) continue;
+      list.push({ d: p.px + p.py + 0.4, t: 'proj', e: p });
+    }
+
+    list.sort((a, c) => a.d - c.d);
+
+    for (const item of list) {
+      if (item.t === 'node') this.drawNode(ctx, item.e);
+      else if (item.t === 'building') this.drawBuilding(ctx, item.e);
+      else if (item.t === 'unit') this.drawUnit(ctx, item.e);
+      else this.drawProjectile(ctx, item.e);
+    }
+  }
+
+  drawNode(ctx, n) {
+    const [mx, my] = this.worldToCanvas(n.x + 0.5, n.y + 0.5);
+    const kind = n.kind;
+    const depleted = n.amount < n.max * 0.34;
+    const s = resourceSprite(kind, n.variant, depleted);
+    ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+  }
+
+  drawBuilding(ctx, b) {
+    const g = this.game;
+    const stage = b.built ? 2 : (b.progress > 0.45 ? 1 : 0);
+    const s = buildingSprite(b.type, g.players[b.owner].colorIdx, stage);
+    const [mx, my] = this.worldToCanvas(b.tx, b.ty);
+    if (!b.built) ctx.globalAlpha = 0.55 + b.progress * 0.45;
+    ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+    ctx.globalAlpha = 1;
+
+    // Humo en edificios dañados.
+    if (b.built && b.hp < b.maxHp * 0.45) {
+      const t = g.time * 2 + b.id;
+      ctx.globalAlpha = 0.35;
+      for (let i = 0; i < 3; i++) {
+        const k = (t + i * 0.7) % 2;
+        ctx.fillStyle = '#5a5a5a';
+        ctx.beginPath();
+        ctx.arc(mx + Math.sin(t + i) * 8, my - 20 - k * 26 - b.size * 8, 5 + k * 7, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    const dmg = b.hp < b.maxHp - 0.5;
+    if (!b.built || b.selected || (dmg && this.showHealthFor(b))) {
+      const [cx, cy] = this.worldToCanvas(b.cx, b.cy);
+      const topY = cy - (b.size * TILE_H) / 2 - (b.type === 'castle' ? 90 : b.type === 'tower' ? 58 : 46);
+      this.healthBar(ctx, cx, topY, 26 + b.size * 8, b.hp / b.maxHp, b.owner);
+      if (!b.built) {
+        ctx.fillStyle = 'rgba(0,0,0,.55)';
+        ctx.fillRect(cx - 20, topY + 7, 40, 4);
+        ctx.fillStyle = '#e6c86a';
+        ctx.fillRect(cx - 20, topY + 7, 40 * b.progress, 4);
+      }
+    }
+    // Barra de producción.
+    if (b.queue.length && b.owner === g.human.id) {
+      const [cx, cy] = this.worldToCanvas(b.cx, b.cy);
+      const item = b.queue[0];
+      const topY = cy - (b.size * TILE_H) / 2 - 34;
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(cx - 18, topY, 36, 3);
+      ctx.fillStyle = item.blocked ? '#d2453c' : '#6fd06f';
+      ctx.fillRect(cx - 18, topY, 36 * (item.progress / item.time), 3);
+    }
+  }
+
+  showHealthFor(e) {
+    return this.showHealth || e.selected || (this.hover === e);
+  }
+
+  drawUnit(ctx, u) {
+    const g = this.game;
+    const frame = u.attackAnim > 0
+      ? (u.attackAnim > 0.25 ? 4 : 5)
+      : (u.moving ? (Math.floor(u.anim) % 4) : 0);
+    const s = unitSprite(u.type, g.players[u.owner].colorIdx, u.dir, frame, u.back);
+    const [mx, my] = this.worldToCanvas(u.x, u.y);
+    ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+
+    if (u.carry > 0.5 && u.carryRes) {
+      const col = { food: '#d24a3a', wood: '#8a6234', gold: '#e0b52c', stone: '#b6b6b0' }[u.carryRes];
+      ctx.fillStyle = col;
+      ctx.fillRect(mx + (u.dir > 0 ? -13 : 8), my - 34, 6, 5);
+    }
+    if (u.selected || (u.hp < u.maxHp - 0.5 && this.showHealthFor(u))) {
+      this.healthBar(ctx, mx, my - 44, 22, u.hp / u.maxHp, u.owner);
+    }
+  }
+
+  healthBar(ctx, x, y, w, frac, owner) {
+    frac = clamp(frac, 0, 1);
+    ctx.fillStyle = 'rgba(0,0,0,.6)';
+    ctx.fillRect(x - w / 2 - 1, y - 1, w + 2, 6);
+    ctx.fillStyle = frac > 0.6 ? '#4fbf4f' : frac > 0.3 ? '#e0b52c' : '#d2453c';
+    ctx.fillRect(x - w / 2, y, w * frac, 4);
+  }
+
+  drawProjectile(ctx, p) {
+    const [mx, my] = this.worldToCanvas(p.px, p.py);
+    const y = my - p.pz * Z_PX;
+    if (p.kindOf === 'boulder') {
+      ctx.fillStyle = '#6b6259';
+      ctx.beginPath(); ctx.arc(mx, y, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,.2)';
+      ctx.beginPath(); ctx.ellipse(mx, my, 4, 2, 0, 0, Math.PI * 2); ctx.fill();
+    } else {
+      const ang = Math.atan2(p.ty - p.y, p.tx - p.x);
+      ctx.save();
+      ctx.translate(mx, y);
+      ctx.rotate(ang * 0.5 - 0.4);
+      ctx.strokeStyle = '#e8dfc0'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  drawParticles(ctx) {
+    for (const p of this.game.fx.parts) {
+      const [mx, my] = this.worldToCanvas(p.x, p.y);
+      const a = clamp(p.life / p.max, 0, 1);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      const s = p.size * (0.5 + a * 0.5);
+      ctx.fillRect(mx - s / 2, my - p.z * Z_PX - s / 2, s, s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  drawPlacement(ctx) {
+    const g = this.game;
+    const pl = g.placing;
+    if (!pl || pl.tx === undefined) return;
+    const B = BUILDINGS[pl.type];
+    const ok = g.canPlace(pl.type, pl.tx, pl.ty, g.human) && g.human.canAfford(B.cost);
+    const s = buildingSprite(pl.type, g.human.colorIdx, 2);
+    const [mx, my] = this.worldToCanvas(pl.tx, pl.ty);
+    // Huella
+    for (let y = 0; y < B.size; y++) {
+      for (let x = 0; x < B.size; x++) {
+        const tileOk = g.map.isBuildable(pl.tx + x, pl.ty + y) && g.map.nodeIndexAt(pl.tx + x, pl.ty + y) < 0;
+        const [px, py] = this.worldToCanvas(pl.tx + x, pl.ty + y);
+        ctx.beginPath();
+        ctx.moveTo(px, py); ctx.lineTo(px + HW, py + HH);
+        ctx.lineTo(px, py + TILE_H); ctx.lineTo(px - HW, py + HH);
+        ctx.closePath();
+        ctx.fillStyle = tileOk ? 'rgba(110,220,120,.28)' : 'rgba(220,80,70,.35)';
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 0.65;
+    ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+    ctx.globalAlpha = 1;
+    if (!ok) {
+      ctx.strokeStyle = 'rgba(230,90,80,.9)'; ctx.lineWidth = 2;
+      const c = this.worldToCanvas(pl.tx + B.size / 2, pl.ty + B.size / 2);
+      ctx.beginPath();
+      ctx.moveTo(c[0] - 12, c[1] - 12); ctx.lineTo(c[0] + 12, c[1] + 12);
+      ctx.moveTo(c[0] + 12, c[1] - 12); ctx.lineTo(c[0] - 12, c[1] + 12);
+      ctx.stroke();
+    }
+  }
+
+  // --- Niebla ---------------------------------------------------------------
+
+  /**
+   * La niebla se dibuja a 1/5 de resolución y sólo se rehace cuando cambia la
+   * cámara o la visibilidad; después se escala con suavizado bilineal.
+   */
+  drawFog(ctx) {
+    const g = this.game;
+    const key = `${Math.round(this.cam.x)}|${Math.round(this.cam.y)}|${this.cam.zoom.toFixed(3)}|${g.fogVersion}`;
+    if (key !== this.fogKey) {
+      this.fogKey = key;
+      this.renderFogCanvas();
+    }
+    const S = this.fogScale, M = this.fogMargin;
+    ctx.save();
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = 0.84;
+    ctx.drawImage(this.fogBlur, -M * S, -M * S, this.fogBlur.width * S, this.fogBlur.height * S);
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  renderFogCanvas() {
+    const g = this.game;
+    const fc = this.fogCtx, S = this.fogScale, M = this.fogMargin;
+    fc.setTransform(1, 0, 0, 1, 0, 0);
+    fc.clearRect(0, 0, this.fog.width, this.fog.height);
+    fc.fillStyle = '#000';
+    fc.fillRect(0, 0, this.fog.width, this.fog.height);
+
+    const b = this.visibleTileBounds(2);
+    const z = this.cam.zoom;
+    // Rombos "recortados" para lo que se ve o se ha explorado.
+    const drawTile = (x, y, op) => {
+      const [sx, sy] = this.worldToScreen(x, y);
+      const px = sx / S + M, py = sy / S + M;
+      const hw = (HW * z) / S + 0.9, hh = (HH * z) / S + 0.9;
+      fc.globalAlpha = op;
+      fc.beginPath();
+      fc.moveTo(px, py - hh * 0.02);
+      fc.lineTo(px + hw, py + hh);
+      fc.lineTo(px, py + hh * 2);
+      fc.lineTo(px - hw, py + hh);
+      fc.closePath();
+      fc.fill();
+    };
+
+    fc.globalCompositeOperation = 'destination-out';
+    for (let y = b.y0; y <= b.y1; y++) {
+      for (let x = b.x0; x <= b.x1; x++) {
+        const i = y * g.map.size + x;
+        if (g.fogVisible[i]) drawTile(x, y, 1);
+        else if (g.fogExplored[i]) drawTile(x, y, 0.55);
+      }
+    }
+    fc.globalCompositeOperation = 'source-over';
+    fc.globalAlpha = 1;
+
+    // Desenfoque barato: se aplica sobre el lienzo reducido, no sobre la pantalla.
+    const bc = this.fogBlurCtx;
+    bc.setTransform(1, 0, 0, 1, 0, 0);
+    bc.clearRect(0, 0, this.fogBlur.width, this.fogBlur.height);
+    bc.filter = 'blur(1.4px)';
+    bc.drawImage(this.fog, 0, 0);
+    bc.filter = 'none';
+  }
+
+  // --- Texto flotante y HUD sobre el mundo ----------------------------------
+
+  drawFloatingText(ctx) {
+    ctx.save();
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.font = 'bold 13px "Trebuchet MS", sans-serif';
+    ctx.textAlign = 'center';
+    const colors = { food: '#ff8b76', wood: '#d3a468', gold: '#ffdc6a', stone: '#d8d8d2' };
+    for (const t of this.game.fx.texts) {
+      const [sx, sy] = this.worldToScreen(t.x, t.y);
+      if (sx < -50 || sy < -50 || sx > this.w + 50 || sy > this.h + 50) continue;
+      const k = 1 - t.life / t.max;
+      ctx.globalAlpha = clamp(t.life / t.max * 1.6, 0, 1);
+      ctx.fillStyle = colors[t.kind] || '#fff';
+      ctx.strokeStyle = 'rgba(0,0,0,.8)'; ctx.lineWidth = 3;
+      ctx.strokeText(t.text, sx, sy - 40 - k * 26);
+      ctx.fillText(t.text, sx, sy - 40 - k * 26);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  drawHud(ctx) {
+    ctx.save();
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    // Rectángulo de selección.
+    const s = this.dragBox;
+    if (s) {
+      ctx.strokeStyle = '#e8e2c8'; ctx.lineWidth = 1.5;
+      ctx.fillStyle = 'rgba(232,226,200,.12)';
+      const x = Math.min(s.x0, s.x1), y = Math.min(s.y0, s.y1);
+      const w = Math.abs(s.x1 - s.x0), h = Math.abs(s.y1 - s.y0);
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x, y, w, h);
+    }
+    // Marcador de orden.
+    if (this.orderMark && this.orderMark.life > 0) {
+      const om = this.orderMark;
+      const [sx, sy] = this.worldToScreen(om.x, om.y);
+      const k = 1 - om.life / 0.5;
+      ctx.strokeStyle = om.color; ctx.lineWidth = 2;
+      ctx.globalAlpha = 1 - k;
+      ctx.beginPath();
+      ctx.ellipse(sx, sy, 6 + k * 16, 3 + k * 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  markOrder(x, y, color = '#8fe08f') {
+    this.orderMark = { x, y, color, life: 0.5 };
+  }
+
+  tick(dt) {
+    if (this.orderMark) this.orderMark.life -= dt;
+  }
+
+  // --- Minimapa -------------------------------------------------------------
+
+  drawMinimap(mctx, w, h) {
+    const g = this.game, S = g.map.size;
+    mctx.clearRect(0, 0, w, h);
+    mctx.fillStyle = '#0b110c';
+    mctx.fillRect(0, 0, w, h);
+    const sx = w / (S * 2), sy = h / (S * 2);
+    const toMini = (u, v) => [(u - v + S) * sx, (u + v) * sy];
+
+    mctx.drawImage(g.map.minimap, 0, 0, w, h);
+
+    // Niebla.
+    mctx.save();
+    mctx.fillStyle = 'rgba(0,0,0,.72)';
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const i = y * S + x;
+        if (g.fogExplored[i]) continue;
+        const [px, py] = toMini(x, y);
+        mctx.fillRect(px - sx - 0.5, py - 0.5, sx * 2 + 1, sy * 2 + 1);
+      }
+    }
+    mctx.fillStyle = 'rgba(0,0,0,.32)';
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const i = y * S + x;
+        if (!g.fogExplored[i] || g.fogVisible[i]) continue;
+        const [px, py] = toMini(x, y);
+        mctx.fillRect(px - sx - 0.5, py - 0.5, sx * 2 + 1, sy * 2 + 1);
+      }
+    }
+    mctx.restore();
+
+    // Edificios y unidades.
+    for (const b of g.buildings) {
+      if (b.owner !== g.human.id && !g.isExplored(b.cx | 0, b.cy | 0)) continue;
+      const [px, py] = toMini(b.cx, b.cy);
+      mctx.fillStyle = PLAYER_COLORS[g.players[b.owner].colorIdx].light;
+      const r = 1.5 + b.size * 0.8;
+      mctx.fillRect(px - r, py - r * 0.6, r * 2, r * 1.2);
+    }
+    for (const u of g.units) {
+      if (u.owner !== g.human.id && !g.isVisible(u.x | 0, u.y | 0)) continue;
+      const [px, py] = toMini(u.x, u.y);
+      mctx.fillStyle = PLAYER_COLORS[g.players[u.owner].colorIdx].main;
+      mctx.fillRect(px - 1.5, py - 1.2, 3, 2.6);
+    }
+
+    // Rectángulo de la vista.
+    const corners = [
+      this.screenToWorld(0, 0), this.screenToWorld(this.w, 0),
+      this.screenToWorld(this.w, this.h), this.screenToWorld(0, this.h),
+    ];
+    mctx.strokeStyle = 'rgba(255,255,255,.85)';
+    mctx.lineWidth = 1.4;
+    mctx.beginPath();
+    corners.forEach(([u, v], i) => {
+      const [px, py] = toMini(u, v);
+      if (i === 0) mctx.moveTo(px, py); else mctx.lineTo(px, py);
+    });
+    mctx.closePath();
+    mctx.stroke();
+  }
+
+  minimapToWorld(px, py, w, h) {
+    const S = this.game.map.size;
+    const sx = w / (S * 2), sy = h / (S * 2);
+    const a = px / sx - S;   // u - v
+    const bb = py / sy;      // u + v
+    return [(a + bb) / 2, (bb - a) / 2];
+  }
+
+  // --- Selección por pantalla ----------------------------------------------
+
+  entityAtScreen(sx, sy) {
+    const g = this.game;
+    const [u, v] = this.screenToWorld(sx, sy);
+    let best = null, bestD = Infinity;
+    for (const un of g.unitsNear(u, v, 1.2)) {
+      if (un.owner !== g.human.id && !g.isVisible(un.x | 0, un.y | 0)) continue;
+      // Comprobación en pantalla: el "cuerpo" está por encima del punto del suelo.
+      const [mx, my] = this.worldToScreen(un.x, un.y);
+      const dx = Math.abs(mx - sx), dy = my - sy;
+      if (dx < 14 * this.cam.zoom && dy > -8 * this.cam.zoom && dy < 42 * this.cam.zoom) {
+        const d = dx + Math.abs(dy - 18);
+        if (d < bestD) { bestD = d; best = un; }
+      }
+    }
+    if (best) return best;
+    const tx = Math.floor(u), ty = Math.floor(v);
+    const id = g.map.inBounds(tx, ty) ? g.map.occupied[g.map.idx(tx, ty)] : 0;
+    if (id) {
+      const b = g.byId.get(id);
+      if (b && (b.owner === g.human.id || g.isExplored(tx, ty))) return b;
+    }
+    const node = g.map.nodeAtTile(tx, ty);
+    if (node && g.isExplored(tx, ty)) return node;
+    return null;
+  }
+
+  unitsInBox(x0, y0, x1, y1, ownerId) {
+    const g = this.game;
+    const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+    const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+    const out = [];
+    for (const u of g.units) {
+      if (u.owner !== ownerId) continue;
+      const [mx, my] = this.worldToScreen(u.x, u.y);
+      const cy = my - 16 * this.cam.zoom;
+      if (mx >= minX && mx <= maxX && cy >= minY && cy <= maxY) out.push(u);
+    }
+    return out;
+  }
+}
