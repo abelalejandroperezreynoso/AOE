@@ -21,6 +21,48 @@ function isControl(target) {
   return !!(target && target.closest && target.closest(CONTROL_SELECTOR));
 }
 
+// --- Pantalla completa ------------------------------------------------------
+
+const fsEl = () => document.documentElement;
+
+export function fullscreenSupported() {
+  const e = fsEl();
+  return !!(e.requestFullscreen || e.webkitRequestFullscreen || e.msRequestFullscreen);
+}
+
+export function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+}
+
+/** Alterna la pantalla completa. Debe llamarse desde un gesto del usuario. */
+export function toggleFullscreen() {
+  try {
+    if (isFullscreen()) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+      return exit && exit.call(document);
+    }
+    const e = fsEl();
+    const req = e.requestFullscreen || e.webkitRequestFullscreen || e.msRequestFullscreen;
+    return req && req.call(e, { navigationUI: 'hide' });
+  } catch (err) {
+    return Promise.reject(err);
+  }
+}
+
+/** Mantiene los botones y el `<body>` al día con el estado real. */
+export function syncFullscreenUi() {
+  const on = isFullscreen();
+  document.body.classList.toggle('is-fullscreen', on);
+  for (const id of ['btn-fullscreen', 'btn-fullscreen-menu']) {
+    const b = document.getElementById(id);
+    if (!b) continue;
+    b.title = on ? 'Salir de la pantalla completa [F11]' : 'Pantalla completa [F11]';
+    b.setAttribute('aria-pressed', String(on));
+    const label = b.querySelector('.fs-label');
+    if (label) label.textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa';
+  }
+}
+
 export class UI {
   constructor(game, renderer, audio) {
     this.game = game;
@@ -74,6 +116,7 @@ export class UI {
     document.getElementById('btn-restart2').onclick = () => location.reload();
     const vol = document.getElementById('volume');
     vol.oninput = () => this.audio.setVolume(parseFloat(vol.value));
+    this.setupFullscreen();
     this.el.idleBtn.onclick = () => this.selectIdleVillager();
     document.getElementById('btn-speed').onclick = () => this.cycleSpeed();
     document.getElementById('btn-help').onclick = () => {
@@ -82,6 +125,27 @@ export class UI {
     document.getElementById('btn-help-close').onclick = () => {
       document.getElementById('help-panel').classList.add('hidden');
     };
+  }
+
+  /** Botón de pantalla completa: se oculta si el navegador no la admite. */
+  setupFullscreen() {
+    const btn = document.getElementById('btn-fullscreen');
+    if (!btn) return;
+    if (!fullscreenSupported()) { btn.classList.add('hidden'); return; }
+    btn.onclick = () => {
+      const p = toggleFullscreen();
+      if (p && p.catch) p.catch(() => this.notify('El navegador ha bloqueado la pantalla completa', 'bad'));
+    };
+    const onChange = () => {
+      syncFullscreenUi();
+      // El lienzo cambia de tamaño al entrar y salir.
+      this.r.resize();
+      this.r.clampCam();
+    };
+    for (const ev of ['fullscreenchange', 'webkitfullscreenchange', 'msfullscreenchange']) {
+      document.addEventListener(ev, onChange);
+    }
+    syncFullscreenUi();
   }
 
   cycleSpeed() {
