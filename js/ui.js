@@ -10,6 +10,17 @@ import { fmtTime, clamp, dist } from './utils.js';
 const HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'A', 'S', 'D', 'F', 'G', 'H', 'Z', 'X', 'C', 'V', 'B', 'N'];
 const MARKET_RATE = { sell: 0.8, buy: 1.4 };
 
+/**
+ * Elementos que se pulsan o se arrastran: mientras el puntero esté encima no se
+ * desplaza la cámara, aunque esté pegado al borde. Sólo los controles en sí,
+ * no los paneles que los contienen: el fondo de una barra sigue desplazando.
+ */
+const CONTROL_SELECTOR = 'button, select, input, a, #minimap, .overlay, .panel';
+
+function isControl(target) {
+  return !!(target && target.closest && target.closest(CONTROL_SELECTOR));
+}
+
 export class UI {
   constructor(game, renderer, audio) {
     this.game = game;
@@ -115,7 +126,15 @@ export class UI {
     window.addEventListener('mousemove', (e) => {
       const rect = c.getBoundingClientRect();
       const x = e.clientX - rect.left, y = e.clientY - rect.top;
-      this.mouse = { x, y, inside: x >= 0 && y >= 0 && x <= rect.width && y <= rect.height };
+      this.touchMode = false; // hay ratón de verdad: vuelve el desplazamiento por el borde
+      this.mouse = {
+        x, y,
+        wx: e.clientX, wy: e.clientY, // coordenadas de ventana, para el borde de pantalla
+        inside: x >= 0 && y >= 0 && x <= rect.width && y <= rect.height,
+        // Sobre un control no se desplaza la cámara, para poder pulsarlo tranquilamente.
+        onControl: isControl(e.target),
+        out: false,
+      };
       if (this.drag) {
         this.drag.x1 = x; this.drag.y1 = y;
         if (Math.hypot(x - this.drag.x0, y - this.drag.y0) > 5) this.drag.moved = true;
@@ -214,7 +233,10 @@ export class UI {
       if (btn && !btn.disabled) { e.preventDefault(); btn.action(); this.audio.play('click'); }
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('blur', () => { this.keys.clear(); if (this.mouse) this.mouse.out = true; });
+    // Si el puntero abandona la ventana, se detiene el desplazamiento de borde.
+    document.addEventListener('mouseleave', () => { if (this.mouse) this.mouse.out = true; });
+    document.addEventListener('mouseenter', () => { if (this.mouse) this.mouse.out = false; });
   }
 
   /**
@@ -849,6 +871,13 @@ export class UI {
     }
   }
 
+  /**
+   * Desplazamiento por el borde de la pantalla, como en un juego a pantalla
+   * completa: lo que dispara el movimiento es el borde de la ventana, no el del
+   * lienzo, así que llevar el ratón al tope de la pantalla siempre funciona
+   * aunque encima haya una barra del HUD. Sólo se detiene si el puntero está
+   * justo sobre un control que se pueda pulsar o arrastrar.
+   */
   edgeScroll(dt) {
     const r = this.r;
     let dx = 0, dy = 0;
@@ -857,12 +886,17 @@ export class UI {
     if (k.has('arrowright') || k.has('d')) dx += 1;
     if (k.has('arrowup') || k.has('w')) dy -= 1;
     if (k.has('arrowdown') || k.has('s')) dy += 1;
-    if (this.mouse && this.mouse.inside && !this.drag) {
-      const m = 14;
-      if (this.mouse.x < m) dx -= 1;
-      if (this.mouse.x > r.w - m) dx += 1;
-      if (this.mouse.y < m) dy -= 1;
-      if (this.mouse.y > r.h - m) dy += 1;
+
+    const mo = this.mouse;
+    if (mo && !mo.out && !mo.onControl && !this.drag && !this.panning && !this.touchMode) {
+      const m = 26;
+      const W = window.innerWidth, H = window.innerHeight;
+      if (mo.wx >= 0 && mo.wx <= W && mo.wy >= 0 && mo.wy <= H) {
+        if (mo.wx < m) dx -= 1;
+        else if (mo.wx > W - m) dx += 1;
+        if (mo.wy < m) dy -= 1;
+        else if (mo.wy > H - m) dy += 1;
+      }
     }
     if (dx || dy) {
       const sp = 900 * dt / r.cam.zoom;
