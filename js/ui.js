@@ -474,14 +474,36 @@ export class UI {
       const g = this.game;
       const target = this.r.entityAtScreen(x, y);
       const mine = g.selection.length && g.selection[0].owner === g.human.id;
-      // Tocar algo propio lo selecciona; en cualquier otro caso es una orden.
-      if (target && target.kind && target.owner === g.human.id) this.clickSelect(x, y, false, 0);
+      // Tocar algo propio lo selecciona, salvo que lo que haya seleccionado
+      // pueda trabajar en ello: mandar aldeanos a terminar unos cimientos es
+      // una orden, no un cambio de selección.
+      if (mine && this.canWorkOn(target)) this.rightClick(x, y, false);
+      else if (target && target.kind && target.owner === g.human.id) this.clickSelect(x, y, false, 0);
       else if (mine) this.rightClick(x, y, false);
       else this.clickSelect(x, y, false, 0);
       e.preventDefault();
     }, { passive: false });
 
     c.addEventListener('touchcancel', () => { start = null; lastPan = null; pinch = 0; });
+  }
+
+  /**
+   * ¿Los aldeanos seleccionados tienen trabajo que hacer en ese objetivo?
+   * Con el dedo no hay clic derecho, así que un toque tiene que decidir entre
+   * seleccionar y dar la orden. Sobre unos cimientos propios o una granja
+   * propia lo que se quiere es mandar a los aldeanos; el edificio terminado se
+   * sigue seleccionando como siempre.
+   *
+   * No entra el reparar: seleccionar un edificio dañado —para ver cómo va o
+   * para sacar unidades de él— es demasiado corriente como para robarle el
+   * toque. Para trabajar sobre unos cimientos que ya no quieres, basta con
+   * deseleccionar tocando el suelo y volver a tocarlos.
+   */
+  canWorkOn(target) {
+    const g = this.game;
+    if (!target || target.kind !== 'building' || target.owner !== g.human.id) return false;
+    if (target.built && target.type !== 'farm') return false;
+    return g.selection.some((e) => e.kind === 'unit' && e.type === 'villager' && e.owner === g.human.id);
   }
 
   // --- Selección ------------------------------------------------------------
