@@ -101,6 +101,7 @@ export class UI {
     this.el.pauseMenu = id('pause-menu');
     this.el.endScreen = id('end-screen');
     this.el.idleBtn = id('idle-villager');
+    this.el.idleCount = id('idle-count');
     this.el.speed = id('speed-label');
   }
 
@@ -561,7 +562,7 @@ export class UI {
 
   selectIdleVillager() {
     const idle = this.game.idleVillagers();
-    if (!idle.length) { this.notify('No hay aldeanos ociosos'); return; }
+    if (!idle.length) { this.notify('No hay aldeanos en reposo'); return; }
     this.idleIdx = ((this.idleIdx || 0) + 1) % idle.length;
     const v = idle[this.idleIdx];
     this.select([v]);
@@ -1187,8 +1188,11 @@ export class UI {
 
     const idle = g.idleVillagers().length;
     if (this.el.idleBtn._v !== idle) {
-      this.el.idleBtn.textContent = `Ociosos: ${idle}`;
-      this.el.idleBtn.classList.toggle('active', idle > 0);
+      this.el.idleCount.textContent = idle;
+      this.el.idleBtn.classList.toggle('has-idle', idle > 0);
+      this.el.idleBtn.title = idle
+        ? `${idle} aldeano${idle === 1 ? '' : 's'} en reposo · pulsa para ir al siguiente [.]`
+        : 'Aldeanos en reposo [.]';
       this.el.idleBtn._v = idle;
     }
 
