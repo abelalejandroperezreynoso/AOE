@@ -9,6 +9,7 @@ import { fmtTime, clamp, dist } from './utils.js';
 
 const HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'A', 'S', 'D', 'F', 'G', 'H', 'Z', 'X', 'C', 'V', 'B', 'N'];
 const MARKET_RATE = { sell: 0.8, buy: 1.4 };
+const QUEUE_ICONS = 6; // iconos que se dibujan de la cola; el resto los dice el contador
 
 /**
  * Elementos que se pulsan o se arrastran: mientras el puntero esté encima no se
@@ -118,6 +119,7 @@ export class UI {
     const vol = document.getElementById('volume');
     vol.oninput = () => this.audio.setVolume(parseFloat(vol.value));
     this.setupFullscreen();
+    this.watchBars();
     this.el.idleBtn.onclick = () => this.selectIdleVillager();
     document.getElementById('btn-speed').onclick = () => this.cycleSpeed();
     document.getElementById('btn-help').onclick = () => {
@@ -147,6 +149,34 @@ export class UI {
       document.addEventListener(ev, onChange);
     }
     syncFullscreenUi();
+  }
+
+  /**
+   * Las barras ya no tienen un alto fijo: la de abajo crece con la cola y
+   * encoge cuando no hay nada seleccionado. Se miden y el resultado se le pasa
+   * al lienzo, que ocupa lo que quede en medio.
+   */
+  watchBars() {
+    const root = document.documentElement;
+    const topbar = document.getElementById('topbar');
+    const bars = [topbar, this.el.bottombar];
+    let last = '';
+    const apply = () => {
+      const top = topbar.offsetHeight, bottom = this.el.bottombar.offsetHeight;
+      const key = `${top}/${bottom}`;
+      if (key === last) return; // sin cambio real: nada que repintar
+      last = key;
+      root.style.setProperty('--top-total', `${top}px`);
+      root.style.setProperty('--bottom-total', `${bottom}px`);
+      this.r.resize();
+      this.r.clampCam();
+    };
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(apply);
+      for (const b of bars) ro.observe(b);
+    }
+    window.addEventListener('resize', apply);
+    apply();
   }
 
   cycleSpeed() {
@@ -933,7 +963,8 @@ export class UI {
     if (key !== this._queueKey) {
       this._queueKey = key;
       q.innerHTML = '';
-      items.forEach((item, i) => {
+      // Más iconos no caben en una tira estrecha; para el resto está el contador.
+      items.slice(0, QUEUE_ICONS).forEach((item, i) => {
         const el = document.createElement('button');
         el.className = 'qitem' + (item.blocked ? ' blocked' : '');
         el.innerHTML = `<img src="${this.queueIcon(item)}"><span class="qbar"></span>`;
