@@ -798,6 +798,11 @@ export class UI {
         .map((r) => `<i class="dot ${r}"></i>${b.cost[r]}`).join(' ')}</span>` : '';
       el.innerHTML = `${inner}<span class="key">${b.hotkey}</span>${costHtml}`;
       el.title = `${b.label}${b.hotkey ? ` [${b.hotkey}]` : ''}\n${b.tooltip || ''}${b.cost ? `\nCoste: ${RESOURCES.filter((r) => b.cost[r]).map((r) => `${b.cost[r]} ${RES_NAME[r]}`).join(', ')}` : ''}`;
+      const run = () => {
+        if (b.disabled) { this.audio.play('error'); this.notify('Recursos insuficientes', 'bad'); return; }
+        b.action();
+        this.audio.play('click');
+      };
       // Con ratón la ficha sigue al puntero; con el dedo solo se ve mientras
       // se mantiene pulsado, para que no se quede tapando la barra inferior.
       el.addEventListener('pointerenter', (e) => {
@@ -805,15 +810,31 @@ export class UI {
       });
       el.addEventListener('pointerleave', () => this.hideTooltip());
       el.addEventListener('pointerdown', (e) => {
-        if (e.pointerType !== 'mouse') this.showTooltip(b, el, true);
+        if (e.pointerType === 'mouse') return;
+        el._tapFrom = { x: e.clientX, y: e.clientY };
+        this.showTooltip(b, el, true);
       });
-      for (const ev of ['pointerup', 'pointercancel']) {
-        el.addEventListener(ev, (e) => { if (e.pointerType !== 'mouse') this.hideTooltip(); });
-      }
+      el.addEventListener('pointercancel', () => { el._tapFrom = null; this.hideTooltip(); });
+      /*
+       * La orden se ejecuta al levantar el dedo, sin esperar al «click» que
+       * sintetiza el navegador: en iOS ese click llega tarde o no llega cuando
+       * se repiten los toques, y encolar varias unidades seguidas fallaba.
+       * Si el dedo se ha desplazado es que se estaba deslizando la tira, no
+       * pulsando.
+       */
+      el.addEventListener('pointerup', (e) => {
+        if (e.pointerType === 'mouse') return;
+        this.hideTooltip();
+        const from = el._tapFrom;
+        el._tapFrom = null;
+        if (!from || Math.hypot(e.clientX - from.x, e.clientY - from.y) > 12) return;
+        el._tapAt = performance.now();
+        run();
+      });
       el.onclick = () => {
-        if (b.disabled) { this.audio.play('error'); this.notify('Recursos insuficientes', 'bad'); return; }
-        b.action();
-        this.audio.play('click');
+        // Descarta el click sintetizado que sigue a un toque ya atendido.
+        if (el._tapAt && performance.now() - el._tapAt < 700) return;
+        run();
       };
       cont.appendChild(el);
     });
@@ -897,24 +918,45 @@ export class UI {
     }
   }
 
+  /**
+   * Cola del edificio seleccionado, con un contador de cuántas cosas van a
+   * salir. Igual que la tira: el DOM sólo se rehace cuando cambia la cola, no
+   * en cada fotograma, que era pura basura para el navegador del móvil.
+   */
   renderQueue() {
     const g = this.game;
     const sel = g.selection[0];
     const q = this.el.queue;
-    if (!sel || sel.kind !== 'building' || !sel.queue || !sel.queue.length) {
-      if (q.childElementCount) q.innerHTML = '';
-      return;
+    const items = (sel && sel.kind === 'building' && sel.queue) ? sel.queue : [];
+    const key = items.map((it) => `${it.kind}:${it.key}:${it.blocked ? 1 : 0}`).join(',');
+
+    if (key !== this._queueKey) {
+      this._queueKey = key;
+      q.innerHTML = '';
+      items.forEach((item, i) => {
+        const el = document.createElement('button');
+        el.className = 'qitem' + (item.blocked ? ' blocked' : '');
+        el.innerHTML = `<img src="${this.queueIcon(item)}"><span class="qbar"></span>`;
+        el.title = item.blocked
+          ? 'Bloqueado: límite de población alcanzado. Clic para cancelar.'
+          : `${this.queueLabel(item)} · Clic para cancelar`;
+        el.onclick = () => { g.cancelQueueItem(sel, i); this.renderQueue(); };
+        el._bar = el.querySelector('.qbar');
+        q.appendChild(el);
+      });
+      if (items.length > 1) {
+        const c = document.createElement('span');
+        c.className = 'qcount';
+        c.textContent = `×${items.length}`;
+        c.title = `${items.length} en cola`;
+        q.appendChild(c);
+      }
     }
-    q.innerHTML = '';
-    sel.queue.forEach((item, i) => {
-      const el = document.createElement('button');
-      el.className = 'qitem' + (item.blocked ? ' blocked' : '');
-      const pct = Math.round((item.progress / item.time) * 100);
-      el.innerHTML = `<img src="${this.queueIcon(item)}"><span class="qbar" style="height:${i === 0 ? pct : 0}%"></span>`;
-      el.title = item.blocked ? 'Bloqueado: límite de población alcanzado. Clic para cancelar.' : 'Clic para cancelar';
-      el.onclick = () => { g.cancelQueueItem(sel, i); this.renderQueue(); this.renderCommands(); };
-      q.appendChild(el);
-    });
+
+    // Sólo avanza el primero de la cola.
+    if (items.length && q.firstElementChild) {
+      q.firstElementChild._bar.style.height = `${clamp((items[0].progress / items[0].time) * 100, 0, 100)}%`;
+    }
   }
 
   /**
@@ -944,13 +986,14 @@ export class UI {
       cont.innerHTML = '';
       for (const b of busy) {
         const item = b.queue[0];
-        const more = b.queue.length - 1;
+        const total = b.queue.length;
         const el = document.createElement('button');
         el.className = 'prod' + (item.blocked ? ' blocked' : '');
         el.innerHTML = `<img src="${this.queueIcon(item)}" alt=""><span class="pbar"></span>${
-          more ? `<span class="pmore">+${more}</span>` : ''}`;
+          total > 1 ? `<span class="pmore">×${total}</span>` : ''}`;
         el.title = `${this.queueLabel(item)} · ${BUILDINGS[b.type].name}${
-          item.blocked ? ' (bloqueado: falta población)' : ''}\nClic para ir al edificio`;
+          total > 1 ? ` (${total} en cola)` : ''}${
+          item.blocked ? ' · bloqueado: falta población' : ''}\nClic para ir al edificio`;
         el.onclick = () => {
           this.select([b]);
           this.r.centerOn(b.cx, b.cy);
