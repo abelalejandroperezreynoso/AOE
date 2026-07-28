@@ -210,9 +210,12 @@ export class Game {
     this.fx.debris(b.cx, b.cy, 10 + b.size * 6);
     this.fx.decal(b.cx, b.cy, 'rubble');
     if (this.audio) this.audio.play('collapse');
-    // Los aldeanos que trabajaban aquí quedan libres.
+    // Los aldeanos que trabajaban aquí quedan libres; si estaban construyendo,
+    // intentan encadenar solos con otra obra pendiente que tengan a la vista.
     for (const u of this.units) {
-      if (u.task && u.task.target === b) u.task = null;
+      if (!u.task || u.task.target !== b) continue;
+      if (u.task.type === 'build') u.chainOrIdle(this, this.players[u.owner], b);
+      else u.task = null;
     }
     const i = this.selection.indexOf(b);
     if (i >= 0) this.selection.splice(i, 1);
@@ -351,6 +354,21 @@ export class Game {
       if (!d || !d.includes(res)) continue;
       const dd = dist(x, y, b.cx, b.cy);
       if (dd < bestD) { bestD = dd; best = b; }
+    }
+    return best;
+  }
+
+  /**
+   * Obra sin terminar del mismo jugador más cercana a (x,y), dentro del radio
+   * dado. La usan los aldeanos para encadenar construcciones: al terminar una,
+   * si hay otra a la vista, van solos a seguir con ella.
+   */
+  findUnbuiltNear(player, x, y, radius, exclude) {
+    let best = null, bestD = Infinity;
+    for (const b of player.buildings) {
+      if (b === exclude || b.built || b.dead) continue;
+      const d = dist(x, y, b.cx, b.cy);
+      if (d <= radius && d < bestD) { bestD = d; best = b; }
     }
     return best;
   }
