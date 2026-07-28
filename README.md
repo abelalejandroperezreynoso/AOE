@@ -4,32 +4,72 @@ Juego de **estrategia medieval en tiempo real** para navegador, inspirado en los
 clásicos del género. Recolecta recursos, haz crecer tu aldea, avanza por cuatro
 edades y conquista a tus rivales.
 
-No necesita instalación, servidor de aplicaciones ni compilación: es HTML, CSS y
-JavaScript modular puro. Todo el arte (unidades, edificios, terreno, iconos) y
-todo el sonido se **generan por código** en tiempo de ejecución, así que el juego
-completo pesa unos pocos cientos de kilobytes y no descarga ningún recurso
-externo.
+Se juega en solitario contra la máquina o **contra otra persona**, cada quien
+desde su dispositivo.
+
+El juego es HTML, CSS y JavaScript modular puro, sin compilación. Todo el arte
+(unidades, edificios, terreno, iconos) y todo el sonido se **generan por código**
+en tiempo de ejecución, así que pesa unos pocos cientos de kilobytes y no
+descarga ningún recurso externo.
 
 ## Jugar
 
 Sirve la carpeta con cualquier servidor estático:
 
 ```bash
-python3 -m http.server 8000
+npm start          # equivale a: node tools/dev-server.mjs
 # y entra en http://localhost:8000
 ```
 
 Hace falta un servidor (no vale abrir el archivo con `file://`) porque el juego
-usa módulos ES.
+usa módulos ES. `tools/dev-server.mjs` no tiene dependencias y sirve además la
+sala del multijugador, de modo que se puede probar una partida entre dos
+dispositivos de la misma red local. Para jugar sólo en solitario vale cualquier
+servidor estático, por ejemplo `python3 -m http.server 8000`.
 
 ## Publicar en Netlify
 
 El repositorio está listo para desplegarse tal cual:
 
 - **Desde Git**: conecta el repositorio en Netlify. `netlify.toml` indica que no
-  hay comando de compilación y que la carpeta a publicar es la raíz.
+  hay comando de compilación y que la carpeta a publicar es la raíz. Netlify
+  instalará por su cuenta la única dependencia del proyecto (`@netlify/blobs`),
+  que usa la función de la sala; el juego en sí no depende de nada.
 - **Arrastrando**: suelta la carpeta del proyecto en [Netlify Drop](https://app.netlify.com/drop).
+  Así se publica el juego, pero sin la función de la sala: el multijugador
+  necesita el despliegue desde Git o la CLI.
 - **Con la CLI**: `npx netlify-cli deploy --prod --dir=.`
+
+## Multijugador
+
+Uno contra uno, cada quien desde su dispositivo:
+
+1. En el menú principal, **Jugar con otra persona**.
+2. Escribe tu nombre y entra en la sala. Verás a quienes estén conectados.
+3. Pulsa **Invitar** en la persona con la que quieras jugar.
+4. Cuando acepte, la partida arranca en los dos dispositivos (unos 3 segundos).
+
+Quien envía la invitación hace de anfitrión: su dispositivo lleva la simulación
+y el otro le manda sus órdenes. **La partida viaja directa de un navegador al
+otro por WebRTC**, sin pasar por ningún servidor, con un consumo de unos 8 kB/s
+incluso con ejércitos grandes.
+
+El servidor sólo interviene para que los dos jugadores se encuentren, y deja de
+usarse en cuanto la partida empieza. En Netlify eso lo resuelve una función
+(`netlify/functions/lobby.mjs`) que guarda la presencia y las invitaciones en
+Netlify Blobs; no hace falta ningún servicio externo ni cuenta de terceros.
+
+Limitaciones conocidas:
+
+- Hace falta que **ambos navegadores puedan establecer una conexión directa**.
+  Funciona en la misma red local y en la mayoría de conexiones domésticas
+  gracias a los servidores STUN públicos, pero algunas redes muy restrictivas
+  (ciertas corporativas o móviles) lo impiden; para cubrir esos casos haría
+  falta un servidor TURN, que no es gratuito.
+- Si se corta la conexión, la partida termina y se avisa: no hay reconexión.
+- El anfitrión manda el estado completo, así que un invitado que abriese las
+  herramientas del navegador podría ver el mapa entero. En pantalla la niebla
+  de guerra funciona con normalidad para cada jugador.
 
 ## Cómo se juega
 
@@ -96,6 +136,12 @@ js/sprites.js       Arte procedural: todo se dibuja con Canvas
 js/ai.js            IA de los rivales
 js/ui.js            HUD, panel de órdenes, ratón, teclado y táctil
 js/audio.js         Efectos de sonido sintetizados con WebAudio
+js/lobby-ui.js      Pantalla de la sala de espera
+js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
+js/net/protocol.js  Codificación binaria del estado y de las órdenes
+js/net/session.js   Partida en red: anfitrión que simula, invitado que pinta
+netlify/functions/  Sala de espera (sólo para que dos jugadores se encuentren)
+tools/dev-server.mjs  Servidor local: juego + sala, sin dependencias
 ```
 
 Para depurar, el objeto de la partida está disponible en la consola como
@@ -110,6 +156,10 @@ Para depurar, el objeto de la partida está disponible en la consola como
   fotograma, y se guardan en caché.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
+- En multijugador el anfitrión manda diez instantáneas por segundo en binario y
+  el invitado interpola entre ellas para pintar a 60 fps. Tras una batalla de
+  80 unidades, el estado de ambos coincide exactamente y las posiciones difieren
+  menos de una décima de casilla.
 
 ## Aviso legal
 

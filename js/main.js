@@ -5,31 +5,54 @@ import { Renderer } from './render.js';
 import { UI, toggleFullscreen, fullscreenSupported, syncFullscreenUi } from './ui.js';
 import { AI } from './ai.js';
 import { Audio } from './audio.js';
+import { LobbyUI } from './lobby-ui.js';
+import { NetSession } from './net/session.js';
 
 const el = (id) => document.getElementById(id);
 
 const audio = new Audio();
 let game = null, renderer = null, ui = null, raf = 0;
 
-function startGame(opts) {
+/**
+ * Crea la partida. `net` sólo llega en multijugador y trae la conexión ya
+ * establecida con el otro jugador.
+ */
+function startGame(opts, net = null) {
   el('main-menu').classList.add('hidden');
   el('loading').classList.remove('hidden');
+  el('loading-text').textContent = net ? 'Sincronizando la partida...' : 'Generando el mundo...';
 
   // Un fotograma de respiro para que se vea la pantalla de carga.
   requestAnimationFrame(() => setTimeout(() => {
     try {
       game = new Game(opts);
-      game.ai = new AI(game);
+      if (net) {
+        const session = new NetSession(net.peer, net.role, game);
+        // Si se cae la conexión no hay ni ganador ni perdedor: se avisa y se
+        // cierra la partida, que sin el otro jugador no puede seguir.
+        session.onLost = () => {
+          if (game.over) return;
+          ui.notify('Se ha perdido la conexión con el otro jugador.', 'bad');
+          game.endGame(false, 'disconnect');
+        };
+      } else {
+        game.ai = new AI(game);
+      }
       el('app').classList.remove('hidden');
       renderer = new Renderer(el('game'), game);
       ui = new UI(game, renderer, audio);
       window.game = game; // útil para depurar desde la consola
 
-      const start = game.map.starts[0];
+      const start = game.map.starts[game.human.id] || game.map.starts[0];
       renderer.centerOn(start.x + 1, start.y + 1);
       renderer.resize();
       ui.refreshSelection();
-      ui.notify('Reúne recursos, avanza de edad y derrota a tus rivales.', 'good');
+      if (net) {
+        document.getElementById('btn-speed').classList.add('hidden');
+        ui.notify(`Partida contra ${game.players[net.role === 'host' ? 1 : 0].name}. ¡Suerte!`, 'good');
+      } else {
+        ui.notify('Reúne recursos, avanza de edad y derrota a tus rivales.', 'good');
+      }
 
       el('loading').classList.add('hidden');
       loop(performance.now());
@@ -39,6 +62,19 @@ function startGame(opts) {
     }
   }, 30));
 }
+
+// Multijugador: la sala entrega la conexión ya hecha y aquí sólo se arranca.
+const lobbyUi = new LobbyUI(({ peer, role, seed, mapSize, names }) => {
+  audio.ensure();
+  startGame({
+    opponents: 1,
+    difficulty: 'normal',
+    mapSize,
+    seed,
+    localPlayer: role === 'host' ? 0 : 1,
+    playerNames: names,
+  }, { peer, role });
+});
 
 let last = 0;
 function loop(now) {
@@ -94,4 +130,17 @@ function hash(str) {
 // Permite empezar con Enter desde el menú.
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !el('main-menu').classList.contains('hidden')) el('btn-start').click();
+});
+
+window.__lobbyUi = lobbyUi; // útil para depurar la conexión desde la consola
+
+// Si se cierra la pestaña estando en la sala, se avisa para no dejar un
+// jugador fantasma en la lista de los demás.
+window.addEventListener('pagehide', () => {
+  if (lobbyUi.lobby.id && !lobbyUi.launched) {
+    navigator.sendBeacon?.('/api/lobby', new Blob(
+      [JSON.stringify({ action: 'bye', id: lobbyUi.lobby.id, token: lobbyUi.lobby.token })],
+      { type: 'application/json' },
+    ));
+  }
 });
