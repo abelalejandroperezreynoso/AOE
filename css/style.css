@@ -376,9 +376,12 @@ body.cursor-attack #game { cursor: cell; }
   background: linear-gradient(180deg, #3a2c1c, #211810);
   border-bottom: 2px solid var(--panel-edge);
   z-index: 10;
+  /* Nunca en dos líneas: la barra tiene alto fijo y lo que se envuelve acaba
+     dibujado sobre el mapa. Antes que envolver, que se encoja. */
+  flex-wrap: nowrap;
 }
 
-.res-group { display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.res-group { display: flex; gap: 6px; flex-wrap: nowrap; min-width: 0; }
 .res {
   display: flex; align-items: center; gap: 6px;
   background: rgba(0,0,0,.32);
@@ -388,6 +391,7 @@ body.cursor-attack #game { cursor: cell; }
   font-size: 15px;
   font-weight: bold;
   min-width: 76px;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .res span.warn, #res-pop.warn { color: #ff9a92; }
@@ -412,8 +416,9 @@ body.cursor-attack #game { cursor: cell; }
   white-space: nowrap;
 }
 
-.right-group { display: flex; align-items: center; gap: 8px; }
-.tbtn { padding: 5px 11px; font-size: 13px; }
+.right-group { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: nowrap; }
+/* El texto de los botones tampoco parte: «Ociosos: 3» caía en dos renglones. */
+.tbtn { padding: 5px 11px; font-size: 13px; white-space: nowrap; }
 .tbtn.icon { padding: 5px 8px; display: flex; align-items: center; }
 
 /* Icono de pantalla completa: cuatro esquinas que se invierten al activarla. */
@@ -749,16 +754,20 @@ button.cmd, button.qitem, button.prod { margin: 0; }
 }
 
 /* Móviles: la barra superior no debe envolverse nunca y las órdenes van abajo. */
-@media (max-width: 680px) {
-  /* Sin suelo: los paneles ya traen su alto y la barra se ajusta a ellos. */
-  :root { --bar-h: 34px; --bottom-h: 162px; --bottom-min: 0px; --prod-h: 42px; }
+/*
+ * Barra superior compacta. Se aplica tanto en móvil de pie (poco ancho) como
+ * en apaisado (poco alto): ahí la muesca se lleva unos 44 px por lado, así que
+ * el ancho útil es mucho menor que el de la pantalla y con el tamaño de
+ * escritorio la barra se envolvía en dos líneas y se metía en el mapa.
+ */
+@media (max-width: 680px), (max-height: 430px) {
   #topbar {
     padding: var(--sa-top) calc(5px + var(--sa-right)) 0 calc(5px + var(--sa-left));
     gap: 5px;
   }
   /* Los recursos ceden ancho antes que los botones de la derecha, pero nunca
      se recortan: cada ficha se encoge hasta su contenido. */
-  .res-group { flex: 1 1 auto; flex-wrap: nowrap; gap: 3px; }
+  .res-group { flex: 1 1 auto; gap: 3px; }
   .res {
     min-width: 0; flex: 0 1 auto; padding: 2px 5px; font-size: 12px; gap: 3px;
     border-radius: 4px;
@@ -766,9 +775,14 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   .dot { width: 10px; height: 10px; }
   .right-group { gap: 4px; flex: none; }
   .tbtn { padding: 3px 6px; font-size: 11px; }
-  #idle-villager { display: none; }
   .tbtn-long { display: none; } /* «Vel. 1x» pasa a ser solo «1x» */
   .clock { font-size: 12px; min-width: 30px; }
+}
+
+@media (max-width: 680px) {
+  /* Sin suelo: los paneles ya traen su alto y la barra se ajusta a ellos. */
+  :root { --bar-h: 34px; --bottom-h: 162px; --bottom-min: 0px; --prod-h: 42px; }
+  #idle-villager { display: none; } /* con este ancho no cabe */
 
   #bottombar {
     flex-wrap: wrap; gap: 5px;
