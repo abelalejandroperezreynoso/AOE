@@ -22,6 +22,8 @@
   /* Alto real que ocupan las barras, ya con las zonas seguras incluidas. */
   --top-total: calc(var(--bar-h) + var(--sa-top));
   --bottom-total: calc(var(--bottom-h) + var(--sa-bottom));
+
+  --prod-h: 46px; /* alto total de la tira de producción, con bordes y relleno */
 }
 
 * { box-sizing: border-box; }
@@ -429,6 +431,54 @@ body.is-fullscreen .fs-shrink { display: inline; }
 .tbtn.active { background: linear-gradient(180deg, #a8862c, #6d5314); color: #251b09; font-weight: bold; }
 .clock { font-variant-numeric: tabular-nums; color: #cbb68c; font-size: 14px; min-width: 44px; text-align: right; }
 
+/* Tira de producción */
+
+#production {
+  position: absolute;
+  top: calc(var(--top-total) + 2px);
+  left: calc(3px + var(--sa-left));
+  max-width: calc(100% - 6px - var(--sa-left) - var(--sa-right));
+  display: flex; gap: 5px;
+  /* El relleno deja sitio al halo de «bloqueado»: al desbordar se recortaría. */
+  padding: 3px;
+  overflow-x: auto; overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  z-index: 11;
+}
+
+.prod {
+  position: relative; flex: none; padding: 0;
+  width: 38px; height: 38px;
+  border-radius: 6px;
+  border: 1px solid #6b5334;
+  background: linear-gradient(180deg, #4d3b26, #2a1f14);
+  box-shadow: 0 3px 10px rgba(0,0,0,.55);
+  overflow: hidden;
+}
+.prod img { width: 100%; height: 100%; display: block; pointer-events: none; }
+.prod .pbar {
+  position: absolute; left: 0; bottom: 0; height: 4px;
+  background: #6fd06f;
+  pointer-events: none;
+  transition: width .1s linear;
+}
+.prod .pmore {
+  position: absolute; top: 0; right: 0;
+  padding: 0 3px;
+  font-size: 10px; font-weight: bold;
+  color: #f0e6c8; background: rgba(0,0,0,.65);
+  border-bottom-left-radius: 5px;
+  pointer-events: none;
+}
+/* Bloqueado: no hay población para lo que viene, así que la cola no avanza.
+   Se marca con fuerza porque significa que la producción está parada. */
+.prod.blocked {
+  border-color: #e0554a;
+  box-shadow: 0 0 0 2px rgba(224,85,74,.35), 0 3px 10px rgba(0,0,0,.55);
+}
+.prod.blocked img { filter: grayscale(.55) brightness(.8); }
+.prod.blocked .pbar { background: #e0554a; }
+
 /* Avisos */
 
 #notifications {
@@ -441,6 +491,8 @@ body.is-fullscreen .fs-shrink { display: inline; }
   z-index: 12;
   pointer-events: none;
 }
+/* Con la tira de producción a la vista, los avisos bajan para no taparla. */
+body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px); }
 .notif {
   background: rgba(24,17,10,.9);
   border: 1px solid #6b5334;
@@ -664,7 +716,7 @@ body.is-fullscreen .fs-shrink { display: inline; }
 
 /* Móviles: la barra superior no debe envolverse nunca y las órdenes van abajo. */
 @media (max-width: 680px) {
-  :root { --bar-h: 34px; --bottom-h: 158px; }
+  :root { --bar-h: 34px; --bottom-h: 158px; --prod-h: 42px; }
   #topbar {
     padding: var(--sa-top) calc(5px + var(--sa-right)) 0 calc(5px + var(--sa-left));
     gap: 5px;
@@ -709,6 +761,8 @@ body.is-fullscreen .fs-shrink { display: inline; }
   .cmd img { width: 48px; height: 48px; }
   .mm-hint { display: none; }
   .hint { font-size: 11px; }
+  .prod { width: 34px; height: 34px; }
+  .prod .pmore { font-size: 9px; }
   #notifications { max-width: 92vw; }
   .notif { font-size: 12.5px; padding: 5px 11px; }
 }
