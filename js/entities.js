@@ -453,13 +453,13 @@ export class Unit {
 
   doBuild(g, dt, speed, player) {
     const b = this.task.target;
-    if (!b || b.dead) { this.task = null; return; }
-    if (b.built && b.hp >= b.maxHp) { this.task = null; return; }
+    if (!b || b.dead) { this.chainOrIdle(g, player, b); return; }
+    if (b.built && b.hp >= b.maxHp) { this.chainOrIdle(g, player, b); return; }
     const d = g.edgeDist(this, b);
     if (d > 0.8) {
       if (!this.path && this.repathCd <= 0) {
         const goals = ringTiles(g.map, b.tx, b.ty, b.size, b.size, 1);
-        if (!goals.length || !this.setDestination(g, b.cx, b.cy, goals)) { this.task = null; return; }
+        if (!goals.length || !this.setDestination(g, b.cx, b.cy, goals)) { this.chainOrIdle(g, player, b); return; }
       }
       if (this.path) this.followPath(g, dt, speed);
       else this.moveToward(g, b.cx, b.cy, speed * dt);
@@ -478,8 +478,20 @@ export class Unit {
       }
     } else {
       b.hp = Math.min(b.maxHp, b.hp + (b.maxHp / BUILDINGS[b.type].time) * 0.75 * dt);
-      if (b.hp >= b.maxHp) this.task = null;
+      if (b.hp >= b.maxHp) this.chainOrIdle(g, player, b);
     }
+  }
+
+  /**
+   * Al quedarse sin obra, busca otra construcción sin terminar del mismo
+   * jugador dentro de su rango de visión y se va sola a seguir con ella; si
+   * no encuentra ninguna, se queda libre (como antes de esta mecánica).
+   */
+  chainOrIdle(g, player, finished) {
+    const radius = UNITS.villager.los;
+    const next = g.findUnbuiltNear(player, this.x, this.y, radius, finished);
+    if (next) { this.task = { type: 'build', target: next }; this.path = null; this.repathCd = 0; }
+    else this.task = null;
   }
 
   // --- Combate --------------------------------------------------------------
