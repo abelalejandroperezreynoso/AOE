@@ -55,7 +55,13 @@ export function ramp(color) {
 // --- Valores por defecto ----------------------------------------------------
 
 const SKIN = '#d9a878', LEGS = '#3e3a33', HELM = '#a7a9b0';
-const soldier = (extra) => ({ skin: SKIN, legs: LEGS, helmet: HELM, ...extra, scale: 1 });
+const CLOTH = '#b9a279';   // lino del jubón que asoma bajo la armadura
+const LEATHER = '#7a5432'; // correas, cinturón y botas
+const PLUME = '#e0dcd2';   // crin del penacho
+
+const soldier = (extra) => ({
+  skin: SKIN, legs: LEGS, helmet: HELM, cloth: CLOTH, leather: LEATHER, ...extra, scale: 1,
+});
 
 /**
  * Aspecto de cada tipo. Los campos que un objeto no tiene sencillamente no
@@ -64,20 +70,23 @@ const soldier = (extra) => ({ skin: SKIN, legs: LEGS, helmet: HELM, ...extra, sc
  */
 export const LOOK = {
   unit: {
-    villager: { skin: SKIN, legs: LEGS, metal: '#b9bcc4', wood: '#6b4d2c', scale: 1 },
+    villager: {
+      skin: SKIN, legs: LEGS, cloth: CLOTH, leather: LEATHER,
+      metal: '#b9bcc4', wood: '#6b4d2c', scale: 1,
+    },
     militia: soldier({ metal: '#c9ccd4', wood: '#8c6b3a' }),
     manatarms: soldier({ metal: '#c9ccd4', wood: '#8c6b3a' }),
-    longswordsman: soldier({ metal: '#c9ccd4', wood: '#8c6b3a' }),
-    champion: soldier({ metal: '#c9ccd4', wood: '#8c6b3a' }),
+    longswordsman: soldier({ metal: '#c9ccd4', wood: '#8c6b3a', plume: PLUME }),
+    champion: soldier({ metal: '#c9ccd4', wood: '#8c6b3a', plume: PLUME }),
     spearman: soldier({ metal: '#d2d6de', wood: '#7a5c33' }),
     pikeman: soldier({ metal: '#d2d6de', wood: '#7a5c33' }),
     archer: soldier({ metal: '#d2d6de', wood: '#7a4f28' }),
     crossbowman: soldier({ metal: '#8d8f96', wood: '#5e4526' }),
     arbalester: soldier({ metal: '#8d8f96', wood: '#5e4526' }),
     skirmisher: soldier({ metal: '#d2d6de', wood: '#7a5c33' }),
-    scout: soldier({ horse: '#8a6a4a' }),
-    knight: soldier({ horse: '#4a3f38' }),
-    cavalier: soldier({ horse: '#4a3f38' }),
+    scout: soldier({ horse: '#8a6a4a', metal: '#c9ccd4', wood: '#8c6b3a' }),
+    knight: soldier({ horse: '#4a3f38', metal: '#c9ccd4', wood: '#8c6b3a' }),
+    cavalier: soldier({ horse: '#4a3f38', metal: '#c9ccd4', wood: '#8c6b3a', plume: PLUME }),
     ram: { wood: '#6b4f2c', metal: '#8d8f96', wheel: '#4a3720', scale: 1 },
     mangonel: { wood: '#6b4f2c', wheel: '#4a3720', scale: 1 },
     trebuchet: { wood: '#6b4f2c', wheel: '#4a3720', scale: 1 },
@@ -138,7 +147,8 @@ const scale = {
 export const LOOK_FIELDS = {
   unit: [
     color('skin', 'Piel'), color('legs', 'Calzas'), color('helmet', 'Yelmo'),
-    color('metal', 'Metal'), color('wood', 'Madera'), color('horse', 'Montura'),
+    color('metal', 'Metal'), color('wood', 'Madera'), color('cloth', 'Jubón'),
+    color('leather', 'Cuero'), color('plume', 'Penacho'), color('horse', 'Montura'),
     color('wheel', 'Ruedas'), scale,
   ],
   building: [

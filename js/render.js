@@ -44,7 +44,8 @@ export class Renderer {
     this.canvas.height = Math.max(1, Math.round(h * dpr));
     this.dpr = dpr;
     // Los sprites se guardan a la densidad de la pantalla: a zoom 1 la copia
-    // sale píxel a píxel en vez de ampliada.
+    // sale píxel a píxel en vez de ampliada. Cada fotograma se sube o se baja
+    // según lo cerca que esté la cámara (ver `render`).
     setSpriteQuality(dpr);
     this.w = w; this.h = h;
     const fw = Math.ceil(w / this.fogScale) + this.fogMargin * 2;
@@ -123,11 +124,15 @@ export class Renderer {
 
     /*
      * Ampliar es lo que emborrona: por debajo de 1:1 los mapas de bits ya
-     * horneados se ven perfectos, y por encima hay que volver a dibujar. Como
-     * cuanto más cerca está la cámara menos cabe en pantalla, la ruta nítida
-     * es también la que menos cosas tiene que dibujar.
+     * horneados se ven perfectos, y por encima hay que volver a dibujar. Antes
+     * de llegar a eso está la caché, que se hornea a la resolución que pida la
+     * cámara: copiar un mapa de bits cuesta una fracción de lo que cuesta
+     * volver a dibujar a un soldado entero con su armadura, así que sólo se
+     * pinta a mano cuando ni al máximo (3×) daría la talla. Y ahí ya está la
+     * cámara tan cerca que caben pocas unidades en pantalla.
      */
-    this.sharp = z > 1;
+    setSpriteQuality(Math.min(3, Math.ceil(this.dpr * z)));
+    this.sharp = this.dpr * z > 3;
     ctx.imageSmoothingEnabled = true;
 
     const b = this.visibleTileBounds();

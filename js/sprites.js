@@ -265,166 +265,873 @@ const UW = 48, UH = 60, UOX = 24, UOY = 48;
 const BOWSTRING = '#e8e4d8';
 // Hueco extra por encima del ancla: al jinete se le salía la cabeza del lienzo
 // y al trabuquete el brazo al lanzar.
-const HEADROOM = { cavalry: 14, siege: 8 };
+const HEADROOM = { cavalry: 14, siege: 8, infantry: 6 };
+
+/*
+ * Anatomía del muñeco, en píxeles desde sus pies (hacia arriba es negativo).
+ * Todas las unidades a pie salen de este mismo esqueleto —mismas caderas,
+ * mismos hombros, misma cabeza— y lo que las distingue es el equipo que se les
+ * cuelga encima, no el cuerpo.
+ */
+const BODY = {
+  sole: 0, ankle: -3.2, knee: -8.8, hip: -14, waist: -17.6,
+  chest: -21.6, shoulder: -25.4, neck: -27.4, head: -32.4, headR: 4.5,
+};
+
+/*
+ * El equipo de cada tipo:
+ *   armor   0 ropa, 1 cuero, 2 cota de malla, 3 coraza, 4 coraza y hombreras
+ *   helm    'cap' capacete, 'nasal' con nasal y cofia, 'great' yelmo cerrado,
+ *           'crest' yelmo cerrado con penacho, 'hood' capucha de tela
+ *   shield  'round' redondo, 'heater' de cometa, 'buckler' rodela
+ *   cape    largo de la capa, en fracción del cuerpo (0 = sin capa)
+ *
+ * Las mejoras de una misma línea suben de escalón, así que un campeón y una
+ * milicia se distinguen de un vistazo aunque salgan del mismo dibujo.
+ */
+const GEAR = {
+  villager: { armor: 0, helm: null, cape: 0 },
+  militia: { armor: 1, helm: 'cap', shield: 'round', cape: 0.5 },
+  manatarms: { armor: 2, helm: 'nasal', shield: 'round', cape: 0.75 },
+  longswordsman: { armor: 3, helm: 'great', shield: 'heater', cape: 0.95 },
+  champion: { armor: 4, helm: 'crest', shield: 'heater', cape: 1.1 },
+  spearman: { armor: 1, helm: 'cap', shield: 'buckler', cape: 0.45 },
+  pikeman: { armor: 2, helm: 'nasal', shield: 'buckler', cape: 0.7 },
+  archer: { armor: 0, helm: 'hood', cape: 0 },
+  crossbowman: { armor: 1, helm: 'cap', cape: 0 },
+  arbalester: { armor: 2, helm: 'nasal', cape: 0 },
+  skirmisher: { armor: 1, helm: 'hood', cape: 0 },
+  scout: { armor: 1, helm: 'cap', cape: 0.55 },
+  knight: { armor: 3, helm: 'great', shield: 'heater', cape: 1 },
+  cavalier: { armor: 4, helm: 'crest', shield: 'heater', cape: 1.1 },
+};
+const NO_GEAR = { armor: 0, helm: null, cape: 0 };
+
+/*
+ * Colores ya resueltos de una unidad. El soldado toca dos docenas de tonos
+ * (cara al sol, cara en sombra, filo, brillo del yelmo...) y derivarlos cuesta
+ * más que pintarlos, así que se hace una vez por tipo y color de jugador. Como
+ * salen de `look`, que el catálogo puede cambiar, el caché se vacía con los
+ * demás.
+ */
+const palCache = new Map();
+
+function palette(type, colorIdx) {
+  const key = `${type}|${colorIdx}`;
+  const hit = palCache.get(key);
+  if (hit) return hit;
+  const col = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length];
+  const L = look('unit', type);
+  const [metalL, metal, metalD] = ramp(L.metal || '#b9bcc4');
+  const [helmL, helm, helmD] = ramp(L.helmet || L.metal || '#a7a9b0');
+  const [woodL, wood, woodD] = ramp(L.wood || '#7a5c33');
+  const [legsL, legs] = ramp(L.legs || '#3e3a33');
+  const [leatherL, leather, leatherD] = ramp(L.leather || '#7a5432');
+  const skin = L.skin || '#d9a878';
+  const cloth = L.cloth || '#b9a279';
+  const p = {
+    col,
+    tunic: col.main, tunicL: shade(col.main, 0.2), tunicD: col.dark,
+    cape: shade(col.main, -0.06), capeL: mix(col.main, col.light, 0.5),
+    capeD: shade(col.dark, -0.22),
+    skin, skinL: shade(skin, 0.13), skinD: shade(skin, -0.26),
+    metal, metalL, metalD, gleam: shade(metalL, 0.32),
+    helm, helmL, helmD,
+    wood, woodL, woodD,
+    legs, legsL,
+    leather, leatherL, leatherD,
+    cloth, clothD: shade(cloth, -0.2),
+    hair: L.hair || '#6b4a2c',
+    plume: L.plume || '#e0dcd2',
+    mail: mix(metalD, '#3c3f46', 0.5), mailL: mix(metal, '#5a5e66', 0.4),
+  };
+  palCache.set(key, p);
+  return p;
+}
 
 function limb(ctx, x1, y1, x2, y2, w, color) {
   ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
 }
 
-/**
- * Dibuja una figura humanoide. f=0..3 ciclo de marcha, 4/5 ataque.
- * dir=1 mira a la derecha, dir=-1 a la izquierda. back=true de espaldas.
- */
-function humanoid(ctx, o) {
-  const { tunic, trim, skin, helm, legs, f, back } = o;
-  const [legsL, legsM] = ramp(legs);
-  const walk = f < 4 ? Math.sin((f / 4) * Math.PI * 2) : 0;
-  const cx = 0, ground = 0;
-  const bob = f < 4 ? Math.abs(walk) * -1.2 : 0;
-  const hipY = ground - 13 + bob;
-  const shoulderY = ground - 24 + bob;
-
-  // Piernas
-  limb(ctx, cx - 1, hipY, cx - 2 + walk * 4, ground, 4, legsM);
-  limb(ctx, cx + 1, hipY, cx + 2 - walk * 4, ground, 4, legsL);
-  // Torso
-  ctx.fillStyle = tunic;
-  ctx.beginPath();
-  ctx.moveTo(cx - 5, hipY + 1); ctx.lineTo(cx - 5.5, shoulderY);
-  ctx.lineTo(cx + 5.5, shoulderY); ctx.lineTo(cx + 5, hipY + 1);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = trim;
-  ctx.fillRect(cx - 5, hipY - 2, 10, 2.5);
-  // Cabeza
-  ctx.fillStyle = skin;
-  ctx.beginPath(); ctx.arc(cx + 0.5, shoulderY - 5, 4.4, 0, Math.PI * 2); ctx.fill();
-  if (!back) {
-    ctx.fillStyle = 'rgba(0,0,0,.55)';
-    ctx.fillRect(cx + 2, shoulderY - 6.5, 1.2, 1.2);
-  }
-  if (helm) {
-    ctx.fillStyle = helm;
-    ctx.beginPath();
-    ctx.arc(cx + 0.5, shoulderY - 5.5, 4.9, Math.PI, Math.PI * 2); ctx.fill();
-    ctx.fillRect(cx - 4.4, shoulderY - 6, 9.4, 1.8);
-  }
-  return { hipY, shoulderY, cx, ground, walk };
+function dot(ctx, x, y, r, color) {
+  ctx.fillStyle = color;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
 }
 
-function drawUnit(ctx, type, colorIdx, f, back) {
-  const col = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length];
-  const L = look('unit', type);
-  const tunic = col.main, trim = col.dark, skin = L.skin;
+// --- Piezas del soldado -----------------------------------------------------
+//
+// La luz entra por arriba y por la izquierda: lo que mira a ese lado va con el
+// tono claro de su material y lo que le da la espalda con el oscuro. Todas las
+// piezas siguen ese acuerdo, que es lo que hace que el muñeco parezca de bulto
+// y no una pegatina.
+
+/** Pierna: muslo, pantorrilla, bota y, si va acorazado, greba y rodillera. */
+function leg(ctx, P, G, phase, front, bob) {
+  const hipX = front ? 1.4 : -1.4;
+  const kneeX = hipX + phase * 2.4;
+  const footX = hipX + phase * 4.6;
+  const lift = Math.max(0, phase) * 1.5; // el pie que adelanta se despega
+  const hipY = BODY.hip + bob;
+  const kneeY = BODY.knee + bob * 0.4 - lift * 0.5;
+  const ankY = BODY.ankle - lift;
+  const hose = front ? P.legsL : P.legs;
+  limb(ctx, hipX, hipY, kneeX, kneeY, 4.6, hose);
+  limb(ctx, kneeX, kneeY, footX, ankY, 3.8, hose);
+  if (G.armor >= 3) {
+    // Greba y rodillera: una tira de hierro sobre la espinilla, no toda la pierna.
+    limb(ctx, (kneeX + footX) / 2 + 0.4, (kneeY + ankY) / 2, footX + 0.6, ankY, 2.2,
+      front ? P.metal : P.metalD);
+    dot(ctx, kneeX + 0.2, kneeY + 0.4, 1.5, front ? P.metal : P.metalD);
+  }
+  // Bota: caña, empeine y suela.
+  const sole = BODY.sole - lift;
+  const lea = front ? P.leather : P.leatherD;
+  poly(ctx, [
+    [footX - 2.6, ankY - 1.2], [footX + 2.4, ankY - 1.2],
+    [footX + 4.8, sole - 1.6], [footX + 4.8, sole - 0.9], [footX - 2.8, sole - 0.9],
+  ], lea);
+  poly(ctx, [
+    [footX - 2.9, sole - 1.1], [footX + 4.9, sole - 1.1],
+    [footX + 4.9, sole], [footX - 2.9, sole],
+  ], P.leatherD);
+}
+
+/** Piernas del jinete: rodilla doblada sobre la silla y pie en el estribo. */
+function ridingLegs(ctx, P, G) {
+  const hipY = BODY.hip, kneeY = hipY + 1.5, footY = hipY + 9;
+  for (const [side, tone] of [[-1, P.legs], [1, P.legsL]]) {
+    const kx = 4.2 + side * 0.8, fx = 1.8 + side * 0.8;
+    limb(ctx, side * 1.2, hipY, kx, kneeY, 4.6, tone);
+    limb(ctx, kx, kneeY, fx, footY, 3.8, tone);
+    if (G.armor >= 3) limb(ctx, kx, kneeY + 0.5, fx, footY, 3, side < 0 ? P.metalD : P.metal);
+    poly(ctx, [
+      [fx - 2.4, footY - 1.4], [fx + 1.6, footY - 1.4],
+      [fx + 4, footY + 0.4], [fx - 2.6, footY + 0.4],
+    ], side < 0 ? P.leatherD : P.leather);
+    // Estribo.
+    ctx.strokeStyle = P.metalD; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(fx + 0.4, footY + 0.6, 2.2, 0, Math.PI); ctx.stroke();
+  }
+}
+
+/** Faldón de la túnica, con ribete y las escarcelas de hierro por encima. */
+function skirt(ctx, P, G, walk) {
+  const y0 = BODY.waist, y1 = BODY.hip + 3.6;
+  const sway = walk * 0.9;
+  poly(ctx, [[-4.8, y0], [4.8, y0], [5.8 + sway, y1], [-5.8 + sway, y1]], P.tunic);
+  // Mitad en sombra y ribete del bajo.
+  poly(ctx, [[0.8, y0], [4.8, y0], [5.8 + sway, y1], [1.4 + sway, y1]], P.tunicD);
+  poly(ctx, [
+    [-5.8 + sway, y1 - 1.3], [5.8 + sway, y1 - 1.3],
+    [5.8 + sway, y1], [-5.8 + sway, y1],
+  ], P.tunicD);
+  if (G.armor >= 2) {
+    // Tiras de cuero bajo el faldón.
+    ctx.fillStyle = P.leatherD;
+    for (let i = -2; i <= 2; i++) ctx.fillRect(i * 2.2 + sway - 0.7, y1 - 0.4, 1.6, 2.4);
+  }
+  if (G.armor >= 3) {
+    // Escarcelas: dos lamas de hierro sobre la cadera.
+    poly(ctx, [[-5.2, y0 + 0.6], [5.2, y0 + 0.6], [5.6, y0 + 2.4], [-5.6, y0 + 2.4]], P.metal);
+    poly(ctx, [[-5.6, y0 + 2.4], [5.6, y0 + 2.4], [6, y0 + 4.2], [-6, y0 + 4.2]], P.metalD);
+    ctx.fillStyle = P.metalL;
+    ctx.fillRect(-5, y0 + 0.8, 3.4, 0.8);
+  }
+}
+
+/** Torso: túnica, protección según el escalón, cinturón y hombreras. */
+function torso(ctx, P, G) {
+  const sh = BODY.shoulder, ch = BODY.chest, wa = BODY.waist + 0.6, R = 6.3;
+  // Silueta: hombros anchos que se estrechan en la cintura.
+  poly(ctx, [
+    [-R + 0.6, sh + 0.6], [R - 0.2, sh + 0.6], [R - 0.5, ch],
+    [4.6, wa], [-4.6, wa], [-R + 0.9, ch],
+  ], P.tunic);
+  // Costado en sombra y luz de canto en el hombro izquierdo.
+  poly(ctx, [[1.2, sh + 0.8], [R - 0.2, sh + 0.6], [R - 0.5, ch], [4.6, wa], [1.6, wa]], P.tunicD);
+  poly(ctx, [[-R + 0.6, sh + 0.8], [-R + 2.4, sh + 0.8], [-R + 2.6, ch], [-R + 0.9, ch]], P.tunicL);
+  // Escote: asoma la camisa de lino de debajo.
+  poly(ctx, [[-2.6, sh + 0.2], [2.6, sh + 0.2], [2.2, sh + 2.2], [-2.2, sh + 2.2]], P.cloth);
+  poly(ctx, [[0.4, sh + 0.4], [2.6, sh + 0.2], [2.2, sh + 2.2], [0.4, sh + 2.2]], P.clothD);
+
+  if (G.armor === 1) {
+    // Coleto de cuero con sus costuras.
+    poly(ctx, [[-4.4, sh + 1.6], [4.4, sh + 1.6], [4, wa - 0.4], [-4, wa - 0.4]], P.leather);
+    poly(ctx, [[1, sh + 1.6], [4.4, sh + 1.6], [4, wa - 0.4], [1, wa - 0.4]], P.leatherD);
+    ctx.strokeStyle = P.leatherL; ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(-0.2, sh + 2); ctx.lineTo(-0.2, wa - 0.8); ctx.stroke();
+  } else if (G.armor === 2) {
+    // Cota de malla, y encima la sobreveste del color del jugador.
+    poly(ctx, [[-5.4, sh + 1], [5.2, sh + 1], [4.6, wa], [-4.6, wa]], P.mail);
+    ctx.fillStyle = P.mailL;
+    for (let y = sh + 2.4; y < wa - 0.6; y += 1.6) {
+      for (let x = -4.4; x < 4.4; x += 1.8) ctx.fillRect(x + (y % 3.2 < 1.6 ? 0 : 0.9), y, 0.9, 0.7);
+    }
+    poly(ctx, [[-2.6, sh + 1.4], [2.6, sh + 1.4], [2.4, wa], [-2.4, wa]], P.tunic);
+    poly(ctx, [[0.4, sh + 1.4], [2.6, sh + 1.4], [2.4, wa], [0.4, wa]], P.tunicD);
+  } else if (G.armor >= 3) {
+    // Coraza: peto abombado, con el brillo por el lado de la luz.
+    ctx.fillStyle = P.metal;
+    ctx.beginPath();
+    ctx.moveTo(-5, sh + 1.4);
+    ctx.lineTo(5, sh + 1.4);
+    ctx.quadraticCurveTo(5.4, ch + 2, 3.4, wa + 0.4);
+    ctx.lineTo(-3.4, wa + 0.4);
+    ctx.quadraticCurveTo(-5.4, ch + 2, -5, sh + 1.4);
+    ctx.closePath(); ctx.fill();
+    poly(ctx, [[1.4, sh + 1.4], [5, sh + 1.4], [4.6, ch + 3], [3.4, wa + 0.4], [1.8, wa + 0.4]], P.metalD);
+    poly(ctx, [[-4.2, sh + 2], [-2.6, sh + 2], [-2.2, wa], [-3.4, wa]], P.metalL);
+    ctx.fillStyle = P.gleam; ctx.fillRect(-3.9, sh + 2.4, 0.7, 4.4);
+    // Nervio central y remaches.
+    ctx.strokeStyle = P.metalD; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.moveTo(0, sh + 2.2); ctx.lineTo(0.4, wa); ctx.stroke();
+    dot(ctx, -3.6, sh + 2.2, 0.7, P.metalL);
+    dot(ctx, 3.4, sh + 2.2, 0.7, P.metalD);
+  }
+
+  if (G.armor >= 1) {
+    // Cinturón con hebilla.
+    poly(ctx, [[-4.8, wa - 1.4], [4.8, wa - 1.4], [4.8, wa + 0.6], [-4.8, wa + 0.6]], P.leatherD);
+    ctx.fillStyle = P.woodL; ctx.fillRect(-1.2, wa - 1.6, 2.6, 2.4);
+    ctx.fillStyle = P.woodD; ctx.fillRect(-0.4, wa - 1, 1, 1.2);
+  }
+  if (G.armor >= 2) {
+    // Gola.
+    poly(ctx, [[-3.4, sh + 0.4], [3.4, sh + 0.4], [3, sh + 2], [-3, sh + 2]], P.metalD);
+    ctx.fillStyle = P.metalL; ctx.fillRect(-3, sh + 0.6, 3, 0.8);
+  }
+  if (G.armor >= 3) {
+    // Hombreras: casquete de hierro sobre cada hombro.
+    for (const [side, tone] of [[-1, P.metal], [1, P.metalD]]) {
+      ctx.fillStyle = tone;
+      ctx.beginPath();
+      ctx.ellipse(side * 5.4, sh + 1.8, 2.8, 2.4, side * 0.3, Math.PI, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(side * 5.4 - 2.8, sh + 1.6, 5.6, 2.2);
+      if (G.armor >= 4) {
+        // Reborde y remache de la hombrera de campeón.
+        ctx.fillStyle = side < 0 ? P.metalL : P.metal;
+        ctx.fillRect(side * 5.4 - 2.8, sh + 3.4, 5.6, 0.9);
+        dot(ctx, side * 5.4, sh + 1.4, 0.8, side < 0 ? P.metalL : P.metal);
+      }
+    }
+  }
+}
+
+/** Capa del color del jugador, que ondea con el paso. */
+function cape(ctx, P, G, walk, back) {
+  if (!G.cape) return;
+  const top = BODY.shoulder + 0.4;
+  const bottom = BODY.shoulder + 22 * G.cape;
+  const mid = (top + bottom) / 2;
+  const sway = walk * 1.8;
+  // La capa vuela hacia atrás lo bastante como para verse por detrás del
+  // escudo; de espaldas se abre todavía más y tapa casi todo el cuerpo.
+  const w = back ? 1.35 : 1;
+  ctx.beginPath();
+  ctx.moveTo(2.4, top);
+  ctx.lineTo(-4.4, top + 0.4);
+  ctx.quadraticCurveTo(-11.4 * w - sway, mid, -10 * w - sway * 1.5, bottom);
+  ctx.quadraticCurveTo(-3, bottom + 1.8, 2.6 - sway * 0.4, bottom - 1.4);
+  ctx.quadraticCurveTo(5.4 * w, mid, 3.2, top + 1);
+  ctx.closePath();
+  ctx.fillStyle = P.cape; ctx.fill();
+  // Pliegues: el que da al viento va claro y el hueco, oscuro.
+  ctx.strokeStyle = P.capeD; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-2.6, top + 2);
+  ctx.quadraticCurveTo(-6.4 * w - sway, mid, -5.6 * w - sway, bottom - 1.4);
+  ctx.moveTo(1.4, top + 2.6);
+  ctx.quadraticCurveTo(0.2, mid, -0.4 - sway * 0.5, bottom - 1.6);
+  ctx.stroke();
+  ctx.strokeStyle = P.capeL; ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(-3.8, top + 1.4);
+  ctx.quadraticCurveTo(-10 * w - sway, mid, -8.8 * w - sway * 1.4, bottom - 1);
+  ctx.stroke();
+  // Broche en el hombro.
+  dot(ctx, 2.2, top + 0.8, 1.4, P.woodL);
+  dot(ctx, 2.5, top + 1.1, 0.6, P.woodD);
+}
+
+/** Cabeza, cuello y yelmo. */
+function head(ctx, P, G, back) {
+  const hy = BODY.head, R = BODY.headR;
+  const style = G.helm;
+  limb(ctx, 0, BODY.neck + 1.8, 0.4, BODY.neck - 1.4, 4, P.skinD);
+  if (G.armor >= 2 && style !== 'great' && style !== 'crest') {
+    // Cofia de malla: enmarca la cara y baja hasta los hombros.
+    ctx.fillStyle = P.mail;
+    ctx.beginPath(); ctx.ellipse(0.2, hy + 0.8, R + 1.4, R + 2, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = P.mailL;
+    ctx.beginPath(); ctx.ellipse(-2, hy - 0.4, R * 0.6, R * 0.9, 0, Math.PI, Math.PI * 2); ctx.fill();
+  }
+
+  if (style === 'great' || style === 'crest') {
+    // Yelmo cerrado: no se ve la cara, sólo la vista y los respiraderos.
+    ctx.fillStyle = P.helm;
+    ctx.beginPath();
+    ctx.moveTo(-R - 0.4, hy - 1);
+    ctx.quadraticCurveTo(0.2, hy - R - 2.6, R + 0.8, hy - 1);
+    ctx.lineTo(R + 0.6, hy + R - 0.6);
+    ctx.quadraticCurveTo(0.4, hy + R + 1.4, -R - 0.2, hy + R - 0.8);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = P.helmD; // media cara en sombra
+    poly(ctx, [[2, hy - R - 1], [R + 0.8, hy - 1], [R + 0.6, hy + R - 0.6], [2, hy + R]], P.helmD);
+    ctx.fillStyle = '#20242b'; // vista
+    ctx.fillRect(-R + 0.2, hy - 1.6, 2 * R + 0.4, 1.6);
+    ctx.fillStyle = P.helmL;
+    ctx.fillRect(-R + 0.2, hy - 2.4, 2 * R + 0.4, 0.8); // reborde de la vista
+    ctx.fillRect(-0.7, hy - R - 1.6, 1.4, R * 2 + 0.6); // nervio central
+    ctx.fillStyle = P.helmD;
+    for (let i = 0; i < 3; i++) dot(ctx, 2.4 + i * 1.4, hy + 2.2, 0.5, P.helmD);
+    dot(ctx, -2.6, hy - R + 0.6, 1.5, P.gleam); // brillo
+  } else {
+    // Cara: óvalo, mandíbula en sombra y pómulo a la luz.
+    ctx.fillStyle = P.skin;
+    ctx.beginPath(); ctx.ellipse(0.4, hy, R * 0.88, R, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = P.skinD;
+    ctx.beginPath(); ctx.ellipse(2.4, hy + 1.6, R * 0.42, R * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = P.skinL;
+    ctx.beginPath(); ctx.ellipse(-1.4, hy - 1.2, R * 0.4, R * 0.46, 0, 0, Math.PI * 2); ctx.fill();
+    if (!style) {
+      // Sin yelmo se le ve el pelo: flequillo, nuca y patilla.
+      ctx.fillStyle = P.hair;
+      ctx.beginPath(); ctx.ellipse(0.2, hy - 1.8, R * 0.94, R * 0.72, 0, Math.PI, Math.PI * 2); ctx.fill();
+      ctx.fillRect(-R * 0.92, hy - 2.4, 1.8, 4.2);
+      ctx.fillStyle = shade(P.hair, 0.14);
+      ctx.fillRect(-R * 0.5, hy - 3.9, 2.6, 1);
+    }
+    if (!back) {
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(2.2, hy - 1.2, 1.1, 1.2);   // ojo
+      ctx.fillStyle = 'rgba(0,0,0,.18)';
+      ctx.fillRect(1.8, hy + 1.6, 1.8, 0.6);   // boca
+    }
+  }
+
+  if (style === 'cap' || style === 'nasal') {
+    ctx.fillStyle = P.helm;
+    ctx.beginPath(); ctx.arc(0.4, hy - 0.4, R + 1, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = P.helmD;
+    ctx.fillRect(-R - 0.6, hy - 1.4, 2 * R + 2, 1.6); // ala
+    ctx.fillStyle = P.helmL;
+    ctx.beginPath(); ctx.arc(-1.4, hy - 1.4, R - 0.6, Math.PI * 1.05, Math.PI * 1.62); ctx.lineTo(-1.4, hy - 1.4);
+    ctx.closePath(); ctx.fill();
+    dot(ctx, -2.2, hy - 3.4, 0.9, P.gleam);
+    if (style === 'nasal') {
+      ctx.fillStyle = P.helmD;
+      ctx.fillRect(1.8, hy - 1.4, 1.4, 4.4);        // nasal
+      ctx.fillStyle = P.helmL;
+      ctx.fillRect(1.8, hy - 1.4, 0.6, 4.4);
+      dot(ctx, 0.4, hy - R - 1.2, 0.9, P.helmL);    // remate
+    }
+  } else if (style === 'hood') {
+    // Capucha de tela: casquete sobre la cabeza y esclavina en los hombros.
+    ctx.fillStyle = P.tunic;
+    ctx.beginPath();
+    ctx.moveTo(-R - 1.2, hy + 1.4);
+    ctx.quadraticCurveTo(-R - 1.2, hy - R - 2.4, 0.6, hy - R - 1.8);
+    ctx.quadraticCurveTo(R + 1, hy - R - 1, R + 0.6, hy - 1.6);
+    ctx.lineTo(1.4, hy - 2.6);
+    ctx.quadraticCurveTo(-R + 0.6, hy - 2.4, -R - 0.2, hy + 1.6);
+    ctx.closePath(); ctx.fill();
+    // Esclavina: cae redondeada por detrás del cuello hasta los hombros.
+    ctx.fillStyle = P.tunicD;
+    ctx.beginPath();
+    ctx.moveTo(-R - 0.6, hy + 1.6);
+    ctx.quadraticCurveTo(-1.6, hy + 3.4, 0.4, hy + R + 2.8);
+    ctx.quadraticCurveTo(-3.4, hy + R + 3.6, -R - 1.4, hy + R + 1.8);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = P.tunicL;
+    ctx.beginPath();
+    ctx.arc(-1.4, hy - 2.4, 3, Math.PI * 1.08, Math.PI * 1.72);
+    ctx.lineTo(-1.4, hy - 2.4);
+    ctx.closePath(); ctx.fill();
+  }
+
+  if (style === 'crest') {
+    // Penacho: cresta de crin peinada de la frente al cogote.
+    // Arranca en la cima del yelmo y cae hacia la nuca.
+    const base = hy - 3.6;
+    ctx.fillStyle = P.plume;
+    ctx.beginPath();
+    ctx.moveTo(3, base + 0.6);
+    ctx.quadraticCurveTo(2.6, base - 5.4, -2.2, base - 5.6);
+    ctx.quadraticCurveTo(-6.6, base - 5, -8.4, base + 1.4);
+    ctx.quadraticCurveTo(-5.4, base - 0.4, -2.2, base - 0.8);
+    ctx.quadraticCurveTo(0.4, base - 1, 1.2, base + 0.6);
+    ctx.closePath(); ctx.fill();
+    // Mechones: dos surcos oscuros siguiendo la curva de la crin.
+    ctx.strokeStyle = shade(P.plume, -0.26); ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(2.4, base - 0.4);
+    ctx.quadraticCurveTo(1.6, base - 4.2, -2.4, base - 4.4);
+    ctx.moveTo(-2.6, base - 4.2);
+    ctx.quadraticCurveTo(-6, base - 3.4, -7.4, base + 0.4);
+    ctx.stroke();
+    ctx.fillStyle = P.woodL;
+    ctx.fillRect(1.4, base + 0.2, 2.4, 1.8); // abrazadera del penacho
+  }
+}
+
+/**
+ * Brazo de dos tramos. (hx, hy) es la mano; el codo sale del punto medio,
+ * separado hacia fuera, para que el brazo no quede como un palo.
+ */
+function arm(ctx, P, G, hx, hy, o = {}) {
+  const sx = o.sx !== undefined ? o.sx : 0.6;
+  const sy = o.sy !== undefined ? o.sy : BODY.shoulder + 2.4;
+  const bend = o.bend !== undefined ? o.bend : 2;
+  const dx = hx - sx, dy = hy - sy;
+  const len = Math.hypot(dx, dy) || 1;
+  const ex = (sx + hx) / 2 - (dy / len) * bend;
+  const ey = (sy + hy) / 2 + (dx / len) * bend;
+  const far = !!o.far; // el brazo del fondo va un punto más oscuro
+  // Manga: hierro, malla, la propia túnica o la camisa de lino de debajo.
+  const sleeve = G.armor >= 3 ? (far ? P.metalD : P.metal)
+    : G.armor === 2 ? (far ? P.mail : P.mailL)
+      : G.armor === 1 ? (far ? P.tunicD : P.tunic)
+        : (far ? P.clothD : P.cloth);
+  const fore = G.armor >= 2 ? (far ? P.metalD : P.metal) : (far ? P.skinD : P.skin);
+  limb(ctx, sx, sy, ex, ey, 3.9, sleeve);
+  limb(ctx, ex, ey, hx, hy, 3.2, fore);
+  if (G.armor >= 3) {
+    // Codal y guardabrazo.
+    dot(ctx, ex, ey, 1.8, far ? P.metalD : P.metal);
+    limb(ctx, ex, ey, hx * 0.5 + ex * 0.5, hy * 0.5 + ey * 0.5, 3.3, far ? P.metalD : P.metal);
+  }
+  // Mano: guantelete de hierro, guante de cuero o la mano desnuda.
+  dot(ctx, hx, hy, 1.8, G.armor >= 2 ? (far ? P.metalD : P.metal)
+    : G.armor === 1 ? (far ? P.leatherD : P.leather) : (far ? P.skinD : P.skin));
+  return { ex, ey };
+}
+
+// --- Armas y escudos --------------------------------------------------------
+
+/** Escudo visto de canto, ya en su sitio. */
+function shield(ctx, P, style, x, y) {
+  if (!style) return;
+  ctx.save();
+  ctx.translate(x, y);
+  if (style === 'heater') {
+    const w = 4.9, h = 7.2;
+    const path = () => {
+      ctx.beginPath();
+      ctx.moveTo(-w, -h);
+      ctx.lineTo(w, -h + 0.4);
+      ctx.quadraticCurveTo(w * 0.9, h * 0.4, 0, h);
+      ctx.quadraticCurveTo(-w * 0.9, h * 0.4, -w, -h);
+      ctx.closePath();
+    };
+    path(); ctx.fillStyle = P.tunic; ctx.fill();
+    // Mitad en sombra, banda del color oscuro y filete claro.
+    ctx.save(); path(); ctx.clip();
+    ctx.fillStyle = P.tunicD; ctx.fillRect(1.4, -h - 1, w + 1, h * 2 + 2);
+    ctx.fillStyle = P.tunicL;
+    ctx.beginPath();
+    ctx.moveTo(-w, -h + 2.6); ctx.lineTo(w, -h + 1.6);
+    ctx.lineTo(w, -h + 4); ctx.lineTo(-w, -h + 5); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    path(); ctx.strokeStyle = P.metalD; ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.strokeStyle = P.metalL; ctx.lineWidth = 0.7;
+    ctx.beginPath(); ctx.moveTo(-w + 0.4, -h + 1); ctx.lineTo(-w + 0.4, h * 0.3); ctx.stroke();
+    dot(ctx, 0, -1, 1.6, P.metal);
+    dot(ctx, -0.5, -1.5, 0.7, P.gleam);
+  } else {
+    const r = style === 'buckler' ? 4.2 : 5.7;
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.84, r, 0, 0, Math.PI * 2);
+    ctx.fillStyle = P.tunic; ctx.fill();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = P.tunicD; ctx.fillRect(0.8, -r, r, r * 2);
+    ctx.fillStyle = P.tunicL; ctx.fillRect(-r, -r, r * 0.5, r * 2);
+    ctx.restore();
+    // Aro metálico, umbo y clavos.
+    ctx.beginPath(); ctx.ellipse(0, 0, r * 0.84, r, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = P.metalD; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-0.6, -0.6, r * 0.84, r, 0, Math.PI * 0.9, Math.PI * 1.7);
+    ctx.strokeStyle = P.metalL; ctx.lineWidth = 0.8; ctx.stroke();
+    dot(ctx, 0, 0, r * 0.34, P.metal);
+    dot(ctx, -r * 0.12, -r * 0.14, r * 0.16, P.gleam);
+    ctx.fillStyle = P.metalD;
+    for (let i = 0; i < 4; i++) {
+      const a = Math.PI / 4 + i * Math.PI / 2;
+      dot(ctx, Math.cos(a) * r * 0.6, Math.sin(a) * r * 0.72, 0.6, P.metalD);
+    }
+  }
+  ctx.restore();
+}
+
+/** Espada con la empuñadura en el origen y la hoja hacia arriba. */
+function sword(ctx, P, len) {
+  // Puño forrado de cuero y pomo de latón.
+  ctx.fillStyle = P.leatherD; ctx.fillRect(-1, -1.2, 2, 4.4);
+  ctx.strokeStyle = P.leather; ctx.lineWidth = 0.5;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-1, -0.2 + i * 1.2); ctx.lineTo(1, -0.6 + i * 1.2); ctx.stroke();
+  }
+  dot(ctx, 0, 3.6, 1.3, P.woodL);
+  dot(ctx, 0.4, 3.9, 0.6, P.woodD);
+  // Guarda: dos gavilanes rectos con el canto en sombra.
+  poly(ctx, [[-3.6, -2], [3.6, -2], [3.1, -0.7], [-3.1, -0.7]], P.woodL);
+  poly(ctx, [[-3.6, -1.2], [3.6, -1.2], [3.3, -0.7], [-3.3, -0.7]], P.woodD);
+  // Hoja: cuerpo, filo iluminado, canto en sombra y vaceo.
+  const w = 1.3, tip = -len - 2.2;
+  poly(ctx, [[-w, -2], [w, -2], [w * 0.78, -len + 1], [0, tip], [-w * 0.78, -len + 1]], P.metal);
+  poly(ctx, [[-w, -2], [-w * 0.3, -2], [-w * 0.24, -len + 1], [-w * 0.78, -len + 1]], P.metalL);
+  poly(ctx, [[w * 0.42, -2], [w, -2], [w * 0.78, -len + 1], [w * 0.34, -len + 1]], P.metalD);
+  ctx.strokeStyle = P.metalD; ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(0, -3); ctx.lineTo(0, -len + 1); ctx.stroke();
+}
+
+/** Asta con moharra: lanza, pica o jabalina. */
+function polearm(ctx, P, len, headLen) {
+  const top = -len * 0.75;
+  ctx.fillStyle = P.wood; ctx.fillRect(-1.1, top, 2.2, len);
+  ctx.fillStyle = P.woodD; ctx.fillRect(0.4, top, 0.8, len);   // veta en sombra
+  ctx.fillStyle = P.woodL; ctx.fillRect(-1.1, top, 0.6, len);  // veta a la luz
+  // Empuñadura de cuero y regatón.
+  ctx.fillStyle = P.leatherD; ctx.fillRect(-1.3, -1.6, 2.6, 3.4);
+  ctx.fillStyle = P.metalD; ctx.fillRect(-1.2, len * 0.25 - 1.4, 2.4, 1.6);
+  // Cubo y moharra de hoja de laurel.
+  ctx.fillStyle = P.metalD; ctx.fillRect(-1.4, top - 1.4, 2.8, 2.4);
+  ctx.fillStyle = P.metal;
+  ctx.beginPath();
+  ctx.moveTo(0, top - headLen);
+  ctx.quadraticCurveTo(2.6, top - headLen * 0.42, 0, top - 0.6);
+  ctx.quadraticCurveTo(-2.6, top - headLen * 0.42, 0, top - headLen);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = P.metalL;
+  ctx.beginPath();
+  ctx.moveTo(0, top - headLen);
+  ctx.quadraticCurveTo(-1.3, top - headLen * 0.45, -0.3, top - 1.4);
+  ctx.lineTo(-0.3, top - headLen * 0.7);
+  ctx.closePath(); ctx.fill();
+}
+
+/**
+ * Arco recurvo. Las palas curvan hacia delante y la cuerda se tira hacia el
+ * cuerpo, así que la flecha apunta adelante; `draw` es cuánto se ha tensado.
+ */
+function bow(ctx, P, draw) {
+  ctx.strokeStyle = P.wood; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-1.6, -10.4);
+  ctx.quadraticCurveTo(3.4, -5, 2.4, 0);
+  ctx.quadraticCurveTo(3.4, 5, -1.6, 10.4);
+  ctx.stroke();
+  ctx.strokeStyle = P.woodL; ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-1.2, -9.6);
+  ctx.quadraticCurveTo(2.6, -4.8, 1.8, 0);
+  ctx.quadraticCurveTo(2.6, 4.8, -1.2, 9.6);
+  ctx.stroke();
+  ctx.fillStyle = P.leatherD; ctx.fillRect(1.2, -2.4, 2.2, 4.8); // empuñadura
+  const nock = -1.4 - draw * 7;
+  ctx.strokeStyle = BOWSTRING; ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-1.6, -10.4); ctx.lineTo(nock, 0); ctx.lineTo(-1.6, 10.4); ctx.stroke();
+  if (draw > 0) {
+    // Flecha montada sobre la cuerda.
+    ctx.strokeStyle = P.woodL; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(nock, 0); ctx.lineTo(8.4, 0); ctx.stroke();
+    poly(ctx, [[11.6, 0], [8, -1.3], [8, 1.3]], P.metalL);
+    ctx.strokeStyle = P.plume; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(nock + 0.6, -1.2); ctx.lineTo(nock + 2.4, 1.2); ctx.stroke();
+  }
+}
+
+/** Ballesta vista de perfil; `draw` marca si está montada. */
+function crossbow(ctx, P, draw) {
+  // Cureña: corta y de canto, para que no tape el pecho.
+  poly(ctx, [[-5.4, -1], [5.4, -1.6], [5.8, 0.4], [-5, 1.4]], P.wood);
+  poly(ctx, [[-5.4, -1], [5.4, -1.6], [5.6, -0.8], [-5.2, -0.2]], P.woodL);
+  poly(ctx, [[-5.2, 0.2], [5.7, -0.5], [5.8, 0.4], [-5, 1.4]], P.woodD);
+  ctx.fillStyle = P.metalD; ctx.fillRect(-2.4, 1, 1.4, 2.2); // gatillo
+  ctx.fillStyle = P.leatherD; ctx.fillRect(-5.6, -1.2, 1.6, 2.6); // culata
+  // Arco de acero, atado a la punta de la cureña.
+  ctx.strokeStyle = P.metalD; ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(3, -6.4); ctx.quadraticCurveTo(6.2, -0.6, 3, 5.4); ctx.stroke();
+  ctx.strokeStyle = P.metalL; ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(2.8, -5.8); ctx.quadraticCurveTo(5.4, -0.6, 2.8, 4.8); ctx.stroke();
+  ctx.strokeStyle = BOWSTRING; ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(3, -6.4); ctx.lineTo(draw ? -2.2 : 2.2, -0.6); ctx.lineTo(3, 5.4); ctx.stroke();
+  if (draw) {
+    ctx.fillStyle = P.woodL; ctx.fillRect(-2, -1.4, 8, 1);
+    poly(ctx, [[8.6, -0.9], [5.8, -2], [5.8, 0.2]], P.metalL); // virote
+  }
+}
+
+/** Carcaj a la espalda, con sus flechas emplumadas. */
+function quiver(ctx, P) {
+  const y = BODY.shoulder + 2;
+  // Bandolera cruzada al pecho, y detrás la aljaba.
+  ctx.strokeStyle = P.leather; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(-5.4, y - 1.6); ctx.lineTo(3.2, BODY.waist - 0.6); ctx.stroke();
+  for (let i = 0; i < 3; i++) {
+    const x = -8 + i * 1.3;
+    ctx.strokeStyle = P.woodL; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(x, y + 1); ctx.lineTo(x + 0.5, y - 4.6); ctx.stroke();
+    ctx.strokeStyle = P.plume; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x + 0.3, y - 3); ctx.lineTo(x + 0.5, y - 4.4); ctx.stroke();
+  }
+  poly(ctx, [[-9, y + 0.6], [-5.6, y], [-4.8, y + 8], [-8.2, y + 8.6]], P.leather);
+  poly(ctx, [[-6.4, y + 0.4], [-5.6, y], [-4.8, y + 8], [-5.6, y + 8.2]], P.leatherD);
+  ctx.strokeStyle = P.leatherD; ctx.lineWidth = 0.9;
+  ctx.beginPath(); ctx.moveTo(-8.8, y + 2.8); ctx.lineTo(-5.4, y + 2.2); ctx.stroke();
+}
+
+/** Hacha del aldeano: mango de madera y hoja de hierro remachada. */
+function axe(ctx, P) {
+  ctx.fillStyle = P.wood; ctx.fillRect(-0.9, -11, 1.8, 14);
+  ctx.fillStyle = P.woodD; ctx.fillRect(0.3, -11, 0.7, 14);
+  // Hoja: filo curvo hacia fuera y ojo remachado al mango.
+  ctx.fillStyle = P.metal;
+  ctx.beginPath();
+  ctx.moveTo(-0.6, -12.6);
+  ctx.quadraticCurveTo(2.4, -12.2, 3.4, -10.2);
+  ctx.quadraticCurveTo(2.4, -8.2, -0.6, -8);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = P.metalL;
+  ctx.beginPath();
+  ctx.moveTo(1.4, -12.1);
+  ctx.quadraticCurveTo(3, -11.6, 3.4, -10.2);
+  ctx.quadraticCurveTo(3, -8.8, 1.4, -8.3);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = P.metalD; ctx.fillRect(-1.5, -12.4, 1.4, 4.6);
+  dot(ctx, -0.8, -10.2, 0.5, P.metalL);
+}
+
+// --- Montura ----------------------------------------------------------------
+
+function drawHorse(ctx, P, type, f) {
+  const [horseL, horse, horseD] = ramp(look('unit', type).horse || '#8a6a4a');
+  const gallop = Math.sin((f / 4) * Math.PI * 2);
+  // Patas: primero las del lado en sombra.
+  limb(ctx, -6, 0, -8 + gallop * 3.4, 9, 3, horseD);
+  limb(ctx, 7, 0, 9 - gallop * 3.4, 9, 3, horseD);
+  limb(ctx, -4, 0, -3 - gallop * 3.4, 9, 3.2, horse);
+  limb(ctx, 6, 0, 7 + gallop * 3.4, 9, 3.2, horse);
+  for (const [hx, hy] of [[-8 + gallop * 3.4, 9], [9 - gallop * 3.4, 9], [-3 - gallop * 3.4, 9], [7 + gallop * 3.4, 9]]) {
+    dot(ctx, hx, hy, 1.5, horseD);
+  }
+  // Cuerpo, grupa y pecho.
+  ctx.fillStyle = horse;
+  ctx.beginPath(); ctx.ellipse(1, -2.4, 12.2, 6.6, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = horseL;
+  ctx.beginPath(); ctx.ellipse(-0.5, -5.2, 10, 3.4, -0.06, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = horseD;
+  ctx.beginPath(); ctx.ellipse(2.5, 1.4, 9, 2.6, 0.05, 0, Math.PI * 2); ctx.fill();
+  // Cuello y cabeza.
+  ctx.fillStyle = horse;
+  poly(ctx, [[6, -4], [11.6, -12.4], [14.4, -11], [10, -1]], horse);
+  ctx.beginPath(); ctx.ellipse(13.4, -12.4, 4.4, 3.2, -0.34, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = horseL;
+  ctx.beginPath(); ctx.ellipse(12.4, -13.2, 3.2, 1.8, -0.34, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = horseD;
+  ctx.fillRect(15.4, -12.6, 2.4, 2.6);            // hocico
+  ctx.fillRect(13.2, -15.6, 1.6, 2.6);            // orejas
+  ctx.fillRect(10.8, -15.2, 1.6, 2.6);
+  dot(ctx, 14.6, -13.4, 0.7, '#231d19');          // ojo
+  // Crin y cola.
+  ctx.strokeStyle = horseD; ctx.lineWidth = 2.6;
+  ctx.beginPath();
+  ctx.moveTo(11.4, -13.4);
+  ctx.quadraticCurveTo(8.4, -10.4, 6.2, -5.4); ctx.stroke();
+  ctx.strokeStyle = horseD; ctx.lineWidth = 3.2;
+  ctx.beginPath();
+  ctx.moveTo(-10, -4); ctx.quadraticCurveTo(-14.4, -2.4, -14.8, 3.4); ctx.stroke();
+  // Cabezada y riendas.
+  ctx.strokeStyle = P.leatherD; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(15.6, -11.6); ctx.lineTo(11.4, -11); ctx.moveTo(13.6, -14.4); ctx.lineTo(12.8, -10.2);
+  ctx.moveTo(11.8, -11.2); ctx.lineTo(6.4, -6.6);
+  ctx.stroke();
+  if (type !== 'scout') {
+    // Gualdrapa del color del jugador y silla.
+    poly(ctx, [[-7, -6.4], [5.4, -6.8], [6.4, 1.6], [-8, 2]], P.tunic);
+    poly(ctx, [[-8, 0.4], [6.4, 0], [6.4, 1.6], [-8, 2]], P.tunicD);
+    ctx.fillStyle = P.tunicL; ctx.fillRect(-7, -6.4, 12.4, 1.2);
+  }
+  ctx.fillStyle = P.leatherD;
+  ctx.fillRect(-4.6, -8.4, 8.6, 2.6);
+  ctx.fillStyle = P.leather;
+  ctx.fillRect(-4.6, -8.4, 8.6, 1);
+}
+
+// --- El soldado completo ----------------------------------------------------
+
+/**
+ * Dibuja la unidad a pie (o al jinete). f = 0..3 ciclo de marcha, 4 el brazo
+ * atrás y 5 el golpe. `back` es de espaldas: se le quita la cara y la capa le
+ * tapa el cuerpo.
+ */
+function drawSoldier(ctx, type, P, f, back, mounted) {
+  const G = GEAR[type] || NO_GEAR;
   const atk = f >= 4;
   const swing = f === 5 ? 1 : f === 4 ? -0.5 : 0;
-  shadowEllipse(ctx, 1, 2, 9, 4.5);
+  const walk = !mounted && f < 4 ? Math.sin((f / 4) * Math.PI * 2) : 0;
+  const bob = walk ? Math.abs(walk) * -1.2 : 0;
+  const armY = BODY.shoulder + bob + 3;
 
-  const mounted = UNITS[type] && UNITS[type].class === 'cavalry';
-  if (UNITS[type] && UNITS[type].class === 'siege') { drawSiege(ctx, type, col, f, L); return; }
+  // El cuerpo se inclina con el golpe: primero se echa atrás y luego encima.
+  const lean = atk ? swing * 1.6 : 0;
 
-  if (mounted) {
-    ctx.save();
-    ctx.translate(0, -9);
-    // Caballo
-    const horse = L.horse;
-    const gallop = Math.sin((f / 4) * Math.PI * 2);
-    limb(ctx, -6, 0, -8 + gallop * 3, 9, 3, shade(horse, -0.25));
-    limb(ctx, 7, 0, 9 - gallop * 3, 9, 3, shade(horse, -0.25));
-    limb(ctx, -4, 0, -3 - gallop * 3, 9, 3, horse);
-    limb(ctx, 6, 0, 7 + gallop * 3, 9, 3, horse);
-    ctx.fillStyle = horse;
-    ctx.beginPath(); ctx.ellipse(1, -2, 11, 6, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = shade(horse, 0.1);
-    ctx.beginPath(); ctx.ellipse(11, -8, 4.5, 4, -0.3, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = shade(horse, -0.3);
-    ctx.fillRect(13, -12, 1.8, 3); ctx.fillRect(10, -12, 1.8, 3);
-    limb(ctx, -10, -4, -14, 2, 3, shade(horse, -0.2)); // cola
-    if (type !== 'scout') { ctx.fillStyle = col.main; ctx.fillRect(-6, -6, 12, 7); }
-    ctx.restore();
+  if (!back) cape(ctx, P, G, walk, back);
+  if (mounted) ridingLegs(ctx, P, G);
+  else {
+    leg(ctx, P, G, -walk, false, bob);
+    leg(ctx, P, G, walk, true, bob);
   }
 
   ctx.save();
-  if (mounted) ctx.translate(0, -20);
-  const h = humanoid(ctx, { tunic, trim, skin, helm: L.helmet || null, legs: L.legs, f, back });
+  ctx.translate(lean, bob);
+  skirt(ctx, P, G, walk);
+  // Brazo del fondo, por detrás del torso.
+  const offHand = { x: -6.4, y: armY - bob + 3.6 };
+  if (!G.shield) arm(ctx, P, G, offHand.x - 1, offHand.y + 1.4, { far: true, bend: -2.4 });
+  torso(ctx, P, G);
+  if (type === 'archer' || type === 'crossbowman' || type === 'arbalester' || type === 'skirmisher') {
+    quiver(ctx, P);
+  }
+  head(ctx, P, G, back);
+  if (back) cape(ctx, P, G, walk, back);
+  ctx.restore();
 
-  const metal = L.metal, wood = L.wood;
-  const armY = h.shoulderY + 2;
+  ctx.save();
+  ctx.translate(lean, bob);
+  drawWeapons(ctx, type, P, G, f, atk, swing, armY - bob);
+  ctx.restore();
+}
+
+/** Los brazos, el arma y el escudo: lo que de verdad cambia de unidad a unidad. */
+function drawWeapons(ctx, type, P, G, f, atk, swing, armY) {
+  const shieldAt = (x, y) => {
+    arm(ctx, P, G, x + 1.4, y + 1, { far: true, bend: -2.6 });
+    shield(ctx, P, G.shield, x, y);
+  };
+
   switch (type) {
     case 'villager': {
-      limb(ctx, 3, armY, 8, armY + 6 - (atk ? swing * 8 : 0), 3.2, skin);
-      limb(ctx, -3, armY, -7, armY + 7, 3.2, skin);
-      // Hacha / herramienta
+      arm(ctx, P, G, -6.4, armY + 6, { far: true, bend: -2.2 });
+      const hx = 7.2, hy = armY + 5 - (atk ? swing * 6 : 0);
+      arm(ctx, P, G, hx, hy, { bend: 2.4 });
       ctx.save();
-      ctx.translate(8, armY + 6);
-      ctx.rotate(atk ? -0.9 + swing * 1.4 : 0.5);
-      ctx.fillStyle = wood; ctx.fillRect(-1, -10, 2, 13);
-      ctx.fillStyle = metal; ctx.fillRect(-3.5, -12, 7, 4);
+      ctx.translate(hx, hy);
+      ctx.rotate(atk ? -0.7 + swing * 1.4 : 0.55);
+      axe(ctx, P);
       ctx.restore();
       break;
     }
     case 'militia': case 'manatarms': case 'longswordsman': case 'champion': {
-      limb(ctx, -4, armY, -8, armY + 6, 3.4, skin);
-      // Escudo
-      ctx.fillStyle = col.main; ctx.strokeStyle = shade(col.dark, -0.2); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.ellipse(-8, armY + 4, 4.5, 6, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-      const sx = 5, sy = armY + 3;
-      limb(ctx, 3, armY, sx, sy, 3.4, skin);
+      shieldAt(-8.2, armY + 3.6);
+      const blade = type === 'militia' ? 11 : type === 'manatarms' ? 13 : type === 'longswordsman' ? 15 : 17;
+      // En reposo la hoja se apoya hacia fuera para que no cruce la cara; al
+      // atacar primero se echa atrás sobre el hombro y luego cae hacia delante.
+      const hx = f === 4 ? 3.6 : f === 5 ? 7.4 : 5.4;
+      const hy = f === 4 ? armY - 0.8 : f === 5 ? armY + 2.2 : armY + 3.2;
+      arm(ctx, P, G, hx, hy, { bend: atk ? 3 : 2.2 });
       ctx.save();
-      ctx.translate(sx, sy);
-      ctx.rotate(atk ? -1.9 + swing * 2.3 : -0.35);
-      const swLen = type === 'militia' ? 11 : type === 'champion' ? 17 : 14;
-      ctx.fillStyle = ramp(wood)[2]; ctx.fillRect(-1.2, -2, 2.4, 5);
-      ctx.fillStyle = metal; ctx.fillRect(-1.4, -swLen, 2.8, swLen);
-      ctx.fillStyle = wood; ctx.fillRect(-4, -3, 8, 2);
+      ctx.translate(hx, hy);
+      ctx.rotate(f === 4 ? -1 : f === 5 ? 1.5 : 0.34);
+      sword(ctx, P, blade);
       ctx.restore();
       break;
     }
     case 'spearman': case 'pikeman': {
-      limb(ctx, -4, armY, -8, armY + 6, 3.4, skin);
-      limb(ctx, 3, armY, 6, armY + 2, 3.4, skin);
+      if (G.shield) shieldAt(-7.4, armY + 3.4);
+      else arm(ctx, P, G, -6.4, armY + 4.6, { far: true, bend: -2.4 });
+      // El asta se lleva terciada hacia delante y la estocada la baja y la
+      // adelanta, en vez de pasar por encima de la cabeza.
+      const hx = f === 4 ? 3.6 : f === 5 ? 7.4 : 5.6;
+      const hy = f === 4 ? armY + 1 : armY + 2.4;
+      arm(ctx, P, G, hx, hy, { bend: 2 });
       ctx.save();
-      ctx.translate(6, armY + 2);
-      ctx.rotate(atk ? -1.2 + swing * 0.5 : -0.55);
-      const len = type === 'pikeman' ? 30 : 25;
-      ctx.fillStyle = wood; ctx.fillRect(-1.1, -len * 0.75, 2.2, len);
-      ctx.fillStyle = metal;
-      ctx.beginPath();
-      ctx.moveTo(0, -len * 0.75 - 7); ctx.lineTo(3, -len * 0.75); ctx.lineTo(-3, -len * 0.75);
-      ctx.closePath(); ctx.fill();
+      ctx.translate(hx, hy);
+      ctx.rotate(f === 4 ? 0.12 : f === 5 ? 0.86 : 0.3);
+      polearm(ctx, P, type === 'pikeman' ? 30 : 25, type === 'pikeman' ? 8 : 7);
       ctx.restore();
       break;
     }
     case 'archer': case 'crossbowman': case 'arbalester': case 'skirmisher': {
       const draw = atk ? (f === 5 ? 1 : 0.55) : 0;
-      limb(ctx, -3, armY, 7, armY - 1, 3.2, skin);
-      limb(ctx, 3, armY, 2 - draw * 5, armY + 1, 3.2, skin);
-      ctx.save();
-      ctx.translate(8, armY - 1);
       if (type === 'skirmisher') {
-        ctx.rotate(atk ? -1.4 + draw * 0.8 : -0.4);
-        ctx.fillStyle = wood; ctx.fillRect(-0.9, -14, 1.8, 18);
-        ctx.fillStyle = metal;
-        ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(2.4, -14); ctx.lineTo(-2.4, -14); ctx.closePath(); ctx.fill();
+        arm(ctx, P, G, -6, armY + 5, { far: true, bend: -2.2 });
+        const hx = 6.4, hy = armY - 1.4 - draw * 1.6;
+        arm(ctx, P, G, hx, hy, { bend: 2.6 });
+        ctx.save();
+        ctx.translate(hx, hy);
+        // Se echa la jabalina atrás por encima del hombro y se lanza adelante.
+        ctx.rotate(atk ? -0.5 + draw * 1.5 : 0.26);
+        polearm(ctx, P, 18, 6);
+        ctx.restore();
       } else if (type === 'archer') {
-        ctx.strokeStyle = wood; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, 9, -1.25, 1.25); ctx.stroke();
-        ctx.strokeStyle = BOWSTRING; ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(2.9, -8.6); ctx.lineTo(-draw * 6, 0); ctx.lineTo(2.9, 8.6); ctx.stroke();
+        // Brazo del arco estirado y el de la cuerda tirando hacia atrás.
+        const bx = 8.2, by = armY - 0.6;
+        arm(ctx, P, G, bx + 1.6, by, { far: true, bend: -1.2 });
+        ctx.save();
+        ctx.translate(bx, by);
+        bow(ctx, P, draw);
+        ctx.restore();
+        arm(ctx, P, G, bx - 2.6 - draw * 6, by + 0.8, { bend: 2.6 });
       } else {
-        ctx.fillStyle = wood; ctx.fillRect(-6, -1.6, 14, 3.2);
-        ctx.fillStyle = metal; ctx.fillRect(2, -7, 2.4, 14);
+        const bx = 8.4, by = armY - 0.2;
+        arm(ctx, P, G, bx - 0.4, by + 1.4, { far: true, bend: -1.4 });
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(-0.12 + draw * 0.1);
+        crossbow(ctx, P, draw > 0.4);
+        ctx.restore();
+        arm(ctx, P, G, bx - 4.4, by + 2.4, { bend: 2.2 });
       }
+      break;
+    }
+    case 'scout': case 'knight': case 'cavalier': {
+      if (G.shield) shieldAt(-7.2, armY + 3.4);
+      else arm(ctx, P, G, -6, armY + 4.4, { far: true, bend: -2.4 });
+      const hx = f === 4 ? 3.8 : f === 5 ? 7.6 : 5.4;
+      const hy = f === 4 ? armY - 1.2 : f === 5 ? armY + 2 : armY + 2.8;
+      arm(ctx, P, G, hx, hy, { bend: 2.4 });
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.rotate(f === 4 ? -0.95 : f === 5 ? 1.45 : 0.3);
+      sword(ctx, P, type === 'scout' ? 12 : type === 'knight' ? 15 : 17);
       ctx.restore();
-      // Carcaj
-      ctx.fillStyle = ramp(wood)[2]; ctx.fillRect(-6, h.shoulderY, 3.5, 9);
       break;
     }
     default:
-      limb(ctx, -4, armY, -8, armY + 6, 3.2, skin);
-      limb(ctx, 4, armY, 8, armY + 6, 3.2, skin);
+      arm(ctx, P, G, -6.4, armY + 5, { far: true, bend: -2.2 });
+      arm(ctx, P, G, 6.4, armY + 5, { bend: 2.2 });
   }
+}
+
+function drawUnit(ctx, type, colorIdx, f, back) {
+  const U = UNITS[type];
+  const P = palette(type, colorIdx);
+  if (U && U.class === 'siege') {
+    shadowEllipse(ctx, 1, 2, 13, 5.5);
+    drawSiege(ctx, type, P.col, f, look('unit', type));
+    return;
+  }
+  const mounted = U && U.class === 'cavalry';
+  shadowEllipse(ctx, 1, 2, mounted ? 13 : 9, mounted ? 5.5 : 4.5);
+  if (mounted) {
+    ctx.save();
+    ctx.translate(0, -9);
+    drawHorse(ctx, P, type, f);
+    ctx.restore();
+  }
+  ctx.save();
+  // El jinete se ancla a la silla: la cadera queda justo encima del lomo.
+  if (mounted) ctx.translate(0, -4.5);
+  drawSoldier(ctx, type, P, f, back, mounted);
   ctx.restore();
 }
 
@@ -1033,6 +1740,7 @@ export function iconFor(kind, type, colorIdx = 0) {
 export function clearSpriteCaches() {
   resCache.clear();
   unitCache.clear();
+  palCache.clear();
   buildCache.clear();
   iconCache.clear();
   boundsCache.clear();
