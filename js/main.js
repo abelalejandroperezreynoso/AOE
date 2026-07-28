@@ -97,9 +97,9 @@ function loop(now) {
   ui.update(dt);
 }
 
-window.addEventListener('resize', () => {
-  if (renderer) { renderer.resize(); renderer.clampCam(); }
-});
+// De redimensionar se encarga UI.watchBars(): mide las barras, se lo pasa al
+// lienzo y compensa el zoom al girar. Un segundo listener aquí se adelantaba y
+// le estropeaba la medida de cuánto mundo se veía antes del giro.
 
 // Evita el zoom por doble toque en móviles sin bloquear los controles.
 document.addEventListener('gesturestart', (e) => e.preventDefault());
