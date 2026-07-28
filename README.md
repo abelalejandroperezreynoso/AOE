@@ -83,6 +83,28 @@ resalta y, al pasar el ratón por su nombre, indica cuál era el valor original.
 Hay un botón para restablecer un elemento suelto y otro para dejarlo todo como
 venía de fábrica.
 
+### Aspecto
+
+Cada ficha empieza por una sección **Aspecto** con la que se cambia cómo se
+dibuja el objeto, no sólo sus cifras. La vista previa se rehace al instante,
+mientras se arrastra el selector de color:
+
+- **Unidades**: piel, calzas, yelmo, metal de las armas, madera de los mangos,
+  montura de la caballería, ruedas de las máquinas de asedio y su **tamaño**
+  (de 0,6 a 1,6 veces el normal).
+- **Edificios**: muros, tejado, madera, puerta, basamento, chimenea, tierra y
+  cultivo de la granja, empedrado, mostradores y toldos del mercado, y los
+  detalles propios de cada uno (el fuego de la herrería, la tela del molino,
+  el emblema de los edificios militares). No llevan tamaño: su huella la fija
+  la cuadrícula.
+- **Recursos**: tronco y hojas del árbol, roca y vetas de las minas, mata y
+  bayas, cuerpo, cabeza, patas y cuerna de los animales, además del tamaño.
+
+Sólo aparecen los campos que ese objeto usa de verdad: a un lancero no se le
+pregunta por la montura. Los edificios se pintan en tres tonos por material
+(cara al sol, cara base y sombra); mientras un color no se toque se usan los
+tonos originales, elegidos a mano, y en cuanto se cambia se derivan del nuevo.
+
 Detalles a tener en cuenta:
 
 - Los cambios se guardan **en ese navegador** y se aplican a las **partidas
@@ -140,7 +162,8 @@ o aleja.
   crecientes. Tres niveles de dificultad.
 - Niebla de guerra, minimapa, puntos de reunión, colas de producción, mercado de
   recursos, control de velocidad (1x a 3x) y estadísticas finales.
-- **Catálogo** para consultar y editar los valores de todo el juego.
+- **Catálogo** para consultar y editar todo el juego: sus valores y también el
+  aspecto de cada objeto, con vista previa en vivo.
 
 ## Estructura del código
 
@@ -159,6 +182,7 @@ js/ai.js            IA de los rivales
 js/ui.js            HUD, panel de órdenes, ratón, teclado y táctil
 js/audio.js         Efectos de sonido sintetizados con WebAudio
 js/catalog.js       Catálogo: fichas y edición de los datos del juego
+js/data/appearance.js Colores y tamaño con los que se dibuja cada objeto
 js/data/overrides.js  Valores editados: validación, guardado y aplicación
 js/lobby-ui.js      Pantalla de la sala de espera
 js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
