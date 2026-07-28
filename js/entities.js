@@ -483,15 +483,29 @@ export class Unit {
   }
 
   /**
-   * Al quedarse sin obra, busca otra construcción sin terminar del mismo
-   * jugador dentro de su rango de visión y se va sola a seguir con ella; si
-   * no encuentra ninguna, se queda libre (como antes de esta mecánica).
+   * Al quedarse sin obra el aldeano decide solo qué hacer:
+   *  1. Si hay otra construcción sin terminar del mismo jugador a la vista,
+   *     va a seguir con ella (construir tiene prioridad).
+   *  2. Si no, y acaba de levantar un edificio de recursos (molino,
+   *     campamento maderero o minero, granja), se pone a recolectar lo que
+   *     ese edificio almacena, siempre que haya algo cerca.
+   *  3. Si no hay nada de lo anterior, se queda libre.
    */
   chainOrIdle(g, player, finished) {
     const radius = UNITS.villager.los;
     const next = g.findUnbuiltNear(player, this.x, this.y, radius, finished);
-    if (next) { this.task = { type: 'build', target: next }; this.path = null; this.repathCd = 0; }
-    else this.task = null;
+    if (next) {
+      this.task = { type: 'build', target: next };
+      this.path = null; this.repathCd = 0;
+      return;
+    }
+    const job = g.autoGatherJob(player, finished);
+    if (job) {
+      this.task = { type: 'gather', target: job };
+      this.path = null; this.repathCd = 0;
+      return;
+    }
+    this.task = null;
   }
 
   // --- Combate --------------------------------------------------------------
