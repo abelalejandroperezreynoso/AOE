@@ -598,6 +598,14 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
   pointer-events: none;
 }
 .qitem.blocked { border-color: #c0564a; }
+/* Cuántas cosas van a salir de este edificio, contando la que está en curso. */
+.qcount {
+  align-self: center;
+  margin-left: 3px;
+  font-size: 13px; font-weight: bold;
+  color: var(--gold-l);
+  font-variant-numeric: tabular-nums;
+}
 
 #commands {
   flex: 1;
@@ -720,7 +728,7 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
 
 /* Móviles: la barra superior no debe envolverse nunca y las órdenes van abajo. */
 @media (max-width: 680px) {
-  :root { --bar-h: 34px; --bottom-h: 158px; --prod-h: 42px; }
+  :root { --bar-h: 34px; --bottom-h: 162px; --prod-h: 42px; }
   #topbar {
     padding: var(--sa-top) calc(5px + var(--sa-right)) 0 calc(5px + var(--sa-left));
     gap: 5px;
@@ -743,9 +751,10 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
     flex-wrap: wrap; gap: 5px;
     padding: 5px calc(5px + var(--sa-right)) calc(5px + var(--sa-bottom)) calc(5px + var(--sa-left));
   }
-  #minimap-panel { width: 108px; height: 78px; padding: 3px; order: 1; }
-  #selection-panel { width: calc(100% - 113px); height: 78px; padding: 4px 7px; gap: 3px; order: 2; }
-  #sel-info { min-height: 0; gap: 6px; }
+  #minimap-panel { width: 108px; height: 82px; padding: 3px; order: 1; }
+  #selection-panel { width: calc(100% - 113px); height: 82px; padding: 4px 7px; gap: 3px; order: 2; }
+  /* Recorta en vez de desbordar: si no, el texto se dibujaba encima de la cola. */
+  #sel-info { min-height: 0; gap: 6px; overflow: hidden; }
   .portrait { width: 42px; height: 42px; }
   .sel-name { font-size: 13px; }
   .sel-owner { font-size: 10.5px; margin-bottom: 2px; }
@@ -753,7 +762,8 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
   .stat-row { font-size: 11px; gap: 7px; flex-wrap: nowrap; overflow: hidden; }
   .carry { font-size: 10.5px; margin-top: 1px; }
   #sel-list { max-height: 30px; }
-  .qitem { width: 28px; height: 28px; }
+  .qitem { width: 24px; height: 24px; }
+  .qcount { font-size: 12px; }
   #commands {
     order: 3; flex-basis: 100%; height: 62px;
     grid-template-columns: repeat(auto-fill, 58px);
@@ -774,13 +784,13 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
 /* Teléfonos estrechos: se recorta lo accesorio para que quepan cifras de
    cuatro dígitos sin empujar los botones fuera de la pantalla. */
 @media (max-width: 400px) {
-  :root { --bottom-h: 152px; }
+  :root { --bottom-h: 156px; }
   .res { padding: 2px 4px; font-size: 11.5px; gap: 2px; }
   .dot { width: 9px; height: 9px; }
   .right-group { gap: 3px; }
   .tbtn { padding: 3px 5px; }
-  #minimap-panel { width: 96px; height: 74px; }
-  #selection-panel { width: calc(100% - 101px); height: 74px; }
+  #minimap-panel { width: 96px; height: 78px; }
+  #selection-panel { width: calc(100% - 101px); height: 78px; }
   .portrait { width: 38px; height: 38px; }
   #commands { height: 60px; grid-template-columns: repeat(auto-fill, 56px); grid-auto-rows: 56px; }
   .cmd { width: 56px; height: 56px; }
