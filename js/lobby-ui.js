@@ -2,6 +2,7 @@
 // de la partida en red.
 
 import { Lobby, Peer } from './net/lobby.js';
+import { exportOverrides } from './data/overrides.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -166,7 +167,9 @@ export class LobbyUI {
     this.gameOpts = { seed, mapSize };
     const offer = await this.peer.createOffer();
     this.peer.addEventListener('open', () => this.launch('host'));
-    await this.lobby.signal(ans.to, 'offer', JSON.stringify({ sdp: offer, seed, mapSize, name: this.lobby.name }));
+    await this.lobby.signal(ans.to, 'offer', JSON.stringify({
+      sdp: offer, seed, mapSize, name: this.lobby.name, overrides: exportOverrides(),
+    }));
   }
 
   /** Llega una oferta o una respuesta de conexión. */
@@ -175,6 +178,7 @@ export class LobbyUI {
       if (sig.kind === 'offer') {
         const payload = JSON.parse(sig.data);
         this.gameOpts = { seed: payload.seed, mapSize: payload.mapSize };
+        this.hostOverrides = payload.overrides || null;
         this.opponentName = payload.name || this.opponentName;
         if (!this.peer) this.peer = new Peer();
         this.peer.addEventListener('open', () => this.launch('guest'));
@@ -204,6 +208,7 @@ export class LobbyUI {
       seed: this.gameOpts.seed,
       mapSize: this.gameOpts.mapSize,
       names,
+      overrides: this.hostOverrides,
     });
   }
 }
