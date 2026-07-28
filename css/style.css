@@ -113,6 +113,9 @@ html, body {
 button {
   font-family: inherit;
   cursor: pointer;
+  /* Sin esto, iOS reserva cada toque por si es un doble toque para hacer zoom
+     y se come los siguientes: encolar varias unidades seguidas no funcionaba. */
+  touch-action: manipulation;
   border-radius: 7px;
   border: 1px solid #6b5334;
   background: linear-gradient(180deg, #57422a, #33261a);
@@ -538,6 +541,7 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
   border-radius: 4px;
   background: #0b110c;
   cursor: pointer;
+  touch-action: manipulation;
   image-rendering: auto;
 }
 .mm-hint { flex: none; font-size: 10.5px; color: #8e7c5c; text-align: center; }
