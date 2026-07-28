@@ -160,6 +160,17 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .vol { display: block; margin-bottom: 16px; font-size: 14px; color: #cbb68c; }
 .vol input { width: 100%; margin-top: 6px; accent-color: var(--gold); }
 
+/* Controles que antes estaban en la barra superior y ahora viven en el menú. */
+/* En flujo flexible, no en rejilla: en multijugador el botón de velocidad se
+   oculta y el resto se recoloca sin dejar un hueco. */
+.menu-actions {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 16px;
+}
+.menu-actions button { flex: 1 1 calc(50% - 4px); margin: 0; padding: 9px 10px; font-size: 14px; }
+.menu-actions .wide { flex-basis: 100%; }
+#pause-menu .stats { margin: 4px 0 16px; }
+
 .stats { width: 100%; margin: 10px 0 18px; border-collapse: collapse; font-size: 14px; }
 .stats td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.08); }
 .stats td:last-child { text-align: right; color: var(--gold-l); font-weight: bold; }
@@ -396,6 +407,24 @@ body.cursor-attack #game { cursor: cell; }
 }
 .res span.warn, #res-pop.warn { color: #ff9a92; }
 
+/* Los aldeanos en reposo son una ficha igual que las de recursos, sólo que
+   pulsable: hay que deshacer el aspecto que trae de serie un <button>. */
+#idle-villager {
+  color: var(--parch);
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter .12s, transform .08s;
+}
+#idle-villager:hover { filter: brightness(1.25); }
+#idle-villager:active { transform: translateY(1px); }
+/* Con aldeanos parados la ficha llama la atención; a cero se apaga. */
+#idle-villager.has-idle {
+  border-color: #7fd39b;
+  color: #bdf0cf;
+  background: rgba(38,92,58,.42);
+}
+#idle-villager:not(.has-idle) { opacity: .62; }
+
 .dot {
   width: 13px; height: 13px; border-radius: 50%;
   display: inline-block;
@@ -407,17 +436,9 @@ body.cursor-attack #game { cursor: cell; }
 .dot.gold { background: radial-gradient(circle at 35% 30%, #ffe58a, #c9971a); }
 .dot.stone { background: radial-gradient(circle at 35% 30%, #dcdcd6, #85857e); }
 .dot.pop { background: radial-gradient(circle at 35% 30%, #a8c8ff, #3f6bb8); }
-
-.center-group {
-  font-family: "Palatino Linotype", Palatino, Georgia, serif;
-  font-size: 18px;
-  color: var(--gold-l);
-  letter-spacing: 1px;
-  white-space: nowrap;
-}
+.dot.idle { background: radial-gradient(circle at 35% 30%, #b6f2c8, #2f7d4e); }
 
 .right-group { display: flex; align-items: center; gap: 8px; flex: none; flex-wrap: nowrap; }
-/* El texto de los botones tampoco parte: «Ociosos: 3» caía en dos renglones. */
 .tbtn { padding: 5px 11px; font-size: 13px; white-space: nowrap; }
 .tbtn.icon { padding: 5px 8px; display: flex; align-items: center; }
 
@@ -441,7 +462,6 @@ body.is-fullscreen .fs-shrink { display: inline; }
 }
 .fs-toggle .fs-icon { width: 16px; height: 16px; }
 .tbtn.active { background: linear-gradient(180deg, #a8862c, #6d5314); color: #251b09; font-weight: bold; }
-.clock { font-variant-numeric: tabular-nums; color: #cbb68c; font-size: 14px; min-width: 44px; text-align: right; }
 
 /* Tira de producción */
 
@@ -729,7 +749,8 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   border: 2px solid var(--panel-edge);
   border-radius: 10px;
   padding: 20px 24px;
-  z-index: 30;
+  /* Por encima del menú de pausa: la ayuda se abre desde él. */
+  z-index: 60;
   box-shadow: 0 20px 60px rgba(0,0,0,.7);
 }
 .panel h2 { margin: 0 0 10px; color: var(--gold-l); font-size: 20px; font-family: Georgia, serif; }
@@ -749,7 +770,6 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   #commands { grid-template-columns: repeat(auto-fill, 54px); grid-auto-rows: 54px; }
   .cmd { width: 54px; height: 54px; }
   .cmd img { width: 46px; height: 46px; }
-  .center-group { display: none; }
   .sel-desc { display: none; }
 }
 
@@ -775,14 +795,11 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   .dot { width: 10px; height: 10px; }
   .right-group { gap: 4px; flex: none; }
   .tbtn { padding: 3px 6px; font-size: 11px; }
-  .tbtn-long { display: none; } /* «Vel. 1x» pasa a ser solo «1x» */
-  .clock { font-size: 12px; min-width: 30px; }
 }
 
 @media (max-width: 680px) {
   /* Sin suelo: los paneles ya traen su alto y la barra se ajusta a ellos. */
   :root { --bar-h: 34px; --bottom-h: 162px; --bottom-min: 0px; --prod-h: 42px; }
-  #idle-villager { display: none; } /* con este ancho no cabe */
 
   #bottombar {
     flex-wrap: wrap; gap: 5px;
@@ -835,7 +852,6 @@ button.cmd, button.qitem, button.prod { margin: 0; }
 }
 
 @media (max-width: 340px) {
-  .clock { display: none; }
   .sel-owner { display: none; }
 }
 

@@ -179,22 +179,12 @@
       <div class="res" title="Oro"><i class="dot gold"></i><span id="res-gold">0</span></div>
       <div class="res" title="Piedra"><i class="dot stone"></i><span id="res-stone">0</span></div>
       <div class="res" title="Población"><i class="dot pop"></i><span id="res-pop">0/0</span></div>
-    </div>
-    <div class="center-group">
-      <span id="age-label">Edad Oscura</span>
+      <!-- Los aldeanos en reposo son un dato más de la economía, así que se
+           muestran con la misma ficha que los recursos, pero se pueden pulsar. -->
+      <button id="idle-villager" class="res idle" title="Aldeanos en reposo [.]" aria-label="Aldeanos en reposo"><i class="dot idle"></i><span id="idle-count">0</span></button>
     </div>
     <div class="right-group">
-      <button id="idle-villager" class="tbtn" title="Seleccionar aldeano ocioso [.]">Ociosos: 0</button>
-      <button id="btn-speed" class="tbtn" title="Velocidad del juego"><span class="tbtn-long">Vel. </span><span id="speed-label">1x</span></button>
-      <button id="btn-fullscreen" class="tbtn icon" title="Pantalla completa [F11]" aria-label="Pantalla completa" aria-pressed="false">
-        <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
-          <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
-        </svg>
-      </button>
-      <button id="btn-help" class="tbtn" title="Ayuda [F1]">?</button>
-      <span id="clock" class="clock">0:00</span>
-      <button id="btn-menu" class="tbtn" title="Menú [Esc]">☰</button>
+      <button id="btn-menu" class="tbtn" title="Menú [Esc]" aria-label="Menú">☰</button>
     </div>
   </div>
 
@@ -228,11 +218,11 @@
       <tr><td>WASD / flechas / borde</td><td>Mover la cámara</td></tr>
       <tr><td>Rueda del ratón</td><td>Acercar y alejar</td></tr>
       <tr><td>Ctrl + 0-9 / 0-9</td><td>Guardar y recuperar grupos de control</td></tr>
-      <tr><td>.</td><td>Ir al siguiente aldeano ocioso</td></tr>
+      <tr><td>.</td><td>Ir al siguiente aldeano en reposo (o pulsa su ficha en la barra)</td></tr>
       <tr><td>Espacio</td><td>Centrar la cámara en la selección</td></tr>
       <tr><td>Supr</td><td>Eliminar lo seleccionado</td></tr>
-      <tr><td>P / Esc</td><td>Pausa y menú</td></tr>
-      <tr><td>F11 o el botón ⛶</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
+      <tr><td>P / Esc o el botón ☰</td><td>Pausa y menú: edad, tiempo, velocidad, pantalla completa, volumen y ayuda</td></tr>
+      <tr><td>F11 o el menú</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
       <tr><td>Multijugador</td><td>Desde el menú principal: entra en la sala, elige a alguien e invítalo</td></tr>
       <tr><td>Catálogo</td><td>Desde el menú principal: consulta y edita los valores y el aspecto de todo el juego</td></tr>
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
@@ -251,6 +241,23 @@
   <div id="pause-menu" class="overlay hidden">
     <div class="menu-card small">
       <h2>Pausa</h2>
+      <!-- Todo lo que antes vivía en la barra superior: la barra sólo guarda
+           los recursos, el reposo y este menú. -->
+      <table class="stats">
+        <tr><td>Edad</td><td id="age-label">Edad Oscura</td></tr>
+        <tr><td>Tiempo de partida</td><td id="clock">0:00</td></tr>
+      </table>
+      <div class="menu-actions">
+        <button id="btn-speed" title="Velocidad del juego">Velocidad: <span id="speed-label">1x</span></button>
+        <button id="btn-help" title="Ayuda [F1]">Ayuda</button>
+        <button id="btn-fullscreen" class="wide fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
+          <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+            <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+          </svg>
+          <span class="fs-label">Pantalla completa</span>
+        </button>
+      </div>
       <label class="vol">Volumen
         <input id="volume" type="range" min="0" max="1" step="0.05" value="0.35">
       </label>
