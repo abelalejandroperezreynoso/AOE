@@ -373,6 +373,34 @@ export class Game {
     return best;
   }
 
+  /**
+   * Recurso que debería ponerse a recolectar el aldeano que acaba de levantar
+   * un edificio: el molino manda a por comida, el campamento maderero a por
+   * leña y el minero a por oro o piedra (lo que tenga más cerca). Quien
+   * construye una granja se queda cultivándola.
+   * Devuelve el nodo (o la granja) o null si no hay nada cerca.
+   */
+  autoGatherJob(player, building) {
+    if (!building || building.dead || !building.built) return null;
+    const B = BUILDINGS[building.type];
+    if (!B) return null;
+    if (building.type === 'farm') return building.farmAmount > 0 ? building : null;
+    // El centro urbano almacena de todo, así que no hay un recurso "suyo".
+    if (!B.dropoff || building.type === 'towncenter') return null;
+
+    const radius = (B.los || 5) + 3;
+    let best = null, bestD = Infinity;
+    for (const res of B.dropoff) {
+      const node = this.findResourceNear(building.cx, building.cy, res, radius, player);
+      if (!node) continue;
+      const nx = node.kind === 'building' ? node.cx : node.x + 0.5;
+      const ny = node.kind === 'building' ? node.cy : node.y + 0.5;
+      const d = dist(building.cx, building.cy, nx, ny);
+      if (d < bestD) { bestD = d; best = node; }
+    }
+    return best;
+  }
+
   gatherInfo(target) {
     if (target.kind === 'building') {
       return { res: 'food', rate: 'farm', x: target.cx, y: target.cy, amount: target.farmAmount || 0 };
