@@ -96,21 +96,73 @@ export function drawTerrainTile(ctx, sx, sy, terrain, rnd) {
   }
 }
 
+// --- Resolución de los sprites ----------------------------------------------
+
+/*
+ * Los sprites se cachean en mapas de bits y el mundo se dibuja con la cámara
+ * escalada, así que un sprite rasterizado a 1× se ve borroso en cuanto se
+ * amplía. `quality` es cuántos píxeles de sprite se guardan por cada píxel de
+ * mundo: se ajusta a la densidad de la pantalla para que a zoom 1 la copia sea
+ * exacta. Por encima de ese zoom el renderizador no usa la caché, dibuja los
+ * sprites directamente sobre el lienzo (ver las funciones `paint*`), que a
+ * cualquier ampliación salen nítidos y no gastan memoria.
+ */
+let quality = 1;
+
+export function spriteQuality() { return quality; }
+
+/** Cambiarla invalida los sprites del mundo; los iconos ya rasterizados valen. */
+export function setSpriteQuality(q) {
+  q = Math.max(1, Math.min(3, Math.round(q * 2) / 2));
+  if (q === quality) return;
+  quality = q;
+  resCache.clear();
+  unitCache.clear();
+  buildCache.clear();
+  boundsCache.clear(); // las cajas de los iconos van en píxeles del lienzo
+}
+
+/**
+ * Dibuja un sprite de la caché. Su lienzo está a `quality`× y sus medidas y
+ * anclaje vienen en píxeles de mundo, así que hay que darle a `drawImage` el
+ * tamaño de destino: sin él saldría `quality` veces más grande.
+ */
+export function drawSprite(ctx, s, x, y, scale = 1) {
+  ctx.drawImage(s.canvas, x - s.ox * scale, y - s.oy * scale, s.w * scale, s.h * scale);
+}
+
 // --- Sprites de recursos ----------------------------------------------------
 
 const resCache = new Map();
+const RW = 80, RH = 96, ROX = 40, ROY = 74; // lienzo y anclaje (centro del rombo)
 
 export function resourceSprite(kind, variant = 0, depleted = false) {
   const key = `${kind}|${variant}|${depleted ? 1 : 0}`;
   let s = resCache.get(key);
   if (s) return s;
+  const sc = look('node', kind === 'stump' ? 'tree' : kind).scale || 1;
+  const c = makeCanvas(RW * sc * quality, RH * sc * quality);
+  const ctx = c.getContext('2d');
+  ctx.scale(sc * quality, sc * quality);
+  drawResource(ctx, kind, variant, depleted, ROX, ROY);
+  s = { canvas: c, ox: ROX * sc, oy: ROY * sc, w: RW * sc, h: RH * sc };
+  resCache.set(key, s);
+  return s;
+}
+
+/** Pinta un recurso directamente, con (x, y) ya en el sitio donde va. */
+export function paintResource(ctx, x, y, kind, variant = 0, depleted = false) {
+  const sc = look('node', kind === 'stump' ? 'tree' : kind).scale || 1;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
+  drawResource(ctx, kind, variant, depleted, 0, 0);
+  ctx.restore();
+}
+
+function drawResource(ctx, kind, variant, depleted, ox, oy) {
   // El aspecto del tocón es el del árbol del que salió.
   const L = look('node', kind === 'stump' ? 'tree' : kind);
-  const sc = L.scale || 1;
-  const c = makeCanvas(80 * sc, 96 * sc);
-  const ctx = c.getContext('2d');
-  ctx.scale(sc, sc);
-  const ox = 40, oy = 74; // punto de anclaje (centro del rombo del tile)
   const r = (n) => ((Math.sin(variant * 12.9898 + n * 78.233) * 43758.5453) % 1 + 1) % 1;
 
   switch (kind) {
@@ -204,9 +256,6 @@ export function resourceSprite(kind, variant = 0, depleted = false) {
       break;
     }
   }
-  s = { canvas: c, ox: ox * sc, oy: oy * sc };
-  resCache.set(key, s);
-  return s;
 }
 
 // --- Sprites de unidades ----------------------------------------------------
@@ -428,15 +477,26 @@ export function unitSprite(type, colorIdx, dir, f, back = false) {
   // recorta y una normal no gasta memoria de más.
   const sc = look('unit', type).scale || 1;
   const extra = HEADROOM[UNITS[type] && UNITS[type].class] || 0;
-  const c = makeCanvas(UW * sc, (UH + extra) * sc);
+  const c = makeCanvas(UW * sc * quality, (UH + extra) * sc * quality);
   const ctx = c.getContext('2d');
-  ctx.scale(sc, sc);
+  ctx.scale(sc * quality, sc * quality);
   ctx.translate(UOX, UOY + extra);
   if (dir < 0) ctx.scale(-1, 1);
   drawUnit(ctx, type, colorIdx, f, back);
-  s = { canvas: c, ox: UOX * sc, oy: (UOY + extra) * sc };
+  s = { canvas: c, ox: UOX * sc, oy: (UOY + extra) * sc, w: UW * sc, h: (UH + extra) * sc };
   unitCache.set(key, s);
   return s;
+}
+
+/** Pinta una unidad directamente, con (x, y) a sus pies. */
+export function paintUnit(ctx, x, y, type, colorIdx, dir, f, back = false) {
+  const sc = look('unit', type).scale || 1;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sc, sc);
+  if (dir < 0) ctx.scale(-1, 1);
+  drawUnit(ctx, type, colorIdx, f, back);
+  ctx.restore();
 }
 
 // --- Sprites de edificios ---------------------------------------------------
@@ -730,20 +790,42 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
   }
 }
 
+/** Medidas del lienzo de un edificio y dónde cae su anclaje dentro de él. */
+function buildingGeom(type) {
+  const size = BUILDINGS[type].size;
+  const pad = 14;
+  const topH = type === 'castle' ? 96 : type === 'tower' ? 62 : type === 'towncenter' ? 74 : 52;
+  return {
+    size, pad, topH,
+    w: size * TILE_W + pad * 2,
+    h: pad + topH + size * TILE_H + pad,
+    ox: size * HW + pad,
+    oy: pad + topH,
+  };
+}
+
 /** stage: 0 cimientos, 1 a medio construir, 2 terminado. */
 export function buildingSprite(type, colorIdx, stage = 2) {
   const key = `${type}|${colorIdx}|${stage}`;
   let s = buildCache.get(key);
   if (s) return s;
-  const B = BUILDINGS[type];
-  const size = B.size;
-  const pad = 14;
-  const topH = type === 'castle' ? 96 : type === 'tower' ? 62 : type === 'towncenter' ? 74 : 52;
-  const w = size * TILE_W + pad * 2;
-  const h = pad + topH + size * TILE_H + pad;
-  const c = makeCanvas(w, h);
+  const G = buildingGeom(type);
+  const c = makeCanvas(G.w * quality, G.h * quality);
   const ctx = c.getContext('2d');
-  const ox = size * HW + pad, oy = pad + topH;
+  ctx.scale(quality, quality);
+  drawBuildingStage(ctx, type, colorIdx, stage, G.ox, G.oy, G);
+  s = { canvas: c, ox: G.ox, oy: G.oy, w: G.w, h: G.h };
+  buildCache.set(key, s);
+  return s;
+}
+
+/** Pinta un edificio directamente, con (x, y) en la esquina de su huella. */
+export function paintBuilding(ctx, x, y, type, colorIdx, stage = 2) {
+  drawBuildingStage(ctx, type, colorIdx, stage, x, y, buildingGeom(type));
+}
+
+function drawBuildingStage(ctx, type, colorIdx, stage, ox, oy, G) {
+  const { size, topH, w, h } = G;
 
   if (stage === 0) {
     // Cimientos: estacas y una plataforma de tierra.
@@ -760,7 +842,8 @@ export function buildingSprite(type, colorIdx, stage = 2) {
   } else if (stage === 1) {
     ctx.save();
     ctx.beginPath();
-    ctx.rect(0, oy - topH * 0.45, w, h);
+    // El recorte va sobre la caja del sprite, esté donde esté su anclaje.
+    ctx.rect(ox - G.ox, oy - topH * 0.45, w, h);
     ctx.clip();
     ctx.globalAlpha = 0.92;
     drawBuilding(ctx, type, colorIdx, ox, oy);
@@ -774,9 +857,6 @@ export function buildingSprite(type, colorIdx, stage = 2) {
   } else {
     drawBuilding(ctx, type, colorIdx, ox, oy);
   }
-  s = { canvas: c, ox, oy };
-  buildCache.set(key, s);
-  return s;
 }
 
 // --- Iconos para la interfaz ------------------------------------------------

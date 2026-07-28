@@ -1,10 +1,22 @@
 // Renderizador isométrico sobre canvas 2D.
 
 import { TILE_W, TILE_H, UNITS, BUILDINGS, PLAYER_COLORS } from './config.js';
-import { unitSprite, buildingSprite, resourceSprite, makeCanvas, HW, HH } from './sprites.js';
+import {
+  unitSprite, buildingSprite, resourceSprite, makeCanvas, HW, HH,
+  drawSprite, paintUnit, paintBuilding, paintResource, setSpriteQuality, drawTerrainTile,
+} from './sprites.js';
 import { clamp, dist } from './utils.js';
 
 const Z_PX = 18; // píxeles de altura por unidad de "z" en el mundo
+/*
+ * Tope de rombos que se redibujan por fotograma antes de tirar del lienzo
+ * horneado. Medido sobre el propio juego: hasta ~1000 rombos redibujarlos
+ * cuesta lo mismo que copiar el lienzo (y a partir de zoom 2 sale más barato,
+ * porque ampliar un mapa de bits es más caro que rellenar unos polígonos);
+ * pasado ese punto la copia gana de calle. De cerca nunca se llega al tope, y
+ * de lejos la copia se reduce en pantalla y ya se ve bien.
+ */
+const MAX_TILES = 1000;
 
 export class Renderer {
   constructor(canvas, game) {
@@ -31,6 +43,9 @@ export class Renderer {
     this.canvas.width = Math.max(1, Math.round(w * dpr));
     this.canvas.height = Math.max(1, Math.round(h * dpr));
     this.dpr = dpr;
+    // Los sprites se guardan a la densidad de la pantalla: a zoom 1 la copia
+    // sale píxel a píxel en vez de ampliada.
+    setSpriteQuality(dpr);
     this.w = w; this.h = h;
     const fw = Math.ceil(w / this.fogScale) + this.fogMargin * 2;
     const fh = Math.ceil(h / this.fogScale) + this.fogMargin * 2;
@@ -106,11 +121,17 @@ export class Renderer {
     ctx.setTransform(this.dpr * z, 0, 0, this.dpr * z,
       this.dpr * (this.w / 2 - this.cam.x * z), this.dpr * (this.h / 2 - this.cam.y * z));
 
-    // Terreno estático.
+    /*
+     * Ampliar es lo que emborrona: por debajo de 1:1 los mapas de bits ya
+     * horneados se ven perfectos, y por encima hay que volver a dibujar. Como
+     * cuanto más cerca está la cámara menos cabe en pantalla, la ruta nítida
+     * es también la que menos cosas tiene que dibujar.
+     */
+    this.sharp = z > 1;
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(g.map.canvas, 0, 0);
 
     const b = this.visibleTileBounds();
+    this.drawTerrain(ctx, b);
     this.drawDecals(ctx, b);
     this.drawSelectionMarkers(ctx);
     this.drawEntities(ctx, b);
@@ -121,6 +142,35 @@ export class Renderer {
     this.drawFog(ctx);
     this.drawFloatingText(ctx);
     this.drawHud(ctx);
+  }
+
+  /**
+   * El terreno está horneado en un solo lienzo del tamaño del mapa, que a
+   * pantalla completa mide decenas de millones de píxeles: no cabe guardarlo a
+   * más resolución. En su lugar, cuando la cámara lo ampliaría se vuelven a
+   * dibujar los rombos visibles, que son vectores y salen nítidos a cualquier
+   * escala. Se hace sólo si son pocos: de lejos entra medio mapa en pantalla y
+   * el lienzo horneado, que allí se reduce, se ve igual de bien y cuesta un
+   * único `drawImage`.
+   */
+  drawTerrain(ctx, b) {
+    const m = this.game.map;
+    const tiles = (b.x1 - b.x0 + 1) * (b.y1 - b.y0 + 1);
+    if (this.dpr * this.cam.zoom <= 1.15 || tiles > MAX_TILES || !m.tileRnd) {
+      ctx.drawImage(m.canvas, 0, 0);
+      return;
+    }
+    // El fondo del lienzo horneado, para que el borde del mapa se vea igual.
+    ctx.fillStyle = '#1d2a17';
+    ctx.fillRect(0, 0, m.canvas.width, m.canvas.height);
+    const names = m.terrainNames;
+    for (let y = b.y0; y <= b.y1; y++) {
+      for (let x = b.x0; x <= b.x1; x++) {
+        const i = m.idx(x, y);
+        const [sx, sy] = m.tileToCanvas(x, y);
+        drawTerrainTile(ctx, sx, sy, names[m.terrain[i]], m.tileRnd[i]);
+      }
+    }
   }
 
   drawDecals(ctx, b) {
@@ -141,9 +191,9 @@ export class Renderer {
           ctx.fillRect(mx + Math.cos(ang) * r - 2, my + Math.sin(ang) * r * 0.5 - 2, 5, 4);
         }
       } else if (d.kind === 'stump') {
-        const s = resourceSprite('stump', 0);
         ctx.globalAlpha = Math.min(1, d.life / 3);
-        ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+        if (this.sharp) paintResource(ctx, mx, my, 'stump', 0);
+        else drawSprite(ctx, resourceSprite('stump', 0), mx, my);
         ctx.globalAlpha = 1;
       }
     }
@@ -228,17 +278,18 @@ export class Renderer {
     const [mx, my] = this.worldToCanvas(n.x + 0.5, n.y + 0.5);
     const kind = n.kind;
     const depleted = n.amount < n.max * 0.34;
-    const s = resourceSprite(kind, n.variant, depleted);
-    ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+    if (this.sharp) paintResource(ctx, mx, my, kind, n.variant, depleted);
+    else drawSprite(ctx, resourceSprite(kind, n.variant, depleted), mx, my);
   }
 
   drawBuilding(ctx, b) {
     const g = this.game;
     const stage = b.built ? 2 : (b.progress > 0.45 ? 1 : 0);
-    const s = buildingSprite(b.type, g.players[b.owner].colorIdx, stage);
+    const colorIdx = g.players[b.owner].colorIdx;
     const [mx, my] = this.worldToCanvas(b.tx, b.ty);
     if (!b.built) ctx.globalAlpha = 0.55 + b.progress * 0.45;
-    ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+    if (this.sharp) paintBuilding(ctx, mx, my, b.type, colorIdx, stage);
+    else drawSprite(ctx, buildingSprite(b.type, colorIdx, stage), mx, my);
     ctx.globalAlpha = 1;
 
     // Humo en edificios dañados.
@@ -288,9 +339,10 @@ export class Renderer {
     const frame = u.attackAnim > 0
       ? (u.attackAnim > 0.25 ? 4 : 5)
       : (u.moving ? (Math.floor(u.anim) % 4) : 0);
-    const s = unitSprite(u.type, g.players[u.owner].colorIdx, u.dir, frame, u.back);
+    const colorIdx = g.players[u.owner].colorIdx;
     const [mx, my] = this.worldToCanvas(u.x, u.y);
-    ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+    if (this.sharp) paintUnit(ctx, mx, my, u.type, colorIdx, u.dir, frame, u.back);
+    else drawSprite(ctx, unitSprite(u.type, colorIdx, u.dir, frame, u.back), mx, my);
 
     if (u.carry > 0.5 && u.carryRes) {
       const col = { food: '#d24a3a', wood: '#8a6234', gold: '#e0b52c', stone: '#b6b6b0' }[u.carryRes];
@@ -347,7 +399,6 @@ export class Renderer {
     if (!pl || pl.tx === undefined) return;
     const B = BUILDINGS[pl.type];
     const ok = g.canPlace(pl.type, pl.tx, pl.ty, g.human) && g.human.canAfford(B.cost);
-    const s = buildingSprite(pl.type, g.human.colorIdx, 2);
     const [mx, my] = this.worldToCanvas(pl.tx, pl.ty);
     // Huella
     for (let y = 0; y < B.size; y++) {
@@ -363,7 +414,8 @@ export class Renderer {
       }
     }
     ctx.globalAlpha = 0.65;
-    ctx.drawImage(s.canvas, mx - s.ox, my - s.oy);
+    if (this.sharp) paintBuilding(ctx, mx, my, pl.type, g.human.colorIdx, 2);
+    else drawSprite(ctx, buildingSprite(pl.type, g.human.colorIdx, 2), mx, my);
     ctx.globalAlpha = 1;
     if (!ok) {
       ctx.strokeStyle = 'rgba(230,90,80,.9)'; ctx.lineWidth = 2;
