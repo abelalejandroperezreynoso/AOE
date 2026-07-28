@@ -95,6 +95,7 @@ export class UI {
     this.el.queue = id('queue');
     this.el.notif = id('notifications');
     this.el.tooltip = id('tooltip');
+    this.el.bottombar = id('bottombar');
     this.el.pauseMenu = id('pause-menu');
     this.el.endScreen = id('end-screen');
     this.el.idleBtn = id('idle-villager');
@@ -310,6 +311,9 @@ export class UI {
     // Si el puntero abandona la ventana, se detiene el desplazamiento de borde.
     document.addEventListener('mouseleave', () => { if (this.mouse) this.mouse.out = true; });
     document.addEventListener('mouseenter', () => { if (this.mouse) this.mouse.out = false; });
+    // Al girar el móvil o cambiar el tamaño, la ficha quedaría descolocada.
+    window.addEventListener('resize', () => this.hideTooltip());
+    window.addEventListener('orientationchange', () => this.hideTooltip());
   }
 
   /**
@@ -327,6 +331,7 @@ export class UI {
     c.addEventListener('touchstart', (e) => {
       this.audio.ensure();
       this.touchMode = true;
+      this.hideTooltip();
       if (e.touches.length === 1) {
         start = pos(e.touches[0]);
         lastPan = start;
@@ -762,6 +767,9 @@ export class UI {
 
   renderCommands() {
     const cont = this.el.commands;
+    // Los botones se rehacen enteros: cualquier ficha abierta apunta a uno que
+    // ya no existe, así que se cierra antes de repintar.
+    this.hideTooltip();
     cont.innerHTML = '';
     const btns = this.commandList();
     this.buttons = btns;
@@ -776,8 +784,18 @@ export class UI {
         .map((r) => `<i class="dot ${r}"></i>${b.cost[r]}`).join(' ')}</span>` : '';
       el.innerHTML = `${inner}<span class="key">${b.hotkey}</span>${costHtml}`;
       el.title = `${b.label}${b.hotkey ? ` [${b.hotkey}]` : ''}\n${b.tooltip || ''}${b.cost ? `\nCoste: ${RESOURCES.filter((r) => b.cost[r]).map((r) => `${b.cost[r]} ${RES_NAME[r]}`).join(', ')}` : ''}`;
-      el.onmouseenter = () => this.showTooltip(b, el);
-      el.onmouseleave = () => this.hideTooltip();
+      // Con ratón la ficha sigue al puntero; con el dedo solo se ve mientras
+      // se mantiene pulsado, para que no se quede tapando la barra inferior.
+      el.addEventListener('pointerenter', (e) => {
+        if (e.pointerType === 'mouse') this.showTooltip(b, el);
+      });
+      el.addEventListener('pointerleave', () => this.hideTooltip());
+      el.addEventListener('pointerdown', (e) => {
+        if (e.pointerType !== 'mouse') this.showTooltip(b, el, true);
+      });
+      for (const ev of ['pointerup', 'pointercancel']) {
+        el.addEventListener(ev, (e) => { if (e.pointerType !== 'mouse') this.hideTooltip(); });
+      }
       el.onclick = () => {
         if (b.disabled) { this.audio.play('error'); this.notify('Recursos insuficientes', 'bad'); return; }
         b.action();
@@ -787,20 +805,49 @@ export class UI {
     });
   }
 
-  showTooltip(b, el) {
+  /**
+   * Muestra la ficha de una orden encima de su botón. Nunca se sale de la
+   * pantalla: si no cabe arriba baja, y el ancho se limita por CSS al viewport.
+   * `touch` la dibuja compacta, porque con el dedo tapa la barra inferior.
+   */
+  showTooltip(b, el, touch = false) {
     const t = this.el.tooltip;
     const cost = b.cost
       ? `<div class="tt-cost">${RESOURCES.filter((r) => b.cost[r])
         .map((r) => `<i class="dot ${r}"></i>${b.cost[r]}`).join(' ')}</div>` : '';
+    // En táctil el texto va en línea corrida, así que los saltos se sustituyen
+    // por un separador; con ratón se conservan como renglones.
+    const lines = (b.tooltip || '').split('\n').slice(1);
     t.innerHTML = `<div class="tt-title">${b.label}${b.hotkey ? ` <em>[${b.hotkey}]</em>` : ''}</div>
-      <div class="tt-body">${(b.tooltip || '').split('\n').slice(1).join('<br>')}</div>${cost}`;
+      <div class="tt-body">${lines.join(touch ? ' · ' : '<br>')}</div>${cost}`;
+    t.classList.toggle('touch', touch);
+    t.classList.toggle('with-body', lines.length > 0);
     t.classList.remove('hidden');
+
+    const m = 8;
     const r = el.getBoundingClientRect();
-    t.style.left = `${clamp(r.left + r.width / 2 - 110, 8, window.innerWidth - 236)}px`;
-    t.style.top = `${r.top - t.offsetHeight - 10}px`;
+    const tw = t.offsetWidth, th = t.offsetHeight;
+    // Con el dedo la ficha se apoya sobre la barra inferior completa, no sobre
+    // el botón: así no tapa el panel de selección ni el minimapa.
+    const anchor = touch ? this.el.bottombar.getBoundingClientRect() : r;
+    const cx = touch ? window.innerWidth / 2 : r.left + r.width / 2;
+    t.style.left = `${clamp(cx - tw / 2, m, Math.max(m, window.innerWidth - tw - m))}px`;
+    // Preferencia: encima. Si no cabe, debajo; y siempre dentro de la pantalla.
+    let top = anchor.top - th - 10;
+    if (top < m) top = anchor.bottom + 10;
+    t.style.top = `${clamp(top, m, Math.max(m, window.innerHeight - th - m))}px`;
+
+    // Red de seguridad: en táctil algunos navegadores se comen el «pointerup»
+    // (al deslizar fuera del botón, al abrir un diálogo...) y la ficha se
+    // quedaría pegada tapando la interfaz.
+    clearTimeout(this.tooltipTimer);
+    if (touch) this.tooltipTimer = setTimeout(() => this.hideTooltip(), 4000);
   }
 
-  hideTooltip() { this.el.tooltip.classList.add('hidden'); }
+  hideTooltip() {
+    clearTimeout(this.tooltipTimer);
+    this.el.tooltip.classList.add('hidden');
+  }
 
   showResourceInfo(node) {
     const names = {
