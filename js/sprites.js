@@ -919,4 +919,18 @@ export function iconFor(kind, type, colorIdx = 0) {
   return url;
 }
 
+/**
+ * Vacía todos los cachés de dibujo. Hay que llamarla cuando se cambian datos
+ * del juego desde el catálogo: los sprites se guardan por tipo y color, así
+ * que si cambia el tamaño de un edificio o el color de un terreno hay que
+ * volver a dibujarlos.
+ */
+export function clearSpriteCaches() {
+  resCache.clear();
+  unitCache.clear();
+  buildCache.clear();
+  iconCache.clear();
+  boundsCache.clear();
+}
+
 export { HW, HH };

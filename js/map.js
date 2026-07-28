@@ -2,7 +2,7 @@
 
 import { TILE_W, TILE_H, RESOURCE_NODES } from './config.js';
 import { Rng, makeNoise, fbm, clamp } from './utils.js';
-import { drawTerrainTile, makeCanvas } from './sprites.js';
+import { drawTerrainTile, makeCanvas, TERRAIN_COLORS } from './sprites.js';
 
 const HW = TILE_W / 2, HH = TILE_H / 2;
 
@@ -232,7 +232,7 @@ export class GameMap {
     this.minimap = makeCanvas(w, h);
     const ctx = this.minimap.getContext('2d');
     ctx.clearRect(0, 0, w, h);
-    const colors = ['#5b8b3a', '#4f7d33', '#679a42', '#93743f', '#c2ad6b', '#2f5f9e', '#3f7cb8'];
+    const colors = this.terrainNames.map((n) => TERRAIN_COLORS[n]);
     const sx = w / (S * 2), sy = h / (S * 2);
     for (let y = 0; y < S; y++) {
       for (let x = 0; x < S; x++) {

@@ -7,8 +7,15 @@ import { AI } from './ai.js';
 import { Audio } from './audio.js';
 import { LobbyUI } from './lobby-ui.js';
 import { NetSession } from './net/session.js';
+import { Catalog } from './catalog.js';
+import { loadOverrides, adoptOverrides } from './data/overrides.js';
 
 const el = (id) => document.getElementById(id);
+
+// Los valores que el jugador haya cambiado en el catálogo se aplican antes de
+// que nada lea la configuración.
+loadOverrides();
+const catalog = new Catalog();
 
 const audio = new Audio();
 let game = null, renderer = null, ui = null, raf = 0;
@@ -64,8 +71,11 @@ function startGame(opts, net = null) {
 }
 
 // Multijugador: la sala entrega la conexión ya hecha y aquí sólo se arranca.
-const lobbyUi = new LobbyUI(({ peer, role, seed, mapSize, names }) => {
+const lobbyUi = new LobbyUI(({ peer, role, seed, mapSize, names, overrides }) => {
   audio.ensure();
+  // En multijugador mandan los valores del anfitrión: si el invitado tiene
+  // otros, se adoptan los del anfitrión mientras dure la partida.
+  if (role === 'guest' && overrides) adoptOverrides(overrides);
   startGame({
     opponents: 1,
     difficulty: 'normal',
