@@ -94,14 +94,27 @@ export class Game {
     this.fogCd = 0;
     this.byId = new Map();
 
+    // Red: null en un jugador; en multijugador lo rellena NetSession.
+    this.net = null;
+    this.netRemoved = [];
+    this.netDepleted = [];
+    this.netHasState = false;
+
+    const names = opts.playerNames || [];
+    const localIdx = opts.localPlayer ?? 0;
     for (let i = 0; i < this.playerCount; i++) {
-      const human = i === 0;
-      const p = new Player(i, i, human, human ? 'Tú' : `Rival ${i}`);
+      const local = i === localIdx;
+      const p = new Player(i, i, local, names[i] || (local ? 'Tú' : `Rival ${i}`));
       this.players.push(p);
     }
-    this.human = this.players[0];
+    this.human = this.players[localIdx];
     this.setupStart();
   }
+
+  /** El invitado no simula: sólo pinta lo que le manda el anfitrión. */
+  get isGuest() { return this.net !== null && this.net.role === 'guest'; }
+
+  netSend(cmd) { if (this.net) this.net.sendCommand(cmd); }
 
   // --- Preparación ----------------------------------------------------------
 
@@ -187,6 +200,7 @@ export class Game {
     this.players[u.owner].stats.unitsLost++;
     if (from && from.owner !== undefined) this.players[from.owner].stats.kills++;
     this.byId.delete(u.id);
+    if (this.net && !this.isGuest) this.netRemoved.push(u.id);
     this.fx.blood(u.x, u.y);
     this.fx.decal(u.x, u.y, 'blood');
     const i = this.selection.indexOf(u);
@@ -202,6 +216,7 @@ export class Game {
     this.players[b.owner].buildings.delete(b);
     if (from && from.owner !== undefined) this.players[from.owner].stats.kills++;
     this.byId.delete(b.id);
+    if (this.net && !this.isGuest) this.netRemoved.push(b.id);
     for (let y = b.ty; y < b.ty + b.size; y++) {
       for (let x = b.tx; x < b.tx + b.size; x++) {
         if (this.map.occupied[this.map.idx(x, y)] === b.id) this.map.occupied[this.map.idx(x, y)] = 0;
@@ -223,6 +238,8 @@ export class Game {
   }
 
   checkDefeat(p) {
+    // Quien decide el final de la partida es el anfitrión, que lo comunica.
+    if (this.isGuest) return;
     if (p.defeated) return;
     if (p.buildings.size > 0) return;
     let hasVil = false;
@@ -234,15 +251,18 @@ export class Game {
   }
 
   checkVictory() {
-    if (this.over) return;
+    if (this.over || this.isGuest) return;
     const alive = this.players.filter((p) => !p.defeated);
     if (this.human.defeated) this.endGame(false);
     else if (alive.length === 1 && alive[0] === this.human) this.endGame(true);
+    // En multijugador hay que avisar al otro del resultado, que es el contrario.
+    if (this.over && this.net) this.net.announceOver(!this.over.won);
   }
 
-  endGame(won) {
-    this.over = { won, time: this.time };
-    if (this.ui) this.ui.showEnd(won);
+  endGame(won, reason = null) {
+    if (this.over) return;
+    this.over = { won, time: this.time, reason };
+    if (this.ui) this.ui.showEnd(won, reason);
   }
 
   // --- Consultas espaciales -------------------------------------------------
@@ -419,6 +439,7 @@ export class Game {
       this.killBuilding(target, null);
     } else if (target.alive) {
       const wasTree = target.kind === 'tree';
+      if (this.net && !this.isGuest) this.netDepleted.push(target.id);
       this.map.removeNode(target);
       if (wasTree) this.fx.decal(target.x + 0.5, target.y + 0.5, 'stump');
       else this.fx.puff(target.x + 0.5, target.y + 0.5, 5);
@@ -529,6 +550,10 @@ export class Game {
   commandMove(units, x, y, attackMove = false) {
     const list = units.filter((u) => u.kind === 'unit');
     if (!list.length) return;
+    if (this.isGuest) {
+      this.netSend({ c: 'move', ids: list.map((u) => u.id), x, y, a: attackMove });
+      return;
+    }
     const spots = this.formationSpots(x, y, list.length);
     list.forEach((u, i) => {
       const s = spots[i] || { x, y };
@@ -555,6 +580,13 @@ export class Game {
   }
 
   commandTarget(units, target) {
+    if (this.isGuest) {
+      const list = units.filter((u) => u.kind === 'unit');
+      if (!list.length || !target) return;
+      const k = target.kind === 'building' ? 'b' : target.kind === 'unit' ? 'u' : 'n';
+      this.netSend({ c: 'target', ids: list.map((u) => u.id), k, t: target.id });
+      return;
+    }
     for (const u of units) {
       if (u.kind !== 'unit') continue;
       u.stopTask();
@@ -578,10 +610,64 @@ export class Game {
     }
   }
 
+  /** Detener: cancela lo que estuvieran haciendo las unidades. */
+  commandStop(units) {
+    const list = units.filter((u) => u.kind === 'unit' && u.owner === this.human.id);
+    if (!list.length) return;
+    if (this.isGuest) { this.netSend({ c: 'stop', ids: list.map((u) => u.id) }); return; }
+    for (const u of list) u.stopTask();
+  }
+
+  /** Eliminar lo seleccionado (unidades o edificios propios). */
+  commandDelete(entities) {
+    const list = entities.filter((e) => e.owner === this.human.id && !e.dead);
+    if (!list.length) return;
+    if (this.isGuest) { this.netSend({ c: 'delete', ids: list.map((e) => e.id) }); return; }
+    for (const e of list) {
+      if (e.kind === 'unit') this.killUnit(e, null);
+      else this.killBuilding(e, null);
+    }
+  }
+
+  /** Punto de reunión de uno o varios edificios. */
+  commandRally(buildings, x, y, target) {
+    const list = buildings.filter((b) => b.kind === 'building' && b.owner === this.human.id);
+    if (!list.length) return;
+    if (this.isGuest) {
+      this.netSend({ c: 'rally', ids: list.map((b) => b.id), x, y, t: target && target.kind ? target.id : null });
+      return;
+    }
+    for (const b of list) {
+      b.rally = target && target.kind
+        ? { x: target.x ?? target.cx, y: target.y ?? target.cy, target }
+        : { x, y };
+    }
+  }
+
+  /** Compraventa en el mercado. dir es 'sell' o 'buy'. */
+  commandMarket(res, dir) {
+    const p = this.human;
+    const price = Math.round(100 * (dir === 'sell' ? 0.8 : 1.4));
+    if (dir === 'sell' && p.res[res] < 100) return;
+    if (dir === 'buy' && p.res.gold < price) return;
+    if (this.isGuest) { this.netSend({ c: 'market', r: res, d: dir }); return; }
+    if (dir === 'sell') { p.res[res] -= 100; p.res.gold += price; }
+    else { p.res.gold -= price; p.res[res] += 100; }
+  }
+
+  /** Rendirse. */
+  commandResign() {
+    if (this.isGuest) { this.netSend({ c: 'resign' }); return; }
+    this.human.defeated = true;
+    this.checkVictory();
+    if (!this.over) this.endGame(false);
+  }
+
   /** Cola de producción. Devuelve un mensaje de error o null. */
   queueUnit(building, type, player) {
     const def = UNITS[type];
     if (!def) return 'Unidad desconocida';
+    if (this.isGuest) { this.netSend({ c: 'train', b: building.id, t: type }); return null; }
     if (player.age < def.age) return `Requiere la ${AGES[def.age].name}`;
     if (!player.canAfford(def.cost)) return 'Recursos insuficientes';
     if (building.queue.length >= 12) return 'Cola llena';
@@ -593,6 +679,7 @@ export class Game {
   queueTech(building, key, player) {
     const t = TECHS[key];
     if (!t) return 'Tecnología desconocida';
+    if (this.isGuest) { this.netSend({ c: 'tech', b: building.id, k2: key }); return null; }
     if (player.techs.has(key)) return 'Ya investigada';
     if (player.age < t.age) return `Requiere la ${AGES[t.age].name}`;
     if (t.requires && !player.techs.has(t.requires)) return `Requiere ${TECHS[t.requires].name}`;
@@ -606,6 +693,7 @@ export class Game {
   queueUpgrade(building, key, player) {
     const up = UPGRADES[key];
     if (!up) return 'Mejora desconocida';
+    if (this.isGuest) { this.netSend({ c: 'upgrade', b: building.id, k2: key }); return null; }
     if (player.techs.has(key)) return 'Ya investigada';
     if (player.age < up.age) return `Requiere la ${AGES[up.age].name}`;
     if (building.queue.some((q) => q.key === key)) return 'Ya está en cola';
@@ -618,6 +706,7 @@ export class Game {
   queueAge(building, player) {
     const next = player.age + 1;
     if (next >= AGES.length) return 'Ya estás en la Edad Imperial';
+    if (this.isGuest) { this.netSend({ c: 'age', b: building.id }); return null; }
     const age = AGES[next];
     const req = player.countBuildings((b) => b.built && BUILDINGS[b.type].age <= player.age
       && !['house', 'farm', 'wall', 'towncenter'].includes(b.type));
@@ -630,6 +719,7 @@ export class Game {
   }
 
   cancelQueueItem(building, index) {
+    if (this.isGuest) { this.netSend({ c: 'cancelq', b: building.id, i: index }); return; }
     const item = building.queue[index];
     if (!item) return;
     const player = this.players[building.owner];
@@ -664,6 +754,14 @@ export class Game {
     if (!this.canPlace(type, tx, ty, player)) return 'No se puede construir aquí';
     const cost = BUILDINGS[type].cost;
     if (player.age < BUILDINGS[type].age) return `Requiere la ${AGES[BUILDINGS[type].age].name}`;
+    if (this.isGuest) {
+      // Se comprueba lo evidente en local para poder avisar al momento; la
+      // colocación de verdad la hace el anfitrión.
+      if (!player.canAfford(cost)) return 'Recursos insuficientes';
+      const ids = (builders || []).filter((u) => u.type === 'villager' && !u.dead).map((u) => u.id);
+      this.netSend({ c: 'build', t: type, x: tx, y: ty, ids });
+      return null;
+    }
     if (!player.canAfford(cost)) return 'Recursos insuficientes';
     player.pay(cost);
     const b = this.createBuilding(type, player, tx, ty, false);
@@ -723,6 +821,7 @@ export class Game {
 
   update(dt) {
     if (this.paused || this.over) return;
+    if (this.isGuest) { this.updateAsGuest(dt); return; }
     dt *= this.speed;
     this.time += dt;
     this.rebuildGrid();
@@ -742,6 +841,28 @@ export class Game {
     if (this.fogCd <= 0) { this.fogCd = 0.2; this.updateFog(); }
 
     if (this.ai) this.ai.update(dt);
+    if (this.net) this.net.tick(dt);
+  }
+
+  /**
+   * El invitado no simula: interpola entre las dos últimas instantáneas para
+   * que el movimiento se vea suave aunque lleguen sólo diez por segundo, y
+   * calcula su propia niebla a partir de sus unidades.
+   */
+  updateAsGuest(dt) {
+    this.rebuildGrid();
+    const step = dt / 0.1; // duración esperada entre instantáneas
+    for (const u of this.units) {
+      if (!u.lerpTo) continue;
+      u.lerpT = Math.min(1, (u.lerpT || 0) + step);
+      const k = u.lerpT;
+      u.x = u.lerpFrom.x + (u.lerpTo.x - u.lerpFrom.x) * k;
+      u.y = u.lerpFrom.y + (u.lerpTo.y - u.lerpFrom.y) * k;
+      if (u.attackAnim > 0) u.attackAnim -= dt;
+    }
+    this.fx.update(dt);
+    this.fogCd -= dt;
+    if (this.fogCd <= 0) { this.fogCd = 0.2; this.updateFog(); }
   }
 
   // Utilidades para la interfaz.

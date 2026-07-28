@@ -49,6 +49,7 @@
     </div>
 
     <button id="btn-start" class="primary">Comenzar partida</button>
+    <button id="btn-multi" class="secondary">Jugar con otra persona</button>
     <button id="btn-fullscreen-menu" class="secondary fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
       <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
         <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
@@ -68,6 +69,57 @@
       </ul>
       <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios. Todo el arte se genera por código.</p>
     </div>
+  </div>
+</div>
+
+<!-- ---------- Sala de espera (multijugador) ---------- -->
+<div id="lobby" class="overlay hidden">
+  <div class="menu-card">
+    <h2>Jugar con otra persona</h2>
+    <p class="subtitle">Uno contra uno, cada quien desde su dispositivo.</p>
+
+    <div id="lobby-join">
+      <div class="options">
+        <label>
+          <span>Tu nombre</span>
+          <input id="lobby-name" type="text" maxlength="20" placeholder="¿Cómo te llamas?" autocomplete="nickname">
+        </label>
+        <label>
+          <span>Tamaño del mapa</span>
+          <select id="lobby-size">
+            <option value="48">Pequeño</option>
+            <option value="64" selected>Mediano</option>
+            <option value="80">Grande</option>
+          </select>
+        </label>
+      </div>
+      <button id="btn-lobby-enter" class="primary">Entrar en la sala</button>
+    </div>
+
+    <div id="lobby-room" class="hidden">
+      <div class="lobby-head">
+        <span>Conectado como <b id="lobby-me"></b></span>
+        <span id="lobby-status" class="lobby-status">Buscando jugadores...</span>
+      </div>
+      <ul id="lobby-players" class="lobby-list"></ul>
+      <p class="lobby-hint">
+        Quien envía la invitación hace de anfitrión: su dispositivo lleva la
+        partida. Comparte esta página con la otra persona para que aparezca aquí.
+      </p>
+      <button id="btn-lobby-leave" class="secondary">Salir de la sala</button>
+    </div>
+
+    <div id="lobby-error" class="lobby-error hidden"></div>
+  </div>
+</div>
+
+<!-- ---------- Invitación recibida ---------- -->
+<div id="invite-dialog" class="overlay hidden">
+  <div class="menu-card small">
+    <h2>Te han invitado</h2>
+    <p id="invite-text"></p>
+    <button id="btn-invite-accept" class="primary">Aceptar y jugar</button>
+    <button id="btn-invite-decline" class="secondary">Ahora no</button>
   </div>
 </div>
 
@@ -141,6 +193,7 @@
       <tr><td>Supr</td><td>Eliminar lo seleccionado</td></tr>
       <tr><td>P / Esc</td><td>Pausa y menú</td></tr>
       <tr><td>F11 o el botón ⛶</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
+      <tr><td>Multijugador</td><td>Desde el menú principal: entra en la sala, elige a alguien e invítalo</td></tr>
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
     </table>
     <h2>Consejos</h2>
