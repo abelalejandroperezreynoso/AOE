@@ -19,9 +19,13 @@
   --sa-left: env(safe-area-inset-left, 0px);
   --sa-right: env(safe-area-inset-right, 0px);
 
-  /* Alto real que ocupan las barras, ya con las zonas seguras incluidas. */
+  /* Alto real que ocupan las barras, ya con las zonas seguras incluidas. Es
+     sólo el valor de partida: la barra inferior crece y encoge con lo que hay
+     dentro, y watchBars() reescribe --bottom-total con lo que mide de verdad. */
   --top-total: calc(var(--bar-h) + var(--sa-top));
   --bottom-total: calc(var(--bottom-h) + var(--sa-bottom));
+  /* Suelo de la barra inferior: en escritorio el minimapa necesita ese alto. */
+  --bottom-min: var(--bottom-h);
 
   --prod-h: 46px; /* alto total de la tira de producción, con bordes y relleno */
 }
@@ -441,7 +445,7 @@ body.is-fullscreen .fs-shrink { display: inline; }
   top: calc(var(--top-total) + 2px);
   left: calc(3px + var(--sa-left));
   max-width: calc(100% - 6px - var(--sa-left) - var(--sa-right));
-  display: flex; gap: 5px;
+  display: flex; align-items: start; gap: 5px;
   /* El relleno deja sitio al halo de «bloqueado»: al desbordar se recortaría. */
   padding: 3px;
   overflow-x: auto; overflow-y: hidden;
@@ -517,7 +521,10 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
 
 #bottombar {
   position: absolute; bottom: 0; left: 0; right: 0;
-  height: var(--bottom-total);
+  /* Se adapta a su contenido: sin selección no hay órdenes que enseñar y no
+     tiene sentido reservarles sitio. El lienzo se entera por watchBars(). */
+  height: auto;
+  min-height: calc(var(--bottom-min) + var(--sa-bottom));
   display: flex;
   gap: 8px;
   padding: 8px calc(8px + var(--sa-right)) calc(8px + var(--sa-bottom)) calc(8px + var(--sa-left));
@@ -536,8 +543,11 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
 }
 #minimap {
   width: 100%;
-  flex: 1;
-  min-height: 0; /* sin esto el lienzo no baja de su alto propio y desborda */
+  /* Alto definido a 0 y que crezca: si no, su proporción propia (480×240)
+     marcaba el alto natural del panel y estiraba la barra de más. */
+  height: 0;
+  flex: 1 1 auto;
+  min-height: 0;
   border-radius: 4px;
   background: #0b110c;
   cursor: pointer;
@@ -582,7 +592,7 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
 }
 .sel-chip img { width: 24px; height: 24px; }
 
-#queue { display: flex; gap: 3px; }
+#queue { display: flex; align-items: center; gap: 3px; }
 .qitem {
   width: 34px; height: 34px;
   padding: 0;
@@ -607,6 +617,9 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
   font-variant-numeric: tabular-nums;
 }
 
+/* Vacíos no ocupan ni dejan hueco de separación: eran los espacios muertos. */
+#commands:empty, #sel-list:empty, #queue:empty { display: none; }
+
 #commands {
   flex: 1;
   display: grid;
@@ -614,9 +627,18 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
   grid-auto-rows: 62px;
   gap: 5px;
   align-content: start;
+  align-items: start; /* nunca estirados ni desalineados entre sí */
   overflow-y: auto;
   padding: 2px;
 }
+
+/*
+ * Las fichas del HUD son de tamaño fijo y nunca llevan margen. Hace falta el
+ * selector con la etiqueta para ganarle a `button.danger` del menú de pausa:
+ * «Demoler» comparte esa clase y heredaba su margen superior de 8 px, que lo
+ * dejaba por debajo del resto de órdenes y fuera de la barra.
+ */
+button.cmd, button.qitem, button.prod { margin: 0; }
 
 .cmd {
   width: 62px; height: 62px;
@@ -728,7 +750,8 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
 
 /* Móviles: la barra superior no debe envolverse nunca y las órdenes van abajo. */
 @media (max-width: 680px) {
-  :root { --bar-h: 34px; --bottom-h: 162px; --prod-h: 42px; }
+  /* Sin suelo: los paneles ya traen su alto y la barra se ajusta a ellos. */
+  :root { --bar-h: 34px; --bottom-h: 162px; --bottom-min: 0px; --prod-h: 42px; }
   #topbar {
     padding: var(--sa-top) calc(5px + var(--sa-right)) 0 calc(5px + var(--sa-left));
     gap: 5px;
@@ -752,9 +775,9 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
     padding: 5px calc(5px + var(--sa-right)) calc(5px + var(--sa-bottom)) calc(5px + var(--sa-left));
   }
   #minimap-panel { width: 108px; height: 82px; padding: 3px; order: 1; }
-  #selection-panel { width: calc(100% - 113px); height: 82px; padding: 4px 7px; gap: 3px; order: 2; }
-  /* Recorta en vez de desbordar: si no, el texto se dibujaba encima de la cola. */
-  #sel-info { min-height: 0; gap: 6px; overflow: hidden; }
+  /* Alto mínimo, no fijo: con cola el panel crece en vez de recortar los datos. */
+  #selection-panel { width: calc(100% - 113px); min-height: 82px; padding: 4px 7px; gap: 3px; order: 2; }
+  #sel-info { min-height: 0; gap: 6px; }
   .portrait { width: 42px; height: 42px; }
   .sel-name { font-size: 13px; }
   .sel-owner { font-size: 10.5px; margin-bottom: 2px; }
@@ -765,7 +788,7 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
   .qitem { width: 24px; height: 24px; }
   .qcount { font-size: 12px; }
   #commands {
-    order: 3; flex-basis: 100%; height: 62px;
+    order: 3; flex-basis: 100%; height: auto;
     grid-template-columns: repeat(auto-fill, 58px);
     grid-auto-rows: 58px; grid-auto-flow: column;
     overflow-x: auto; overflow-y: hidden;
@@ -790,9 +813,9 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
   .right-group { gap: 3px; }
   .tbtn { padding: 3px 5px; }
   #minimap-panel { width: 96px; height: 78px; }
-  #selection-panel { width: calc(100% - 101px); height: 78px; }
+  #selection-panel { width: calc(100% - 101px); min-height: 78px; }
   .portrait { width: 38px; height: 38px; }
-  #commands { height: 60px; grid-template-columns: repeat(auto-fill, 56px); grid-auto-rows: 56px; }
+  #commands { grid-template-columns: repeat(auto-fill, 56px); grid-auto-rows: 56px; }
   .cmd { width: 56px; height: 56px; }
   .cmd img { width: 46px; height: 46px; }
 }
@@ -805,7 +828,7 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
 /* Apaisado en el móvil: apenas hay alto, así que las barras se aplanan.
    Los paneles se dejan estirar para no desperdiciar la franja que queda. */
 @media (max-height: 560px) {
-  :root { --bottom-h: 118px; }
+  :root { --bottom-h: 118px; --bottom-min: 118px; }
   #minimap-panel, #selection-panel { height: auto; }
   #commands { height: auto; grid-auto-rows: 48px; grid-template-columns: repeat(auto-fill, 48px); }
   .cmd { width: 48px; height: 48px; }
@@ -814,7 +837,7 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
 }
 
 @media (max-height: 430px) {
-  :root { --bar-h: 32px; --bottom-h: 96px; }
+  :root { --bar-h: 32px; --bottom-h: 96px; --bottom-min: 96px; }
   #minimap-panel { width: 150px; }
   .portrait { width: 40px; height: 40px; }
   .sel-owner { display: none; }
