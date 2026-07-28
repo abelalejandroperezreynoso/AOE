@@ -10,6 +10,7 @@ import {
   fieldsFor, getPath, setValue, reset, isChanged, defaultValue, countChanges,
   TERRAIN_LABELS, NODE_LABELS, RATE_LABELS,
 } from './data/overrides.js';
+import { LOOK } from './data/appearance.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -162,6 +163,7 @@ export class Catalog {
 
   hasChanges(key) {
     if (this.tab === 'terrain') return isChanged('terrain', key);
+    if (this.lookChanged(key)) return true;
     if (this.tab === 'node') {
       if (isChanged('node', key, 'amount')) return true;
       const rate = RESOURCE_NODES[key]?.rate;
@@ -171,14 +173,32 @@ export class Catalog {
     return def ? fieldsFor(this.tab, def).some((f) => isChanged(this.tab, key, f.key)) : false;
   }
 
+  /** ¿Tiene el objeto algún color o tamaño cambiado? */
+  lookChanged(key) {
+    const def = LOOK[this.tab]?.[key];
+    if (!def) return false;
+    const kind = `${this.tab}Look`;
+    return fieldsFor(kind, def).some((f) => isChanged(kind, key, f.key));
+  }
+
   // --- Vistas previas --------------------------------------------------------
 
-  preview(key, size) {
+  /**
+   * `real` dibuja a escala fija, de modo que una unidad a la que se le ha
+   * subido el tamaño se ve más grande. Las miniaturas de la lista, en cambio,
+   * encajan siempre en su hueco: allí interesa reconocer el objeto, no
+   * compararlo.
+   */
+  preview(key, size, real = false) {
     const c = makeCanvas(size, size);
     const ctx = c.getContext('2d');
+    // Deja sitio para el tamaño máximo que se puede elegir en el catálogo.
+    const MAX = 1.6;
     if (this.tab === 'unit') {
       const s = unitSprite(key, 0, 1, 0, false);
-      const sc = Math.min(size / 44, size / 56) * 1.05;
+      const sc = real
+        ? size / (60 * MAX)
+        : Math.min(size / (s.canvas.width - 4), size / (s.canvas.height - 4)) * 1.05;
       ctx.drawImage(s.canvas, size / 2 - s.ox * sc, size - 6 - s.oy * sc, s.canvas.width * sc, s.canvas.height * sc);
     } else if (this.tab === 'building') {
       const s = buildingSprite(key, 0, 2);
@@ -187,7 +207,9 @@ export class Catalog {
         s.canvas.width * sc, s.canvas.height * sc);
     } else if (this.tab === 'node') {
       const s = resourceSprite(key, 0);
-      const sc = Math.min(size / 80, size / 96) * 1.15;
+      const sc = real
+        ? size / (96 * MAX)
+        : Math.min(size / s.canvas.width, size / s.canvas.height) * 1.15;
       ctx.drawImage(s.canvas, size / 2 - s.ox * sc, size - 8 - s.oy * sc, s.canvas.width * sc, s.canvas.height * sc);
     } else {
       // Terreno: un rombo con la misma textura que usa el mapa.
@@ -210,7 +232,7 @@ export class Catalog {
 
     const head = document.createElement('div');
     head.className = 'cat-head';
-    const big = this.preview(key, 120);
+    const big = this.preview(key, 120, true);
     big.className = 'cat-big';
     const info = document.createElement('div');
     const title = document.createElement('h3');
@@ -228,6 +250,7 @@ export class Catalog {
       const def = RESOURCE_NODES[key];
       title.textContent = NODE_LABELS[key] || key;
       sub.textContent = `Da ${RES_NAME[def.res]}. ${def.blocking ? 'Bloquea el paso.' : 'No bloquea el paso.'}`;
+      box.appendChild(this.lookForm(key));
       box.appendChild(this.nodeForm(key, def));
     } else {
       const def = this.tab === 'unit' ? UNITS[key] : BUILDINGS[key];
@@ -236,6 +259,7 @@ export class Catalog {
         ? `${CLASS_NAMES[def.class] || def.class} · disponible en la ${AGES[def.age].name}`
         : `Disponible en la ${AGES[def.age].name}`;
       box.appendChild(this.extraInfo(def));
+      box.appendChild(this.lookForm(key));
       box.appendChild(this.form(this.tab, key, def));
     }
 
@@ -253,6 +277,7 @@ export class Catalog {
       } else {
         reset(this.tab, key);
       }
+      if (LOOK[this.tab]?.[key]) reset(`${this.tab}Look`, key);
       this.renderList();
       this.updateChangeCount();
     };
@@ -281,6 +306,40 @@ export class Catalog {
     if (def.req) add('Necesita', BUILDINGS[def.req].name);
     if (def.pierce) add('Tipo de daño', 'Proyectil');
     return wrap;
+  }
+
+  /**
+   * Sección "Aspecto": los colores con los que se dibuja el objeto y, cuando
+   * tiene sentido, su tamaño. Sólo salen los campos que ese objeto usa de
+   * verdad, así no se pregunta por la montura de un lancero.
+   */
+  lookForm(key) {
+    const def = LOOK[this.tab]?.[key];
+    if (!def) return document.createDocumentFragment();
+    const kind = `${this.tab}Look`;
+    const fields = fieldsFor(kind, def);
+    if (!fields.length) return document.createDocumentFragment();
+    return this.group('Aspecto', fields.map((f) => this.field(kind, key, def, f)));
+  }
+
+  /**
+   * Vuelve a dibujar sólo las miniaturas del elemento activo. Se usa mientras
+   * se arrastra el selector de color: rehacer la lista entera en cada
+   * movimiento del ratón se notaría.
+   */
+  refreshPreview() {
+    const big = el('catalog-detail').querySelector('.cat-big');
+    if (big) {
+      const fresh = this.preview(this.selected, 120, true);
+      fresh.className = 'cat-big';
+      big.replaceWith(fresh);
+    }
+    const thumb = el('catalog-list').querySelector('.cat-item.active .cat-thumb');
+    if (thumb) {
+      const fresh = this.preview(this.selected, 44);
+      fresh.className = 'cat-thumb';
+      thumb.replaceWith(fresh);
+    }
   }
 
   form(kind, key, def) {
@@ -316,8 +375,8 @@ export class Catalog {
     name.className = 'cat-label';
     name.textContent = f.unit ? `${f.label} (${f.unit})` : f.label;
     const input = document.createElement('input');
-    input.type = f.type === 'text' ? 'text' : 'number';
-    if (f.type !== 'text') { input.min = f.min; input.max = f.max; input.step = f.step; }
+    input.type = f.type === 'text' ? 'text' : f.type === 'color' ? 'color' : 'number';
+    if (input.type === 'number') { input.min = f.min; input.max = f.max; input.step = f.step; }
     input.value = getPath(def, f.key);
     const mark = () => {
       const changed = isChanged(kind, key, f.key);
@@ -334,6 +393,15 @@ export class Catalog {
       this.updateChangeCount();
     };
     input.onchange = commit;
+    if (f.type === 'color') {
+      // Con el selector abierto se va viendo el resultado sin esperar a cerrarlo.
+      input.oninput = () => {
+        clearTimeout(this.liveTimer);
+        this.liveTimer = setTimeout(() => {
+          if (setValue(kind, key, f.key, input.value) !== null) this.refreshPreview();
+        }, 60);
+      };
+    }
     input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
     row.append(name, input);
     return row;

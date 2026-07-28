@@ -7,6 +7,7 @@
 
 import { UNITS, BUILDINGS, RESOURCE_NODES, GATHER_RATE, RES_NAME } from '../config.js';
 import { TERRAIN_COLORS, clearSpriteCaches } from '../sprites.js';
+import { LOOK, LOOK_FIELDS } from './appearance.js';
 
 const STORAGE_KEY = 'aor-overrides-v1';
 
@@ -72,7 +73,27 @@ export const RATE_LABELS = {
   berries: 'Recoger bayas', farm: 'Cultivar granja', sheep: 'Ovejas', deer: 'Caza',
 };
 
-const FIELDS_BY_KIND = { unit: UNIT_FIELDS, building: BUILDING_FIELDS, node: NODE_FIELDS };
+/**
+ * El aspecto se guarda en sus propios cajones ("unitLook", ...) porque cambia
+ * cómo se dibuja un objeto, no cómo se comporta: así se puede restablecer el
+ * aspecto sin tocar los números, y al revés.
+ */
+export const LOOK_KINDS = { unitLook: 'unit', buildingLook: 'building', nodeLook: 'node' };
+
+const FIELDS_BY_KIND = {
+  unit: UNIT_FIELDS, building: BUILDING_FIELDS, node: NODE_FIELDS,
+  unitLook: LOOK_FIELDS.unit, buildingLook: LOOK_FIELDS.building, nodeLook: LOOK_FIELDS.node,
+};
+
+/** El objeto cuyos valores edita un cajón: la ficha del juego o su aspecto. */
+export function targetFor(kind, type) {
+  const sub = LOOK_KINDS[kind];
+  if (sub) return LOOK[sub][type];
+  if (kind === 'unit') return UNITS[type];
+  if (kind === 'building') return BUILDINGS[type];
+  if (kind === 'node') return RESOURCE_NODES[type];
+  return null;
+}
 
 export function fieldsFor(kind, def) {
   const list = FIELDS_BY_KIND[kind] || [];
@@ -99,9 +120,15 @@ function setPath(obj, path, value) {
 
 // --- Estado -----------------------------------------------------------------
 
+/** Un juego de cajones vacío, uno por cada familia de datos editables. */
+const emptyBuckets = () => ({
+  unit: {}, building: {}, node: {}, rate: {}, terrain: {},
+  unitLook: {}, buildingLook: {}, nodeLook: {},
+});
+
 /** Valores originales, para poder restablecer y saber qué está cambiado. */
-const defaults = { unit: {}, building: {}, node: {}, rate: {}, terrain: {} };
-let overrides = { unit: {}, building: {}, node: {}, rate: {}, terrain: {} };
+const defaults = emptyBuckets();
+let overrides = emptyBuckets();
 let captured = false;
 
 function capture() {
@@ -120,6 +147,9 @@ function capture() {
   }
   for (const [key, value] of Object.entries(GATHER_RATE)) defaults.rate[key] = value;
   for (const [key, value] of Object.entries(TERRAIN_COLORS)) defaults.terrain[key] = value;
+  for (const [kind, sub] of Object.entries(LOOK_KINDS)) {
+    for (const [type, def] of Object.entries(LOOK[sub])) defaults[kind][type] = { ...def };
+  }
 }
 
 export function defaultValue(kind, type, key) {
@@ -158,10 +188,11 @@ function sanitize(kind, type, key, value) {
     const n = Number(value);
     return Number.isFinite(n) && n > 0 && n <= 100 ? n : null;
   }
-  const def = kind === 'unit' ? UNITS[type] : kind === 'building' ? BUILDINGS[type] : RESOURCE_NODES[type];
+  const def = targetFor(kind, type);
   if (!def) return null;
   const field = fieldsFor(kind, def).find((f) => f.key === key);
   if (!field) return null;
+  if (field.type === 'color') return isHexColor(value) ? String(value).toLowerCase() : null;
   if (field.type === 'text') {
     const s = String(value).replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 120);
     return s || null;
@@ -196,6 +227,12 @@ function applyAll() {
   for (const [key, value] of Object.entries(overrides.terrain)) {
     if (TERRAIN_COLORS[key] !== undefined) TERRAIN_COLORS[key] = value;
   }
+  for (const [kind, sub] of Object.entries(LOOK_KINDS)) {
+    for (const [type, values] of Object.entries(overrides[kind])) {
+      if (!LOOK[sub][type]) continue;
+      for (const [key, value] of Object.entries(values)) LOOK[sub][type][key] = value;
+    }
+  }
   clearSpriteCaches();
 }
 
@@ -211,6 +248,9 @@ function restoreDefaults() {
   for (const [type, values] of Object.entries(defaults.node)) RESOURCE_NODES[type].amount = values.amount;
   for (const [key, value] of Object.entries(defaults.rate)) GATHER_RATE[key] = value;
   for (const [key, value] of Object.entries(defaults.terrain)) TERRAIN_COLORS[key] = value;
+  for (const [kind, sub] of Object.entries(LOOK_KINDS)) {
+    for (const [type, values] of Object.entries(defaults[kind])) Object.assign(LOOK[sub][type], values);
+  }
 }
 
 function save() {
@@ -222,7 +262,7 @@ export function loadOverrides() {
   capture();
   let raw = null;
   try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { raw = null; }
-  overrides = { unit: {}, building: {}, node: {}, rate: {}, terrain: {} };
+  overrides = emptyBuckets();
   if (raw && typeof raw === 'object') {
     for (const kind of Object.keys(overrides)) {
       const bucket = raw[kind];
@@ -271,7 +311,7 @@ export function setValue(kind, type, key, value) {
 
 /** Restablece un objeto completo (o todo el juego si no se indica tipo). */
 export function reset(kind = null, type = null) {
-  if (!kind) overrides = { unit: {}, building: {}, node: {}, rate: {}, terrain: {} };
+  if (!kind) overrides = emptyBuckets();
   else if (type === null) overrides[kind] = {};
   else delete overrides[kind][type];
   restoreDefaults();
@@ -288,7 +328,7 @@ export function exportOverrides() {
 export function adoptOverrides(incoming) {
   if (!incoming || typeof incoming !== 'object') return;
   const mine = exportOverrides();
-  overrides = { unit: {}, building: {}, node: {}, rate: {}, terrain: {} };
+  overrides = emptyBuckets();
   for (const kind of Object.keys(overrides)) {
     const bucket = incoming[kind];
     if (!bucket || typeof bucket !== 'object') continue;
