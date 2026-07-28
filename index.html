@@ -50,6 +50,7 @@
 
     <button id="btn-start" class="primary">Comenzar partida</button>
     <button id="btn-multi" class="secondary">Jugar con otra persona</button>
+    <button id="btn-catalog" class="secondary">Catálogo del juego</button>
     <button id="btn-fullscreen-menu" class="secondary fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
       <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
         <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
@@ -69,6 +70,41 @@
       </ul>
       <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios. Todo el arte se genera por código.</p>
     </div>
+  </div>
+</div>
+
+<!-- ---------- Catálogo ---------- -->
+<div id="catalog" class="overlay hidden">
+  <div class="catalog-card">
+    <header class="catalog-top">
+      <h2>Catálogo del juego</h2>
+      <div class="catalog-top-right">
+        <span id="catalog-changes" class="catalog-changes"></span>
+        <button id="btn-catalog-reset-all" class="secondary">Restablecer todo</button>
+        <button id="btn-catalog-close" class="primary">Volver al menú</button>
+      </div>
+    </header>
+
+    <div id="catalog-tabs" class="catalog-tabs">
+      <button data-tab="unit" class="active">Unidades</button>
+      <button data-tab="building">Edificios</button>
+      <button data-tab="node">Recursos</button>
+      <button data-tab="terrain">Terrenos</button>
+    </div>
+
+    <div class="catalog-body">
+      <div class="catalog-side">
+        <input id="catalog-search" type="search" placeholder="Buscar por nombre..." autocomplete="off">
+        <ul id="catalog-list" class="catalog-list"></ul>
+      </div>
+      <div id="catalog-detail" class="catalog-detail"></div>
+    </div>
+
+    <p class="catalog-foot">
+      Los cambios se guardan en este navegador y se aplican a las partidas
+      nuevas. En multijugador manda quien invita: sus valores se usan en los dos
+      lados.
+    </p>
   </div>
 </div>
 
@@ -194,6 +230,7 @@
       <tr><td>P / Esc</td><td>Pausa y menú</td></tr>
       <tr><td>F11 o el botón ⛶</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
       <tr><td>Multijugador</td><td>Desde el menú principal: entra en la sala, elige a alguien e invítalo</td></tr>
+      <tr><td>Catálogo</td><td>Desde el menú principal: consulta y edita los valores de todo el juego</td></tr>
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
     </table>
     <h2>Consejos</h2>
