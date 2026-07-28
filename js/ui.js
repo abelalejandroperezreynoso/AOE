@@ -107,8 +107,7 @@ export class UI {
     document.getElementById('btn-menu').onclick = () => this.togglePause();
     document.getElementById('btn-resume').onclick = () => this.togglePause();
     document.getElementById('btn-resign').onclick = () => {
-      this.game.human.defeated = true;
-      this.game.endGame(false);
+      this.game.commandResign();
       this.el.pauseMenu.classList.add('hidden');
       this.game.paused = false;
     };
@@ -149,15 +148,25 @@ export class UI {
   }
 
   cycleSpeed() {
+    if (this.game.net) return; // en multijugador el ritmo lo marca la partida
     const speeds = [1, 1.5, 2, 3];
     const i = speeds.indexOf(this.game.speed);
     this.game.speed = speeds[(i + 1) % speeds.length];
     this.el.speed.textContent = `${this.game.speed}x`;
   }
 
+  /**
+   * En multijugador el menú se abre sin detener la partida: no se puede parar
+   * el mundo mientras el otro jugador sigue jugando.
+   */
   togglePause() {
+    const menu = this.el.pauseMenu;
+    if (this.game.net) {
+      menu.classList.toggle('hidden');
+      return;
+    }
     this.game.paused = !this.game.paused;
-    this.el.pauseMenu.classList.toggle('hidden', !this.game.paused);
+    menu.classList.toggle('hidden', !this.game.paused);
   }
 
   // --- Entrada --------------------------------------------------------------
@@ -451,11 +460,7 @@ export class UI {
 
   deleteSelected() {
     const g = this.game;
-    for (const e of g.selection.slice()) {
-      if (e.owner !== g.human.id) continue;
-      if (e.kind === 'unit') g.killUnit(e, null);
-      else g.killBuilding(e, null);
-    }
+    g.commandDelete(g.selection.slice());
     this.select([]);
   }
 
@@ -470,10 +475,7 @@ export class UI {
     // Punto de reunión de un edificio.
     if (sel[0].kind === 'building') {
       const target = this.r.entityAtScreen(x, y);
-      for (const b of sel) {
-        if (b.kind !== 'building') continue;
-        b.rally = target && target.kind ? { x: target.x ?? target.cx, y: target.y ?? target.cy, target } : { x: u, y: v };
-      }
+      g.commandRally(sel, u, v, target);
       this.r.markOrder(u, v, '#ffe9a8');
       this.audio.play('order');
       return;
@@ -637,7 +639,7 @@ export class UI {
       btns.push({
         icon: null, glyph: '✋', label: 'Detener',
         tooltip: 'Cancela la orden actual.',
-        action: () => { for (const u of units) u.stopTask(); },
+        action: () => g.commandStop(units),
       });
       btns.push({
         icon: null, glyph: '☠', label: 'Eliminar',
@@ -655,7 +657,7 @@ export class UI {
         btns.push({
           icon: null, glyph: '☠', label: 'Cancelar obra', danger: true,
           tooltip: 'Derriba los cimientos.',
-          action: () => { g.killBuilding(b, null); },
+          action: () => g.commandDelete([b]),
         });
         return btns;
       }
@@ -737,11 +739,7 @@ export class UI {
             icon: iconFor('res', r, 0), label: `Vender ${RES_NAME[r]}`,
             tooltip: `Vende 100 de ${RES_NAME[r]} a cambio de ${Math.round(100 * MARKET_RATE.sell)} de oro.`,
             disabled: p.res[r] < 100,
-            action: () => {
-              if (p.res[r] < 100) return;
-              p.res[r] -= 100; p.res.gold += Math.round(100 * MARKET_RATE.sell);
-              this.audio.play('tech');
-            },
+            action: () => { g.commandMarket(r, 'sell'); this.audio.play('tech'); },
           });
         }
         for (const r of ['food', 'wood', 'stone']) {
@@ -749,12 +747,7 @@ export class UI {
             icon: iconFor('res', r, 0), label: `Comprar ${RES_NAME[r]}`,
             tooltip: `Compra 100 de ${RES_NAME[r]} por ${Math.round(100 * MARKET_RATE.buy)} de oro.`,
             disabled: p.res.gold < 100 * MARKET_RATE.buy,
-            action: () => {
-              const price = Math.round(100 * MARKET_RATE.buy);
-              if (p.res.gold < price) return;
-              p.res.gold -= price; p.res[r] += 100;
-              this.audio.play('tech');
-            },
+            action: () => { g.commandMarket(r, 'buy'); this.audio.play('tech'); },
           });
         }
       }
@@ -864,14 +857,19 @@ export class UI {
     while (this.el.notif.childElementCount > 6) this.el.notif.firstChild.remove();
   }
 
-  showEnd(won) {
+  showEnd(won, reason = null) {
     const g = this.game;
     const s = g.human.stats;
     this.el.endScreen.classList.remove('hidden');
-    document.getElementById('end-title').textContent = won ? '¡Victoria!' : 'Derrota';
-    document.getElementById('end-title').className = won ? 'win' : 'lose';
+    const cortada = reason === 'disconnect';
+    const title = document.getElementById('end-title');
+    title.textContent = cortada ? 'Partida interrumpida' : (won ? '¡Victoria!' : 'Derrota');
+    title.className = cortada ? '' : (won ? 'win' : 'lose');
+    const intro = cortada
+      ? 'Se ha perdido la conexión con el otro jugador, así que la partida no puede continuar.'
+      : (won ? 'Has conquistado a todos tus rivales.' : 'Tu civilización ha caído.');
     document.getElementById('end-body').innerHTML = `
-      <p>${won ? 'Has conquistado a todos tus rivales.' : 'Tu civilización ha caído.'}</p>
+      <p>${intro}</p>
       <table class="stats">
         <tr><td>Duración</td><td>${fmtTime(g.time)}</td></tr>
         <tr><td>Edad alcanzada</td><td>${AGES[g.human.age].name}</td></tr>
@@ -881,7 +879,7 @@ export class UI {
         <tr><td>Unidades perdidas</td><td>${s.unitsLost}</td></tr>
         <tr><td>Edificios construidos</td><td>${s.buildingsBuilt}</td></tr>
       </table>`;
-    this.audio.play(won ? 'victory' : 'defeat');
+    this.audio.play(cortada ? 'defeat' : (won ? 'victory' : 'defeat'));
   }
 
   // --- Actualización por fotograma -----------------------------------------

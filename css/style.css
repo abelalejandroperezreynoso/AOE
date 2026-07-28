@@ -144,6 +144,50 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .stats td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.08); }
 .stats td:last-child { text-align: right; color: var(--gold-l); font-weight: bold; }
 
+/* ---------- Sala de espera ---------- */
+
+.lobby-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 10px; flex-wrap: wrap;
+  font-size: 13px; color: #cbb68c;
+  margin-bottom: 10px;
+}
+.lobby-head b { color: var(--gold-l); }
+.lobby-status { color: #9c8a68; font-size: 12.5px; }
+
+.lobby-list {
+  list-style: none; margin: 0 0 12px; padding: 0;
+  max-height: 260px; overflow-y: auto;
+  border: 1px solid #513e26; border-radius: 8px;
+  background: rgba(0, 0, 0, .28);
+}
+.lobby-list:empty { display: none; }
+
+.lobby-player {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.lobby-player:last-child { border-bottom: none; }
+.lobby-player .lobby-name {
+  font-size: 15px; color: var(--parch);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lobby-player button { padding: 6px 14px; font-size: 13px; }
+
+.lobby-hint {
+  font-size: 12px; color: #8e7c5c; line-height: 1.5;
+  text-align: left; margin: 0 0 14px;
+}
+.lobby-error {
+  margin-top: 14px; padding: 9px 12px;
+  border: 1px solid #a2544a; border-left-width: 4px;
+  border-radius: 6px;
+  background: rgba(90, 30, 24, .35);
+  color: #ffc9c2; font-size: 13px; text-align: left;
+}
+#invite-dialog .menu-card p { color: #d5c6a2; font-size: 15px; margin: 0 0 18px; }
+
 /* ---------- Cargando ---------- */
 
 .loader { text-align: center; }
