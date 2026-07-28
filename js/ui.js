@@ -160,8 +160,25 @@ export class UI {
     const root = document.documentElement;
     const topbar = document.getElementById('topbar');
     const bars = [topbar, this.el.bottombar];
+    const orientation = () => (window.innerWidth >= window.innerHeight ? 'h' : 'v');
     let last = '';
+    let lastOrientation = orientation();
+    let areaBeforeTurn = 0, settle = 0;
+
     const apply = () => {
+      // Al girar, lo primero es guardar el lienzo de antes: es la referencia
+      // para que se siga viendo la misma cantidad de mundo.
+      if (orientation() !== lastOrientation) {
+        lastOrientation = orientation();
+        if (!areaBeforeTurn) areaBeforeTurn = this.r.w * this.r.h;
+        clearTimeout(settle);
+        // El giro dispara varios avisos seguidos; se espera a que pare.
+        settle = setTimeout(() => {
+          const before = areaBeforeTurn;
+          areaBeforeTurn = 0;
+          this.keepViewOnTurn(before);
+        }, 180);
+      }
       const top = topbar.offsetHeight, bottom = this.el.bottombar.offsetHeight;
       const key = `${top}/${bottom}`;
       if (key === last) return; // sin cambio real: nada que repintar
@@ -177,6 +194,23 @@ export class UI {
     }
     window.addEventListener('resize', apply);
     apply();
+  }
+
+  /**
+   * Al girar el teléfono, el HUD se lleva una parte distinta de la pantalla:
+   * en apaisado pesa bastante más, así que con el mismo zoom se vería mucho
+   * menos mundo y parece que la escala haya cambiado. Se ajusta el zoom para
+   * que el área de mundo a la vista sea la misma antes y después.
+   *
+   * El área visible vale (ancho × alto) / zoom², así que para mantenerla el
+   * zoom tiene que ir con la raíz del área del lienzo. Girar y volver deja el
+   * zoom exactamente como estaba.
+   */
+  keepViewOnTurn(areaBefore) {
+    const areaAfter = this.r.w * this.r.h;
+    if (!areaBefore || !areaAfter) return;
+    this.r.cam.zoom *= Math.sqrt(areaAfter / areaBefore);
+    this.r.clampCam();
   }
 
   cycleSpeed() {
