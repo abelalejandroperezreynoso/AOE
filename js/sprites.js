@@ -3,6 +3,7 @@
 
 import { TILE_W, TILE_H, PLAYER_COLORS, UNITS, BUILDINGS } from './config.js';
 import { shade, mix } from './utils.js';
+import { look, ramp } from './data/appearance.js';
 
 const HW = TILE_W / 2; // 32
 const HH = TILE_H / 2; // 16
@@ -103,20 +104,26 @@ export function resourceSprite(kind, variant = 0, depleted = false) {
   const key = `${kind}|${variant}|${depleted ? 1 : 0}`;
   let s = resCache.get(key);
   if (s) return s;
-  const c = makeCanvas(80, 96);
+  // El aspecto del tocón es el del árbol del que salió.
+  const L = look('node', kind === 'stump' ? 'tree' : kind);
+  const sc = L.scale || 1;
+  const c = makeCanvas(80 * sc, 96 * sc);
   const ctx = c.getContext('2d');
+  ctx.scale(sc, sc);
   const ox = 40, oy = 74; // punto de anclaje (centro del rombo del tile)
   const r = (n) => ((Math.sin(variant * 12.9898 + n * 78.233) * 43758.5453) % 1 + 1) % 1;
 
   switch (kind) {
     case 'tree': {
+      const [, bark, barkD] = ramp(L.trunk);
       shadowEllipse(ctx, ox + 3, oy + 3, 15, 7);
       const th = 16 + r(1) * 8;
-      ctx.fillStyle = '#5a4028';
+      ctx.fillStyle = bark;
       ctx.fillRect(ox - 3, oy - th, 6, th);
-      ctx.fillStyle = '#41301e';
+      ctx.fillStyle = barkD;
       ctx.fillRect(ox + 1, oy - th, 2, th);
-      const leaf = ['#2f6b2c', '#357a30', '#28602a'][variant % 3];
+      const [foliL, foli, foliD] = ramp(L.foliage);
+      const leaf = [foli, foliL, foliD][variant % 3];
       const blobs = [[0, -th - 12, 17], [-11, -th - 4, 12], [11, -th - 5, 12], [-4, -th - 22, 12], [6, -th - 20, 11]];
       for (const [bx, by, br] of blobs) {
         ctx.beginPath();
@@ -130,18 +137,19 @@ export function resourceSprite(kind, variant = 0, depleted = false) {
       break;
     }
     case 'stump': {
+      const [barkL, bark] = ramp(L.trunk);
       shadowEllipse(ctx, ox + 2, oy + 2, 9, 4);
-      ctx.fillStyle = '#5a4028';
+      ctx.fillStyle = bark;
       ctx.fillRect(ox - 4, oy - 7, 8, 7);
       ctx.beginPath(); ctx.ellipse(ox, oy - 7, 4, 2, 0, 0, Math.PI * 2);
-      ctx.fillStyle = '#8a6a45'; ctx.fill();
+      ctx.fillStyle = barkL; ctx.fill();
       break;
     }
     case 'gold': case 'stone': {
       const isGold = kind === 'gold';
       shadowEllipse(ctx, ox + 2, oy + 2, 17, 8);
-      const rock = isGold ? '#8d7a4e' : '#8c8f95';
-      const hi = isGold ? '#ffd24a' : '#d6dae0';
+      const rock = L.rock;
+      const hi = L.accent;
       const parts = depleted ? [[0, 0, 10, 7]] : [[-8, 0, 12, 9], [8, -2, 11, 8], [0, -8, 13, 10]];
       for (const [px, py, pw, ph] of parts) {
         poly(ctx, [
@@ -166,12 +174,12 @@ export function resourceSprite(kind, variant = 0, depleted = false) {
       for (let i = 0; i < 3; i++) {
         const bx = ox + (i - 1) * 9, by = oy - 4 - (i === 1 ? 4 : 0);
         ctx.beginPath(); ctx.ellipse(bx, by, 9, 8, 0, 0, Math.PI * 2);
-        ctx.fillStyle = shade('#2e6b35', (r(i) - 0.5) * 0.25); ctx.fill();
+        ctx.fillStyle = shade(L.bush, (r(i) - 0.5) * 0.25); ctx.fill();
         if (!depleted) {
           for (let k = 0; k < 5; k++) {
             ctx.beginPath();
             ctx.arc(bx + (r(i * 5 + k) - 0.5) * 12, by + (r(i * 3 + k) - 0.5) * 10, 1.8, 0, Math.PI * 2);
-            ctx.fillStyle = '#c8324a'; ctx.fill();
+            ctx.fillStyle = L.berry; ctx.fill();
           }
         }
       }
@@ -180,15 +188,14 @@ export function resourceSprite(kind, variant = 0, depleted = false) {
     case 'sheep': case 'deer': {
       const deer = kind === 'deer';
       shadowEllipse(ctx, ox + 2, oy + 2, 12, 5);
-      const body = deer ? '#a9723f' : '#efe9dc';
-      ctx.fillStyle = '#6b6257';
+      ctx.fillStyle = L.legs;
       ctx.fillRect(ox - 7, oy - 8, 2.5, 8); ctx.fillRect(ox + 5, oy - 8, 2.5, 8);
       ctx.beginPath(); ctx.ellipse(ox, oy - 12, 11, 7, 0, 0, Math.PI * 2);
-      ctx.fillStyle = body; ctx.fill();
+      ctx.fillStyle = L.body; ctx.fill();
       ctx.beginPath(); ctx.ellipse(ox - 11, oy - 17, 5, 4.5, 0, 0, Math.PI * 2);
-      ctx.fillStyle = deer ? '#8f5f34' : '#3b3a38'; ctx.fill();
+      ctx.fillStyle = L.head; ctx.fill();
       if (deer) {
-        ctx.strokeStyle = '#5e4326'; ctx.lineWidth = 1.6;
+        ctx.strokeStyle = L.antlers; ctx.lineWidth = 1.6;
         ctx.beginPath();
         ctx.moveTo(ox - 12, oy - 21); ctx.lineTo(ox - 15, oy - 27); ctx.moveTo(ox - 13, oy - 24); ctx.lineTo(ox - 17, oy - 24);
         ctx.moveTo(ox - 9, oy - 21); ctx.lineTo(ox - 7, oy - 27); ctx.moveTo(ox - 8, oy - 24); ctx.lineTo(ox - 4, oy - 25);
@@ -197,7 +204,7 @@ export function resourceSprite(kind, variant = 0, depleted = false) {
       break;
     }
   }
-  s = { canvas: c, ox, oy };
+  s = { canvas: c, ox: ox * sc, oy: oy * sc };
   resCache.set(key, s);
   return s;
 }
@@ -206,6 +213,10 @@ export function resourceSprite(kind, variant = 0, depleted = false) {
 
 const unitCache = new Map();
 const UW = 48, UH = 60, UOX = 24, UOY = 48;
+const BOWSTRING = '#e8e4d8';
+// Hueco extra por encima del ancla: al jinete se le salía la cabeza del lienzo
+// y al trabuquete el brazo al lanzar.
+const HEADROOM = { cavalry: 14, siege: 8 };
 
 function limb(ctx, x1, y1, x2, y2, w, color) {
   ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
@@ -217,7 +228,8 @@ function limb(ctx, x1, y1, x2, y2, w, color) {
  * dir=1 mira a la derecha, dir=-1 a la izquierda. back=true de espaldas.
  */
 function humanoid(ctx, o) {
-  const { tunic, trim, skin, helm, f, back } = o;
+  const { tunic, trim, skin, helm, legs, f, back } = o;
+  const [legsL, legsM] = ramp(legs);
   const walk = f < 4 ? Math.sin((f / 4) * Math.PI * 2) : 0;
   const cx = 0, ground = 0;
   const bob = f < 4 ? Math.abs(walk) * -1.2 : 0;
@@ -225,8 +237,8 @@ function humanoid(ctx, o) {
   const shoulderY = ground - 24 + bob;
 
   // Piernas
-  limb(ctx, cx - 1, hipY, cx - 2 + walk * 4, ground, 4, '#3e3a33');
-  limb(ctx, cx + 1, hipY, cx + 2 - walk * 4, ground, 4, '#4a453c');
+  limb(ctx, cx - 1, hipY, cx - 2 + walk * 4, ground, 4, legsM);
+  limb(ctx, cx + 1, hipY, cx + 2 - walk * 4, ground, 4, legsL);
   // Torso
   ctx.fillStyle = tunic;
   ctx.beginPath();
@@ -253,19 +265,20 @@ function humanoid(ctx, o) {
 
 function drawUnit(ctx, type, colorIdx, f, back) {
   const col = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length];
-  const tunic = col.main, trim = col.dark, skin = '#d9a878';
+  const L = look('unit', type);
+  const tunic = col.main, trim = col.dark, skin = L.skin;
   const atk = f >= 4;
   const swing = f === 5 ? 1 : f === 4 ? -0.5 : 0;
   shadowEllipse(ctx, 1, 2, 9, 4.5);
 
   const mounted = UNITS[type] && UNITS[type].class === 'cavalry';
-  if (UNITS[type] && UNITS[type].class === 'siege') { drawSiege(ctx, type, col, f); return; }
+  if (UNITS[type] && UNITS[type].class === 'siege') { drawSiege(ctx, type, col, f, L); return; }
 
   if (mounted) {
     ctx.save();
     ctx.translate(0, -9);
     // Caballo
-    const horse = type === 'scout' ? '#8a6a4a' : '#4a3f38';
+    const horse = L.horse;
     const gallop = Math.sin((f / 4) * Math.PI * 2);
     limb(ctx, -6, 0, -8 + gallop * 3, 9, 3, shade(horse, -0.25));
     limb(ctx, 7, 0, 9 - gallop * 3, 9, 3, shade(horse, -0.25));
@@ -284,8 +297,9 @@ function drawUnit(ctx, type, colorIdx, f, back) {
 
   ctx.save();
   if (mounted) ctx.translate(0, -20);
-  const h = humanoid(ctx, { tunic, trim, skin, helm: type === 'villager' ? null : shade('#b9bcc4', -0.1), f, back });
+  const h = humanoid(ctx, { tunic, trim, skin, helm: L.helmet || null, legs: L.legs, f, back });
 
+  const metal = L.metal, wood = L.wood;
   const armY = h.shoulderY + 2;
   switch (type) {
     case 'villager': {
@@ -295,8 +309,8 @@ function drawUnit(ctx, type, colorIdx, f, back) {
       ctx.save();
       ctx.translate(8, armY + 6);
       ctx.rotate(atk ? -0.9 + swing * 1.4 : 0.5);
-      ctx.fillStyle = '#6b4d2c'; ctx.fillRect(-1, -10, 2, 13);
-      ctx.fillStyle = '#b9bcc4'; ctx.fillRect(-3.5, -12, 7, 4);
+      ctx.fillStyle = wood; ctx.fillRect(-1, -10, 2, 13);
+      ctx.fillStyle = metal; ctx.fillRect(-3.5, -12, 7, 4);
       ctx.restore();
       break;
     }
@@ -311,9 +325,9 @@ function drawUnit(ctx, type, colorIdx, f, back) {
       ctx.translate(sx, sy);
       ctx.rotate(atk ? -1.9 + swing * 2.3 : -0.35);
       const swLen = type === 'militia' ? 11 : type === 'champion' ? 17 : 14;
-      ctx.fillStyle = '#3a2c1c'; ctx.fillRect(-1.2, -2, 2.4, 5);
-      ctx.fillStyle = '#c9ccd4'; ctx.fillRect(-1.4, -swLen, 2.8, swLen);
-      ctx.fillStyle = '#8c6b3a'; ctx.fillRect(-4, -3, 8, 2);
+      ctx.fillStyle = ramp(wood)[2]; ctx.fillRect(-1.2, -2, 2.4, 5);
+      ctx.fillStyle = metal; ctx.fillRect(-1.4, -swLen, 2.8, swLen);
+      ctx.fillStyle = wood; ctx.fillRect(-4, -3, 8, 2);
       ctx.restore();
       break;
     }
@@ -324,8 +338,8 @@ function drawUnit(ctx, type, colorIdx, f, back) {
       ctx.translate(6, armY + 2);
       ctx.rotate(atk ? -1.2 + swing * 0.5 : -0.55);
       const len = type === 'pikeman' ? 30 : 25;
-      ctx.fillStyle = '#7a5c33'; ctx.fillRect(-1.1, -len * 0.75, 2.2, len);
-      ctx.fillStyle = '#d2d6de';
+      ctx.fillStyle = wood; ctx.fillRect(-1.1, -len * 0.75, 2.2, len);
+      ctx.fillStyle = metal;
       ctx.beginPath();
       ctx.moveTo(0, -len * 0.75 - 7); ctx.lineTo(3, -len * 0.75); ctx.lineTo(-3, -len * 0.75);
       ctx.closePath(); ctx.fill();
@@ -340,22 +354,22 @@ function drawUnit(ctx, type, colorIdx, f, back) {
       ctx.translate(8, armY - 1);
       if (type === 'skirmisher') {
         ctx.rotate(atk ? -1.4 + draw * 0.8 : -0.4);
-        ctx.fillStyle = '#7a5c33'; ctx.fillRect(-0.9, -14, 1.8, 18);
-        ctx.fillStyle = '#d2d6de';
+        ctx.fillStyle = wood; ctx.fillRect(-0.9, -14, 1.8, 18);
+        ctx.fillStyle = metal;
         ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(2.4, -14); ctx.lineTo(-2.4, -14); ctx.closePath(); ctx.fill();
       } else if (type === 'archer') {
-        ctx.strokeStyle = '#7a4f28'; ctx.lineWidth = 2;
+        ctx.strokeStyle = wood; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(0, 0, 9, -1.25, 1.25); ctx.stroke();
-        ctx.strokeStyle = '#e8e4d8'; ctx.lineWidth = 0.8;
+        ctx.strokeStyle = BOWSTRING; ctx.lineWidth = 0.8;
         ctx.beginPath();
         ctx.moveTo(2.9, -8.6); ctx.lineTo(-draw * 6, 0); ctx.lineTo(2.9, 8.6); ctx.stroke();
       } else {
-        ctx.fillStyle = '#5e4526'; ctx.fillRect(-6, -1.6, 14, 3.2);
-        ctx.fillStyle = '#8d8f96'; ctx.fillRect(2, -7, 2.4, 14);
+        ctx.fillStyle = wood; ctx.fillRect(-6, -1.6, 14, 3.2);
+        ctx.fillStyle = metal; ctx.fillRect(2, -7, 2.4, 14);
       }
       ctx.restore();
       // Carcaj
-      ctx.fillStyle = '#6b4d2c'; ctx.fillRect(-6, h.shoulderY, 3.5, 9);
+      ctx.fillStyle = ramp(wood)[2]; ctx.fillRect(-6, h.shoulderY, 3.5, 9);
       break;
     }
     default:
@@ -365,40 +379,40 @@ function drawUnit(ctx, type, colorIdx, f, back) {
   ctx.restore();
 }
 
-function drawSiege(ctx, type, col, f) {
+function drawSiege(ctx, type, col, f, L) {
   const recoil = f >= 4 ? (f === 5 ? -3 : 2) : 0;
+  const [woodL, wood, woodD] = ramp(L.wood);
+  const [, wheel, wheelD] = ramp(L.wheel);
   if (type === 'ram') {
-    ctx.fillStyle = '#5e4426';
-    poly(ctx, [[-16, -6], [16, -6], [13, -16], [-13, -16]], '#6b4f2c');
-    poly(ctx, [[-13, -16], [13, -16], [10, -22], [-10, -22]], '#7d5c33');
-    ctx.fillStyle = '#3f2f1c';
+    poly(ctx, [[-16, -6], [16, -6], [13, -16], [-13, -16]], wood);
+    poly(ctx, [[-13, -16], [13, -16], [10, -22], [-10, -22]], woodL);
+    ctx.fillStyle = woodD;
     ctx.fillRect(-18 + recoil, -12, 30, 5);
-    ctx.fillStyle = '#8d8f96';
+    ctx.fillStyle = L.metal;
     ctx.fillRect(10 + recoil, -13.5, 7, 8);
     for (const wx of [-11, 0, 11]) {
       ctx.beginPath(); ctx.arc(wx, -3, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#4a3720'; ctx.fill();
-      ctx.strokeStyle = '#2c2013'; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.fillStyle = wheel; ctx.fill();
+      ctx.strokeStyle = wheelD; ctx.lineWidth = 1.4; ctx.stroke();
     }
   } else {
     // Manganel / trabuquete
-    ctx.fillStyle = '#5e4426';
-    poly(ctx, [[-16, -4], [16, -4], [14, -10], [-14, -10]], '#6b4f2c');
+    poly(ctx, [[-16, -4], [16, -4], [14, -10], [-14, -10]], wood);
     for (const wx of [-10, 10]) {
       ctx.beginPath(); ctx.arc(wx, -3, 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#4a3720'; ctx.fill();
-      ctx.strokeStyle = '#2c2013'; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.fillStyle = wheel; ctx.fill();
+      ctx.strokeStyle = wheelD; ctx.lineWidth = 1.4; ctx.stroke();
     }
     const tall = type === 'trebuchet';
-    ctx.strokeStyle = '#7d5c33'; ctx.lineWidth = 3;
+    ctx.strokeStyle = woodL; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(-6, -10); ctx.lineTo(0, tall ? -34 : -22);
     ctx.moveTo(6, -10); ctx.lineTo(0, tall ? -34 : -22); ctx.stroke();
     ctx.save();
     ctx.translate(0, tall ? -32 : -20);
     ctx.rotate(f >= 4 ? (f === 5 ? -1.9 : -0.2) : -0.9);
-    ctx.strokeStyle = '#6b4f2c'; ctx.lineWidth = 3.4;
+    ctx.strokeStyle = wood; ctx.lineWidth = 3.4;
     ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(12, 0); ctx.stroke();
-    ctx.fillStyle = '#4a3720';
+    ctx.fillStyle = wheel;
     ctx.beginPath(); ctx.arc(13, 0, 3.6, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     ctx.fillStyle = col.main;
@@ -410,12 +424,17 @@ export function unitSprite(type, colorIdx, dir, f, back = false) {
   const key = `${type}|${colorIdx}|${dir}|${f}|${back ? 1 : 0}`;
   let s = unitCache.get(key);
   if (s) return s;
-  const c = makeCanvas(UW, UH);
+  // El lienzo crece con el tamaño elegido, así una unidad más grande no se
+  // recorta y una normal no gasta memoria de más.
+  const sc = look('unit', type).scale || 1;
+  const extra = HEADROOM[UNITS[type] && UNITS[type].class] || 0;
+  const c = makeCanvas(UW * sc, (UH + extra) * sc);
   const ctx = c.getContext('2d');
-  ctx.translate(UOX, UOY);
+  ctx.scale(sc, sc);
+  ctx.translate(UOX, UOY + extra);
   if (dir < 0) ctx.scale(-1, 1);
   drawUnit(ctx, type, colorIdx, f, back);
-  s = { canvas: c, ox: UOX, oy: UOY };
+  s = { canvas: c, ox: UOX * sc, oy: (UOY + extra) * sc };
   unitCache.set(key, s);
   return s;
 }
@@ -480,26 +499,28 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
   const col = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length];
   const B = BUILDINGS[type];
   const s = B.size;
-  const wood = '#8a6234', woodD = '#66492a', woodL = '#a37b45';
-  const plaster = '#d8cba6', plasterD = '#b6a887', plasterL = '#eee2c1';
-  const stone = '#9a9a94', stoneD = '#70706c', stoneL = '#bcbcb4';
-  const roofA = '#a8452f', roofB = '#8a3423', roofC = '#c2543a';
+  const L = look('building', type);
+  // Cada material se pinta en tres tonos: cara al sol, cara base y sombra.
+  const [wallL, wall, wallD] = ramp(L.wall || '#d8cba6');
+  const [woodL, wood, woodD] = ramp(L.wood || '#8a6234');
+  const [roofL, roofM, roofD] = ramp(L.roof || '#a8452f');
 
   switch (type) {
     case 'house': {
-      isoPrism(ctx, x, y, s * 0.82, s * 0.82, 16, plasterL, plasterD, plaster);
-      isoRoof(ctx, x, y, s * 0.82, s * 0.82, 16, 15, roofB, roofA, roofC);
+      isoPrism(ctx, x, y, s * 0.82, s * 0.82, 16, wallL, wallD, wall);
+      isoRoof(ctx, x, y, s * 0.82, s * 0.82, 16, 15, roofD, roofM, roofL);
       const d = iso(x, y, s * 0.55, s * 0.82);
-      ctx.fillStyle = '#4d3620'; ctx.fillRect(d[0] - 4, d[1] - 15, 8, 12);
+      ctx.fillStyle = L.door; ctx.fillRect(d[0] - 4, d[1] - 15, 8, 12);
       bannerPole(ctx, x - s * 0.82 * HW + 4, y + s * 0.82 * HH - 2, 20, col);
       break;
     }
     case 'towncenter': {
       // Plataforma de piedra, sala central y pórtico con pilares de madera.
-      isoPrism(ctx, x, y, s, s, 7, '#cdb887', '#8e7a4f', '#ab9668');
+      const [baseL, baseM, baseD] = ramp(L.base);
+      isoPrism(ctx, x, y, s, s, 7, baseL, baseD, baseM);
       // Cuerpo del edificio, algo más pequeño que la huella.
       const inner = iso(x, y, 0.55, 0.55);
-      isoPrism(ctx, inner[0], inner[1] - 7, s - 1.1, s - 1.1, 22, plasterL, plasterD, plaster);
+      isoPrism(ctx, inner[0], inner[1] - 7, s - 1.1, s - 1.1, 22, wallL, wallD, wall);
       // Pilares en las cuatro esquinas del pórtico.
       for (const [u, v] of [[0.1, 0.1], [s - 0.7, 0.1], [0.1, s - 0.7], [s - 0.7, s - 0.7]]) {
         const p = iso(x, y, u, v);
@@ -508,11 +529,11 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       // Tejado bajo y ancho, muy distinto al de una casa.
       ctx.save();
       ctx.translate(0, -37);
-      isoRoof(ctx, x, y, s, s, 0, 15, '#7d3a2a', '#96442f', '#a85a3d');
+      isoRoof(ctx, x, y, s, s, 0, 15, roofD, roofM, roofL);
       ctx.restore();
       // Portalón.
       const door = iso(x, y, s / 2, s - 0.55);
-      ctx.fillStyle = '#3b2a17';
+      ctx.fillStyle = L.door;
       ctx.beginPath();
       ctx.moveTo(door[0] - 7, door[1] - 7); ctx.lineTo(door[0] - 7, door[1] - 20);
       ctx.quadraticCurveTo(door[0], door[1] - 28, door[0] + 7, door[1] - 20);
@@ -522,18 +543,24 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       break;
     }
     case 'mill': {
-      isoPrism(ctx, x + 2, y, s * 0.7, s * 0.7, 20, plasterL, plasterD, plaster);
-      isoRoof(ctx, x + 2, y, s * 0.7, s * 0.7, 20, 12, roofB, roofA, roofC);
+      isoPrism(ctx, x + 2, y, s * 0.7, s * 0.7, 20, wallL, wallD, wall);
+      isoRoof(ctx, x + 2, y, s * 0.7, s * 0.7, 20, 12, roofD, roofM, roofL);
       // Aspas, sujetas al hastial delantero.
       const c0 = iso(x + 2, y, s * 0.35, s * 0.72);
       ctx.save();
       ctx.translate(c0[0], c0[1] - 30);
-      ctx.strokeStyle = '#6b4f2c'; ctx.lineWidth = 2.4;
+      ctx.strokeStyle = wood; ctx.lineWidth = 2.4;
       for (let i = 0; i < 4; i++) {
         const a = i * Math.PI / 2 + 0.4;
         ctx.beginPath(); ctx.moveTo(0, 0);
         ctx.lineTo(Math.cos(a) * 15, Math.sin(a) * 15); ctx.stroke();
-        ctx.fillStyle = 'rgba(235,228,200,.75)';
+      }
+      // La tela va translúcida; se multiplica la opacidad en vez de fijarla
+      // para no pisar el desvanecido de los edificios a medio construir.
+      ctx.fillStyle = L.accent;
+      ctx.globalAlpha *= 0.75;
+      for (let i = 0; i < 4; i++) {
+        const a = i * Math.PI / 2 + 0.4;
         ctx.beginPath();
         ctx.ellipse(Math.cos(a) * 10, Math.sin(a) * 10, 5, 2.4, a, 0, Math.PI * 2); ctx.fill();
       }
@@ -542,11 +569,11 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
     }
     case 'lumbercamp': case 'miningcamp': {
       isoPrism(ctx, x + 3, y + 2, s * 0.55, s * 0.55, 12, woodL, woodD, wood);
-      isoRoof(ctx, x + 3, y + 2, s * 0.55, s * 0.55, 12, 8, '#6d5a3c', '#5a4a31', '#7d6947');
+      isoRoof(ctx, x + 3, y + 2, s * 0.55, s * 0.55, 12, 8, roofD, roofM, roofL);
       if (type === 'lumbercamp') {
         for (let i = 0; i < 3; i++) {
           const p = iso(x, y, 1.2 + i * 0.2, 1.5);
-          ctx.fillStyle = i % 2 ? '#7d5c33' : '#8f6a3c';
+          ctx.fillStyle = i % 2 ? shade(L.accent, -0.1) : L.accent;
           ctx.fillRect(p[0] - 12, p[1] - 6 - i * 4, 24, 5);
           ctx.strokeStyle = 'rgba(0,0,0,.2)'; ctx.strokeRect(p[0] - 12, p[1] - 6 - i * 4, 24, 5);
         }
@@ -554,7 +581,7 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
         const p = iso(x, y, 1.3, 1.4);
         for (const [dx, dy, r] of [[-8, 0, 6], [4, -3, 7], [10, 2, 5]]) {
           ctx.beginPath(); ctx.ellipse(p[0] + dx, p[1] + dy, r, r * 0.75, 0, 0, Math.PI * 2);
-          ctx.fillStyle = '#8c8f95'; ctx.fill();
+          ctx.fillStyle = L.accent; ctx.fill();
           ctx.strokeStyle = 'rgba(0,0,0,.2)'; ctx.stroke();
         }
       }
@@ -562,40 +589,36 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       break;
     }
     case 'farm': {
+      const [, soil, soilD] = ramp(L.soil);
+      const [, crop, cropD] = ramp(L.crop);
       const p00 = iso(x, y, 0, 0), p10 = iso(x, y, s, 0), p11 = iso(x, y, s, s), p01 = iso(x, y, 0, s);
-      poly(ctx, [p00, p10, p11, p01], '#8a6a3c', '#6d5330');
+      poly(ctx, [p00, p10, p11, p01], soil, soilD);
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(p00[0], p00[1]); ctx.lineTo(p10[0], p10[1]); ctx.lineTo(p11[0], p11[1]); ctx.lineTo(p01[0], p01[1]);
       ctx.closePath(); ctx.clip();
       for (let i = 0; i <= 8; i++) {
         const a = iso(x, y, (i / 8) * s, 0), b = iso(x, y, (i / 8) * s, s);
-        ctx.strokeStyle = i % 2 ? '#a8c24a' : '#7a9a34';
+        ctx.strokeStyle = i % 2 ? crop : cropD;
         ctx.lineWidth = 3;
         ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
       }
       ctx.restore();
-      ctx.strokeStyle = '#5b4426'; ctx.lineWidth = 1.5;
-      poly(ctx, [p00, p10, p11, p01], null, '#5b4426');
+      ctx.strokeStyle = L.fence; ctx.lineWidth = 1.5;
+      poly(ctx, [p00, p10, p11, p01], null, L.fence);
       break;
     }
     case 'barracks': case 'archeryrange': case 'stable': case 'siegeworkshop': {
       // Cada edificio militar lleva su propio color de tejado para reconocerlo de un vistazo.
-      const roofs = {
-        barracks: ['#5f2c21', '#7a3a2c', '#8f4a37'],
-        archeryrange: ['#39522c', '#4a6b3a', '#5c8047'],
-        stable: ['#5a4a31', '#6d5a3c', '#7d6947'],
-        siegeworkshop: ['#3d424b', '#4f5560', '#616875'],
-      }[type];
-      isoPrism(ctx, x + 2, y + 1, s - 0.5, s - 0.5, 22, plasterL, plasterD, plaster);
-      isoRoof(ctx, x + 2, y + 1, s - 0.5, s - 0.5, 22, 14, roofs[0], roofs[1], roofs[2]);
+      isoPrism(ctx, x + 2, y + 1, s - 0.5, s - 0.5, 22, wallL, wallD, wall);
+      isoRoof(ctx, x + 2, y + 1, s - 0.5, s - 0.5, 22, 14, roofD, roofM, roofL);
       const front = iso(x + 2, y + 1, (s - 0.5) / 2, s - 0.5);
-      ctx.fillStyle = '#4d3620';
+      ctx.fillStyle = L.door;
       ctx.fillRect(front[0] - 6, front[1] - 20, 12, 17);
       // Emblema según el edificio
       ctx.save();
       ctx.translate(front[0], front[1] - 30);
-      ctx.strokeStyle = '#d8d8d0'; ctx.lineWidth = 2;
+      ctx.strokeStyle = L.accent; ctx.lineWidth = 2;
       if (type === 'barracks') {
         ctx.beginPath(); ctx.moveTo(-5, 5); ctx.lineTo(5, -6); ctx.moveTo(5, 5); ctx.lineTo(-5, -6); ctx.stroke();
       } else if (type === 'archeryrange') {
@@ -610,33 +633,35 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       break;
     }
     case 'blacksmith': {
-      isoPrism(ctx, x + 2, y + 1, s * 0.8, s * 0.8, 18, stoneL, stoneD, stone);
-      isoRoof(ctx, x + 2, y + 1, s * 0.8, s * 0.8, 18, 10, '#54483a', '#43392e', '#635546');
+      const [chL, chM, chD] = ramp(L.chimney);
+      isoPrism(ctx, x + 2, y + 1, s * 0.8, s * 0.8, 18, wallL, wallD, wall);
+      isoRoof(ctx, x + 2, y + 1, s * 0.8, s * 0.8, 18, 10, roofD, roofM, roofL);
       const ch = iso(x + 2, y + 1, s * 0.15, s * 0.15);
-      isoPrism(ctx, ch[0], ch[1] - 20, 0.35, 0.35, 18, '#6d6d68', '#4c4c48', '#5c5c58');
+      isoPrism(ctx, ch[0], ch[1] - 20, 0.35, 0.35, 18, chL, chD, chM);
       ctx.fillStyle = 'rgba(210,210,210,.35)';
       for (let i = 0; i < 3; i++) {
         ctx.beginPath();
         ctx.arc(ch[0] + i * 2 - 2, ch[1] - 44 - i * 8, 4 + i * 2, 0, Math.PI * 2); ctx.fill();
       }
       const f2 = iso(x + 2, y + 1, s * 0.4, s * 0.8);
-      ctx.fillStyle = '#ff9a3c';
+      ctx.fillStyle = L.accent;
       ctx.fillRect(f2[0] - 4, f2[1] - 12, 8, 8);
       bannerPole(ctx, x - s * 0.5 * HW, y + s * 0.5 * HH, 18, col);
       break;
     }
     case 'market': {
       // Plaza empedrada con puestos de distintos colores.
-      isoPrism(ctx, x, y, s, s, 3, '#b3a37e', '#7d7052', '#948763');
-      const stalls = [[0.5, 0.4, '#c9553f'], [1.9, 0.6, '#3f7fa8'], [0.7, 1.9, '#c9a13f'], [2.0, 2.0, '#6b8f4a']];
+      const [grL, grM, grD] = ramp(L.ground);
+      isoPrism(ctx, x, y, s, s, 3, grL, grD, grM);
+      const stalls = [[0.5, 0.4, L.stall1], [1.9, 0.6, L.stall2], [0.7, 1.9, L.stall3], [2.0, 2.0, L.stall4]];
       for (const [u, v, tone] of stalls) {
         const p = iso(x, y, u, v);
         const py = p[1] - 3;
         // Mostrador
-        ctx.fillStyle = '#8a6a3c';
-        poly(ctx, [[p[0] - 13, py - 2], [p[0], py + 5], [p[0] + 13, py - 2], [p[0], py - 9]], '#8a6a3c', '#5b4426');
+        poly(ctx, [[p[0] - 13, py - 2], [p[0], py + 5], [p[0] + 13, py - 2], [p[0], py - 9]],
+          L.counter, shade(L.counter, -0.34));
         // Postes y toldo
-        ctx.fillStyle = '#6b4f2c';
+        ctx.fillStyle = wood;
         ctx.fillRect(p[0] - 12, py - 16, 2, 14); ctx.fillRect(p[0] + 10, py - 16, 2, 14);
         poly(ctx, [[p[0] - 15, py - 16], [p[0], py - 22], [p[0] + 15, py - 16], [p[0], py - 11]], tone, 'rgba(0,0,0,.25)');
         // Género sobre el mostrador
@@ -650,41 +675,41 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
     case 'tower': {
       const H = 52;
       // Zócalo ligeramente más ancho que el fuste.
-      isoPrism(ctx, x, y, 1, 1, 8, stoneL, stoneD, stone);
+      isoPrism(ctx, x, y, 1, 1, 8, wallL, wallD, wall);
       const shaft = iso(x, y, 0.1, 0.1);
-      isoPrism(ctx, shaft[0], shaft[1] - 8, 0.8, 0.8, H, stoneL, stoneD, stone);
+      isoPrism(ctx, shaft[0], shaft[1] - 8, 0.8, 0.8, H, wallL, wallD, wall);
       stoneTexture(ctx, shaft[0], shaft[1] - 8, 0.8, 0.8, H);
       // Saledizo y almenas.
       const topY = 8 + H;
-      isoPrism(ctx, x, y - topY, 1, 1, 6, shade(stoneL, 0.05), stoneD, stone);
-      battlements(ctx, x, y - topY - 6, 1, 1, 0, shade(stoneL, 0.08), stoneD, stone);
+      isoPrism(ctx, x, y - topY, 1, 1, 6, shade(wallL, 0.05), wallD, wall);
+      battlements(ctx, x, y - topY - 6, 1, 1, 0, shade(wallL, 0.08), wallD, wall);
       // Aspillera y puerta.
       const face = iso(x, y, 0.5, 1);
-      ctx.fillStyle = '#2b2118';
+      ctx.fillStyle = shade(L.door, -0.25);
       ctx.fillRect(face[0] - 2, face[1] - topY + 6, 4, 9);
-      ctx.fillStyle = '#3b2a17';
+      ctx.fillStyle = L.door;
       ctx.fillRect(face[0] - 4, face[1] - 12, 8, 10);
       ctx.fillStyle = col.main;
       ctx.fillRect(face[0] - 3.5, face[1] - topY - 4, 7, 7);
       break;
     }
     case 'castle': {
-      isoPrism(ctx, x + 0.1 * HW, y + 0.2 * HH, s - 0.2, s - 0.2, 36, stoneL, stoneD, stone);
+      isoPrism(ctx, x + 0.1 * HW, y + 0.2 * HH, s - 0.2, s - 0.2, 36, wallL, wallD, wall);
       stoneTexture(ctx, x + 0.1 * HW, y + 0.2 * HH, s - 0.2, s - 0.2, 36);
       ctx.save(); ctx.translate(0, -36);
-      isoPrism(ctx, x + 0.1 * HW, y + 0.2 * HH, s - 0.2, s - 0.2, 7, shade(stoneL, 0.06), stoneD, stone);
+      isoPrism(ctx, x + 0.1 * HW, y + 0.2 * HH, s - 0.2, s - 0.2, 7, shade(wallL, 0.06), wallD, wall);
       ctx.restore();
       // Torreones en las cuatro esquinas
       const corners = [[0, 0], [s - 1.1, 0], [0, s - 1.1], [s - 1.1, s - 1.1]];
       for (const [u, v] of corners) {
         const p = iso(x, y, u, v);
-        isoPrism(ctx, p[0], p[1], 1.1, 1.1, 56, stoneL, stoneD, stone);
+        isoPrism(ctx, p[0], p[1], 1.1, 1.1, 56, wallL, wallD, wall);
         ctx.save(); ctx.translate(0, -56);
-        isoPrism(ctx, p[0] - 0.08 * HW, p[1], 1.25, 1.25, 7, shade(stoneL, 0.08), stoneD, stone);
+        isoPrism(ctx, p[0] - 0.08 * HW, p[1], 1.25, 1.25, 7, shade(wallL, 0.08), wallD, wall);
         ctx.restore();
       }
       const gate = iso(x, y, s / 2, s - 0.2);
-      ctx.fillStyle = '#3b2a17';
+      ctx.fillStyle = L.door;
       ctx.beginPath();
       ctx.moveTo(gate[0] - 7, gate[1] - 4); ctx.lineTo(gate[0] - 7, gate[1] - 18);
       ctx.quadraticCurveTo(gate[0], gate[1] - 26, gate[0] + 7, gate[1] - 18);
@@ -694,14 +719,14 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       break;
     }
     case 'wall': {
-      isoPrism(ctx, x, y, 1, 1, 26, stoneL, stoneD, stone);
+      isoPrism(ctx, x, y, 1, 1, 26, wallL, wallD, wall);
       stoneTexture(ctx, x, y, 1, 1, 26);
-      isoPrism(ctx, x, y - 26, 1, 1, 4, shade(stoneL, 0.06), stoneD, stone);
-      battlements(ctx, x, y - 30, 1, 1, 0, shade(stoneL, 0.1), stoneD, stone);
+      isoPrism(ctx, x, y - 26, 1, 1, 4, shade(wallL, 0.06), wallD, wall);
+      battlements(ctx, x, y - 30, 1, 1, 0, shade(wallL, 0.1), wallD, wall);
       break;
     }
     default:
-      isoPrism(ctx, x, y, s, s, 20, plasterL, plasterD, plaster);
+      isoPrism(ctx, x, y, s, s, 20, wallL, wallD, wall);
   }
 }
 
