@@ -159,11 +159,24 @@ export class UI {
   watchBars() {
     const root = document.documentElement;
     const topbar = document.getElementById('topbar');
-    const bars = [topbar, this.el.bottombar];
+    const canvas = this.el.canvas;
     const orientation = () => (window.innerWidth >= window.innerHeight ? 'h' : 'v');
-    let last = '';
+    let lastBars = '';
     let lastOrientation = orientation();
     let areaBeforeTurn = 0, settle = 0;
+
+    /*
+     * El lienzo se dibuja en píxeles CSS sobre un búfer de ancho×dpr. Si el
+     * búfer se queda con la medida anterior, el navegador estira el mapa de
+     * bits para rellenar la caja y el tablero sale deformado. Así que la
+     * referencia es siempre la caja del lienzo, no el alto de las barras: al
+     * girar sólo cambia el ancho y las barras podrían medir lo mismo.
+     */
+    const syncCanvas = () => {
+      if (canvas.clientWidth === this.r.w && canvas.clientHeight === this.r.h) return;
+      this.r.resize();
+      this.r.clampCam();
+    };
 
     const apply = () => {
       // Al girar, lo primero es guardar el lienzo de antes: es la referencia
@@ -176,23 +189,34 @@ export class UI {
         settle = setTimeout(() => {
           const before = areaBeforeTurn;
           areaBeforeTurn = 0;
+          syncCanvas();
           this.keepViewOnTurn(before);
         }, 180);
       }
       const top = topbar.offsetHeight, bottom = this.el.bottombar.offsetHeight;
       const key = `${top}/${bottom}`;
-      if (key === last) return; // sin cambio real: nada que repintar
-      last = key;
-      root.style.setProperty('--top-total', `${top}px`);
-      root.style.setProperty('--bottom-total', `${bottom}px`);
-      this.r.resize();
-      this.r.clampCam();
+      if (key !== lastBars) {
+        lastBars = key;
+        root.style.setProperty('--top-total', `${top}px`);
+        root.style.setProperty('--bottom-total', `${bottom}px`);
+      }
+      syncCanvas();
     };
+
     if (window.ResizeObserver) {
+      // El lienzo también se observa: es quien manda sobre el búfer.
       const ro = new ResizeObserver(apply);
-      for (const b of bars) ro.observe(b);
+      for (const el of [topbar, this.el.bottombar, canvas]) ro.observe(el);
     }
     window.addEventListener('resize', apply);
+    window.addEventListener('orientationchange', apply);
+    /*
+     * Red de seguridad: durante la animación de giro, Safari en iOS informa
+     * de medidas que todavía no son las definitivas, y si el último aviso
+     * llega con las viejas nadie vuelve a corregirlo. Esta comprobación son
+     * dos lecturas y sólo actúa si de verdad no cuadran.
+     */
+    setInterval(syncCanvas, 250);
     apply();
   }
 
