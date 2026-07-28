@@ -71,6 +71,27 @@ Limitaciones conocidas:
   herramientas del navegador podría ver el mapa entero. En pantalla la niebla
   de guerra funciona con normalidad para cada jugador.
 
+## Catálogo del juego
+
+Desde el menú principal, **Catálogo del juego**: una ficha de cada unidad,
+edificio, recurso y tipo de terreno, con su dibujo y todos sus valores.
+
+Los valores **se pueden editar ahí mismo**: coste, tiempo, puntos de vida,
+ataque, armadura, alcance, velocidad, visión, cantidad de los yacimientos,
+velocidad de recolección y el color de cada terreno. Cada campo modificado se
+resalta y, al pasar el ratón por su nombre, indica cuál era el valor original.
+Hay un botón para restablecer un elemento suelto y otro para dejarlo todo como
+venía de fábrica.
+
+Detalles a tener en cuenta:
+
+- Los cambios se guardan **en ese navegador** y se aplican a las **partidas
+  nuevas**, no a una que ya esté en marcha.
+- En **multijugador manda quien invita**: sus valores se usan en los dos lados,
+  de modo que ambos jugadores ven y juegan con las mismas cifras.
+- Los valores se validan y se recortan a un rango razonable, así que no es
+  posible dejar el juego en un estado inservible desde el catálogo.
+
 ## Cómo se juega
 
 | Acción | Control |
@@ -109,7 +130,7 @@ o aleja.
 
 ## Contenido
 
-- **4 edades**, 20 tipos de unidad y 15 edificios distintos.
+- **4 edades**, 17 tipos de unidad y 15 edificios distintos.
 - **11 tecnologías** (armas, armaduras, arquería, economía) y 7 mejoras de línea
   que transforman las unidades ya creadas.
 - **Mapas aleatorios** con semilla reproducible, en tres tamaños y con hasta
@@ -119,6 +140,7 @@ o aleja.
   crecientes. Tres niveles de dificultad.
 - Niebla de guerra, minimapa, puntos de reunión, colas de producción, mercado de
   recursos, control de velocidad (1x a 3x) y estadísticas finales.
+- **Catálogo** para consultar y editar los valores de todo el juego.
 
 ## Estructura del código
 
@@ -136,6 +158,8 @@ js/sprites.js       Arte procedural: todo se dibuja con Canvas
 js/ai.js            IA de los rivales
 js/ui.js            HUD, panel de órdenes, ratón, teclado y táctil
 js/audio.js         Efectos de sonido sintetizados con WebAudio
+js/catalog.js       Catálogo: fichas y edición de los datos del juego
+js/data/overrides.js  Valores editados: validación, guardado y aplicación
 js/lobby-ui.js      Pantalla de la sala de espera
 js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
 js/net/protocol.js  Codificación binaria del estado y de las órdenes
