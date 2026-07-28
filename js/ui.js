@@ -94,6 +94,7 @@ export class UI {
     this.el.selList = id('sel-list');
     this.el.queue = id('queue');
     this.el.notif = id('notifications');
+    this.el.production = id('production');
     this.el.tooltip = id('tooltip');
     this.el.bottombar = id('bottombar');
     this.el.pauseMenu = id('pause-menu');
@@ -863,6 +864,26 @@ export class UI {
     this.buttons = [];
   }
 
+  /** Icono y nombre de un elemento en cola, sea unidad, edad, mejora o tecnología. */
+  queueIcon(item) {
+    const idx = this.game.human.colorIdx;
+    switch (item.kind) {
+      case 'unit': return iconFor('unit', item.key, idx);
+      case 'age': return iconFor('tech', AGES[item.key].short, 0);
+      case 'upgrade': return iconFor('unit', UPGRADES[item.key].to, idx);
+      default: return iconFor('tech', TECHS[item.key].name, 0);
+    }
+  }
+
+  queueLabel(item) {
+    switch (item.kind) {
+      case 'unit': return UNITS[item.key].name;
+      case 'age': return AGES[item.key].name;
+      case 'upgrade': return UPGRADES[item.key].name;
+      default: return TECHS[item.key].name;
+    }
+  }
+
   renderQueue() {
     const g = this.game;
     const sel = g.selection[0];
@@ -875,16 +896,64 @@ export class UI {
     sel.queue.forEach((item, i) => {
       const el = document.createElement('button');
       el.className = 'qitem' + (item.blocked ? ' blocked' : '');
-      const icon = item.kind === 'unit' ? iconFor('unit', item.key, g.human.colorIdx)
-        : item.kind === 'age' ? iconFor('tech', AGES[item.key].short, 0)
-          : item.kind === 'upgrade' ? iconFor('unit', UPGRADES[item.key].to, g.human.colorIdx)
-            : iconFor('tech', TECHS[item.key].name, 0);
       const pct = Math.round((item.progress / item.time) * 100);
-      el.innerHTML = `<img src="${icon}"><span class="qbar" style="height:${i === 0 ? pct : 0}%"></span>`;
+      el.innerHTML = `<img src="${this.queueIcon(item)}"><span class="qbar" style="height:${i === 0 ? pct : 0}%"></span>`;
       el.title = item.blocked ? 'Bloqueado: límite de población alcanzado. Clic para cancelar.' : 'Clic para cancelar';
       el.onclick = () => { g.cancelQueueItem(sel, i); this.renderQueue(); this.renderCommands(); };
       q.appendChild(el);
     });
+  }
+
+  /**
+   * Tira de producción: una ficha por cada edificio propio que esté fabricando
+   * algo, con lo que sale ahora y cuántas cosas más esperan detrás. Así se ve de
+   * un vistazo qué se está produciendo sin ir seleccionando edificio por
+   * edificio. El DOM sólo se rehace cuando cambia la lista; entre medias basta
+   * con mover las barras de progreso.
+   */
+  renderProduction() {
+    const g = this.game;
+    const cont = this.el.production;
+    const busy = [];
+    for (const b of g.buildings) {
+      if (b.owner === g.human.id && b.built && !b.dead && b.queue.length) busy.push(b);
+    }
+    // Orden estable por id: las fichas no deben bailar de sitio al repintar.
+    busy.sort((a, b) => a.id - b.id);
+
+    const key = busy.map((b) => {
+      const it = b.queue[0];
+      return `${b.id}:${it.kind}:${it.key}:${b.queue.length}:${it.blocked ? 1 : 0}`;
+    }).join(',');
+
+    if (key !== this._prodKey) {
+      this._prodKey = key;
+      cont.innerHTML = '';
+      for (const b of busy) {
+        const item = b.queue[0];
+        const more = b.queue.length - 1;
+        const el = document.createElement('button');
+        el.className = 'prod' + (item.blocked ? ' blocked' : '');
+        el.innerHTML = `<img src="${this.queueIcon(item)}" alt=""><span class="pbar"></span>${
+          more ? `<span class="pmore">+${more}</span>` : ''}`;
+        el.title = `${this.queueLabel(item)} · ${BUILDINGS[b.type].name}${
+          item.blocked ? ' (bloqueado: falta población)' : ''}\nClic para ir al edificio`;
+        el.onclick = () => {
+          this.select([b]);
+          this.r.centerOn(b.cx, b.cy);
+        };
+        el._bar = el.querySelector('.pbar');
+        cont.appendChild(el);
+      }
+      cont.classList.toggle('hidden', !busy.length);
+      document.body.classList.toggle('producing', busy.length > 0);
+    }
+
+    const nodes = cont.children;
+    for (let i = 0; i < busy.length && i < nodes.length; i++) {
+      const item = busy[i].queue[0];
+      nodes[i]._bar.style.width = `${clamp((item.progress / item.time) * 100, 0, 100)}%`;
+    }
   }
 
   // --- Avisos ---------------------------------------------------------------
@@ -962,6 +1031,7 @@ export class UI {
     else this.updateAffordability();
 
     this.renderQueue();
+    this.renderProduction();
     this.r.drawMinimap(this.mctx, this.el.minimap.width, this.el.minimap.height);
     this.edgeScroll(dt);
   }
