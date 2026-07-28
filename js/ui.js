@@ -542,11 +542,19 @@ export class UI {
 
   // --- Paneles --------------------------------------------------------------
 
+  /**
+   * Huella de lo que decide *qué* botones existen: la selección, la edad y las
+   * tecnologías (una mejora terminada cambia las unidades que se ofrecen).
+   * Mientras no cambie, los botones se dejan en su sitio y sólo se repinta si
+   * algo se puede pagar o no.
+   */
+  selectionSignature() {
+    const p = this.game.human;
+    return `${this.game.selection.map((e) => `${e.id}:${e.type}`).join(',')}|${p.age}|${p.techs.size}`;
+  }
+
   refreshSelection() {
-    const g = this.game;
-    const sel = g.selection;
-    const key = sel.map((e) => `${e.id}:${e.type}`).join(',') + `|${g.human.age}`;
-    this.selectionKey = key;
+    this.selectionKey = this.selectionSignature();
     this.renderSelectionPanel();
     this.renderCommands();
   }
@@ -683,7 +691,7 @@ export class UI {
               if (err) { this.notify(err, 'bad'); this.audio.play('error'); }
               break;
             }
-            this.renderCommands();
+            this.updateAffordability();
           },
         });
       }
@@ -704,7 +712,7 @@ export class UI {
           action: () => {
             const err = g.queueUpgrade(b, key, p);
             if (err) { this.notify(err, 'bad'); this.audio.play('error'); }
-            this.renderCommands();
+            this.updateAffordability();
           },
         });
       }
@@ -720,7 +728,7 @@ export class UI {
           action: () => {
             const err = g.queueTech(b, key, p);
             if (err) { this.notify(err, 'bad'); this.audio.play('error'); }
-            this.renderCommands();
+            this.updateAffordability();
           },
         });
       }
@@ -735,7 +743,7 @@ export class UI {
             const err = g.queueAge(b, p);
             if (err) { this.notify(err, 'bad'); this.audio.play('error'); }
             else this.notify(`Avanzando a la ${next.name}...`, 'good');
-            this.renderCommands();
+            this.updateAffordability();
           },
         });
       }
@@ -766,10 +774,15 @@ export class UI {
     return btns;
   }
 
+  /**
+   * Rehace la botonera entera. Sólo debe llamarse cuando cambia *qué* botones
+   * hay, nunca al pulsar uno: destruir el nodo que se acaba de tocar rompe los
+   * toques seguidos en el móvil. Para el «se puede pagar o no» está
+   * updateAffordability(), que sólo cambia una clase.
+   */
   renderCommands() {
     const cont = this.el.commands;
-    // Los botones se rehacen enteros: cualquier ficha abierta apunta a uno que
-    // ya no existe, así que se cierra antes de repintar.
+    // Cualquier ficha abierta apunta a un botón que va a dejar de existir.
     this.hideTooltip();
     cont.innerHTML = '';
     const btns = this.commandList();
@@ -1026,7 +1039,7 @@ export class UI {
     }
 
     // Refrescar el panel si la selección cambió o si cambia lo que se puede pagar.
-    const key = g.selection.map((e) => `${e.id}:${e.type}`).join(',') + `|${p.age}`;
+    const key = this.selectionSignature();
     if (key !== this.selectionKey) { this.selectionKey = key; this.refreshSelection(); }
     else this.updateAffordability();
 
