@@ -211,11 +211,16 @@ export class GameMap {
     const ctx = this.canvas.getContext('2d');
     ctx.fillStyle = '#1d2a17';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    // El azar de cada rombo se guarda: el renderizador vuelve a dibujar los
+    // que se ven cuando la cámara está cerca, y deben salir igual que aquí.
     const rng = new Rng(this.seed ^ 0x9e3779b9);
+    this.tileRnd = new Float32Array(S * S);
     for (let y = 0; y < S; y++) {
       for (let x = 0; x < S; x++) {
+        const i = this.idx(x, y);
+        this.tileRnd[i] = rng.next();
         const [sx, sy] = this.tileToCanvas(x, y);
-        drawTerrainTile(ctx, sx, sy, this.terrainNames[this.terrain[this.idx(x, y)]], rng.next());
+        drawTerrainTile(ctx, sx, sy, this.terrainNames[this.terrain[i]], this.tileRnd[i]);
       }
     }
     this.buildMinimap();

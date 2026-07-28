@@ -5,6 +5,7 @@ import {
 } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
+  drawSprite,
 } from './sprites.js';
 import {
   fieldsFor, getPath, setValue, reset, isChanged, defaultValue, countChanges,
@@ -196,21 +197,17 @@ export class Catalog {
     const MAX = 1.6;
     if (this.tab === 'unit') {
       const s = unitSprite(key, 0, 1, 0, false);
-      const sc = real
-        ? size / (60 * MAX)
-        : Math.min(size / (s.canvas.width - 4), size / (s.canvas.height - 4)) * 1.05;
-      ctx.drawImage(s.canvas, size / 2 - s.ox * sc, size - 6 - s.oy * sc, s.canvas.width * sc, s.canvas.height * sc);
+      const sc = real ? size / (60 * MAX) : Math.min(size / (s.w - 4), size / (s.h - 4)) * 1.05;
+      drawSprite(ctx, s, size / 2, size - 6, sc);
     } else if (this.tab === 'building') {
       const s = buildingSprite(key, 0, 2);
-      const sc = Math.min((size - 4) / s.canvas.width, (size - 4) / s.canvas.height);
-      ctx.drawImage(s.canvas, size / 2 - (s.canvas.width * sc) / 2, size - 2 - s.canvas.height * sc,
-        s.canvas.width * sc, s.canvas.height * sc);
+      const sc = Math.min((size - 4) / s.w, (size - 4) / s.h);
+      // Encuadrado por la caja del sprite, no por su anclaje.
+      drawSprite(ctx, s, size / 2 - (s.w / 2 - s.ox) * sc, size - 2 - (s.h - s.oy) * sc, sc);
     } else if (this.tab === 'node') {
       const s = resourceSprite(key, 0);
-      const sc = real
-        ? size / (96 * MAX)
-        : Math.min(size / s.canvas.width, size / s.canvas.height) * 1.15;
-      ctx.drawImage(s.canvas, size / 2 - s.ox * sc, size - 8 - s.oy * sc, s.canvas.width * sc, s.canvas.height * sc);
+      const sc = real ? size / (96 * MAX) : Math.min(size / s.w, size / s.h) * 1.15;
+      drawSprite(ctx, s, size / 2, size - 8, sc);
     } else {
       // Terreno: un rombo con la misma textura que usa el mapa.
       ctx.save();
