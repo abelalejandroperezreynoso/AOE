@@ -1,9 +1,23 @@
-# Despliegue estático en Netlify: no hay proceso de compilación.
-# Basta con conectar el repositorio o arrastrar la carpeta a Netlify Drop.
+# Despliegue en Netlify.
+#
+# El juego son archivos estáticos y no necesita compilarse. La única parte
+# dinámica es la sala de espera del multijugador: una función que sólo sirve
+# para que dos jugadores se encuentren, porque la partida en sí va directa de
+# un navegador al otro por WebRTC.
 
 [build]
   publish = "."
   command = ""
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+# La sala, antes que la regla general de más abajo (gana la primera que encaje).
+[[redirects]]
+  from = "/api/lobby"
+  to = "/.netlify/functions/lobby"
+  status = 200
 
 [[headers]]
   for = "/*"
