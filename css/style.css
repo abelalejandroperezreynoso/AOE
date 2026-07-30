@@ -458,6 +458,24 @@ body.cursor-attack #game { cursor: cell; }
 }
 #idle-villager:not(.has-idle) { opacity: .62; }
 
+/* Ficha de la selección: enseña lo que hay seleccionado y lo suelta al pulsar.
+   Se ajusta a su contenido, que es un icono y un número, no una cifra de
+   recursos, y sólo está a la vista cuando hay algo seleccionado. */
+#selection-chip {
+  color: var(--parch);
+  font-family: inherit;
+  cursor: pointer;
+  min-width: 0;
+  padding: 2px 9px 2px 3px;
+  gap: 4px;
+  border-color: var(--gold);
+  background: rgba(94,72,24,.45);
+  transition: filter .12s, transform .08s;
+}
+#selection-chip:hover { filter: brightness(1.25); }
+#selection-chip:active { transform: translateY(1px); }
+#selection-chip img { width: 26px; height: 26px; display: block; pointer-events: none; }
+
 .dot {
   width: 13px; height: 13px; border-radius: 50%;
   display: inline-block;
@@ -869,6 +887,8 @@ button.cmd, button.qitem, button.prod { margin: 0; }
     border-radius: 4px;
   }
   .dot { width: 10px; height: 10px; }
+  #selection-chip { padding: 1px 6px 1px 2px; gap: 3px; }
+  #selection-chip img { width: 20px; height: 20px; }
   .right-group { gap: 4px; flex: none; }
   .tbtn { padding: 3px 6px; font-size: 11px; }
 }
@@ -917,6 +937,7 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   :root { --bottom-h: 156px; }
   .res { padding: 2px 4px; font-size: 11.5px; gap: 2px; }
   .dot { width: 9px; height: 9px; }
+  #selection-chip img { width: 18px; height: 18px; }
   .right-group { gap: 3px; }
   .tbtn { padding: 3px 5px; }
   #minimap-panel { width: 96px; height: 78px; }
