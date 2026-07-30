@@ -5,6 +5,7 @@ import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, HW, HH,
   drawSprite, paintUnit, paintBuilding, paintResource, setSpriteQuality, drawTerrainSprite,
 } from './sprites.js';
+import { LOOK } from './data/appearance.js';
 import { clamp, dist } from './utils.js';
 
 const Z_PX = 18; // píxeles de altura por unidad de "z" en el mundo
@@ -301,16 +302,49 @@ export class Renderer {
     const [mx, my] = this.worldToCanvas(n.fx, n.fy);
     const kind = n.kind;
     const depleted = n.amount < n.max * 0.34;
-    // Los animales domesticados llevan al cuello la cinta del color de su dueño.
-    if (n.owner !== null && n.owner !== undefined) {
-      const col = PLAYER_COLORS[this.game.players[n.owner].colorIdx];
-      ctx.strokeStyle = col.main; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.ellipse(mx, my, 11, 5.5, 0, 0, Math.PI * 2); ctx.stroke();
-      ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.ellipse(mx, my, 12.5, 6.3, 0, 0, Math.PI * 2); ctx.stroke();
-    }
     if (this.sharp) paintResource(ctx, mx, my, kind, n.variant, depleted);
     else drawSprite(ctx, resourceSprite(kind, n.variant, depleted), mx, my);
+    if (n.owner !== null && n.owner !== undefined) this.drawCollar(ctx, mx, my, n);
+  }
+
+  /**
+   * Los animales domesticados llevan collar del color de su dueño, con su
+   * cascabel. Va encima del sprite y a su misma escala: las medidas salen de
+   * cómo está dibujada la oveja (cuerpo centrado en (0,-12) y cabeza en
+   * (-11,-17) desde el centro del rombo, ver `drawResource` en sprites.js).
+   */
+  drawCollar(ctx, mx, my, n) {
+    const s = (LOOK.node[n.kind] && LOOK.node[n.kind].scale) || 1;
+    const col = PLAYER_COLORS[this.game.players[n.owner].colorIdx];
+    /*
+     * Punto del cuello: donde la cabeza se junta con el cuerpo, que es el borde
+     * de la cabeza por el lado del lomo (la cabeza mide 5 de radio, así que su
+     * canto cae a media distancia entre los dos centros), y el eje que los une.
+     */
+    const bx = mx, by = my - 12 * s;
+    const hx = mx - 11 * s, hy = my - 17 * s;
+    const ang = Math.atan2(hy - by, hx - bx);
+    const nx = bx + (hx - bx) * 0.47, ny = by + (hy - by) * 0.42;
+    ctx.save();
+    ctx.translate(nx, ny);
+    ctx.rotate(ang);
+    // La correa: un anillo estrecho en el eje del cuello y ancho en cruz, que
+    // es como se ve una banda que le da la vuelta al pescuezo.
+    ctx.strokeStyle = col.main;
+    ctx.lineWidth = 2.2 * s;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 1.6 * s, 4.4 * s, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    // El cascabel, colgando por debajo.
+    ctx.fillStyle = col.light;
+    ctx.beginPath();
+    ctx.arc(0, 5.1 * s, 1.7 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.45)';
+    ctx.lineWidth = 0.7 * s;
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawBuilding(ctx, b) {
