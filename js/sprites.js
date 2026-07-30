@@ -2480,6 +2480,12 @@ export function iconFor(kind, type, colorIdx = 0) {
     const sc = Math.min(52 / b.w, 50 / b.h);
     ctx.drawImage(s.canvas, b.x, b.y, b.w, b.h,
       28 - (b.w * sc) / 2, 54 - b.h * sc, b.w * sc, b.h * sc);
+  } else if (kind === 'node') {
+    const s = resourceSprite(type, 0);
+    const b = tightBounds(s.canvas, `n${key}`);
+    const sc = Math.min(52 / b.w, 50 / b.h);
+    ctx.drawImage(s.canvas, b.x, b.y, b.w, b.h,
+      28 - (b.w * sc) / 2, 54 - b.h * sc, b.w * sc, b.h * sc);
   } else if (kind === 'tech') {
     const grad = ctx.createLinearGradient(0, 0, 0, 56);
     grad.addColorStop(0, '#e2d3a6'); grad.addColorStop(1, '#bda87a');

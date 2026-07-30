@@ -134,6 +134,18 @@ export function encodeSnapshot(game, viewer, removed, depleted) {
   w.u16(depleted.length);
   for (const idx of depleted) w.u16(idx);
 
+  // Rebaños: se mueven y cambian de bando, así que van en cada instantánea.
+  // Son unas pocas docenas en todo el mapa, no llegan a cien bytes.
+  const herds = (game.herds || []).filter((n) => n.alive);
+  w.u16(herds.length);
+  for (const n of herds) {
+    w.u16(n.id);
+    w.i16(Math.round(n.fx * POS));
+    w.i16(Math.round(n.fy * POS));
+    w.u8(n.owner === null || n.owner === undefined ? 0 : n.owner + 1);
+    w.u16(Math.max(0, Math.round(n.amount)));
+  }
+
   // Tecnologías del receptor, para que su panel muestre lo ya investigado.
   const techs = viewer ? [...viewer.techs] : [];
   w.u8(Math.min(255, techs.length));
@@ -149,7 +161,10 @@ export function decodeSnapshot(buf) {
   const r = new Reader(buf);
   const type = r.u8();
   if (type !== MSG.SNAPSHOT) return null;
-  const snap = { time: r.f32(), players: [], units: [], buildings: [], projectiles: [], removed: [], depleted: [], techs: [] };
+  const snap = {
+    time: r.f32(), players: [], units: [], buildings: [], projectiles: [],
+    removed: [], depleted: [], herds: [], techs: [],
+  };
 
   const pc = r.u8();
   for (let i = 0; i < pc; i++) {
@@ -207,6 +222,13 @@ export function decodeSnapshot(buf) {
   for (let i = 0; i < rc; i++) snap.removed.push(r.u32());
   const dc = r.u16();
   for (let i = 0; i < dc; i++) snap.depleted.push(r.u16());
+  const hc = r.u16();
+  for (let i = 0; i < hc; i++) {
+    const id = r.u16();
+    const fx = r.i16() / POS, fy = r.i16() / POS;
+    const owner = r.u8();
+    snap.herds.push({ id, fx, fy, owner: owner ? owner - 1 : null, amount: r.u16() });
+  }
   const tc = r.u8();
   for (let i = 0; i < tc; i++) {
     const isUp = r.u8(), key = r.u8();

@@ -143,8 +143,13 @@ export class GameMap {
     const def = RESOURCE_NODES[kind];
     const node = {
       id: this.nodes.length, kind, x, y, res: def.res,
+      // Posición exacta dentro del mundo. En los recursos fijos es el centro de
+      // su casilla; los rebaños se mueven y la van cambiando.
+      fx: x + 0.5, fy: y + 0.5,
       amount: def.amount, max: def.amount, rate: def.rate,
       variant: this.rng.int(0, 2), alive: true, blocking: def.blocking,
+      herd: !!def.herd, tame: def.tame || 0, speed: def.speed || 0,
+      owner: null, task: null, selected: false,
     };
     this.nodes.push(node);
     this.nodeAt[i] = node.id + 1;
@@ -154,9 +159,30 @@ export class GameMap {
 
   removeNode(node) {
     node.alive = false;
+    node.task = null;
     const i = this.idx(node.x, node.y);
-    this.nodeAt[i] = 0;
+    if (this.nodeAt[i] === node.id + 1) this.nodeAt[i] = 0;
     this.blocked[i] = 0;
+  }
+
+  /**
+   * Vuelve a registrar un recurso que se ha movido en la casilla que le toca
+   * por su posición. Devuelve false —y lo deja donde estaba— si la casilla de
+   * destino ya está ocupada por otro recurso.
+   */
+  retileNode(node) {
+    const nx = clamp(Math.floor(node.fx), 0, this.size - 1);
+    const ny = clamp(Math.floor(node.fy), 0, this.size - 1);
+    if (nx === node.x && ny === node.y) return true;
+    const dst = this.idx(nx, ny);
+    if (this.nodeAt[dst]) return false;
+    const src = this.idx(node.x, node.y);
+    if (this.nodeAt[src] === node.id + 1) this.nodeAt[src] = 0;
+    if (node.blocking) this.blocked[src] = 0;
+    node.x = nx; node.y = ny;
+    this.nodeAt[dst] = node.id + 1;
+    if (node.blocking) this.blocked[dst] = 1;
+    return true;
   }
 
   cluster(kind, cx, cy, count, spread, avoid = 0) {
@@ -276,8 +302,10 @@ export class GameMap {
         ctx.fillRect(px - sx - 0.5, py - 0.5, sx * 2 + 1, sy * 2 + 1);
       }
     }
-    // Recursos visibles en el minimapa.
+    // Recursos visibles en el minimapa. Los rebaños no: se mueven, así que los
+    // pinta el renderizador en cada fotograma con el color de su dueño.
     for (const n of this.nodes) {
+      if (n.herd) continue;
       const px = (n.x - n.y + S) * sx, py = (n.x + n.y) * sy;
       ctx.fillStyle = n.kind === 'tree' ? '#28541f'
         : n.kind === 'gold' ? '#e0b52c'

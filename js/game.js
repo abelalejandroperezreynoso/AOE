@@ -108,6 +108,10 @@ export class Game {
       this.players.push(p);
     }
     this.human = this.players[localIdx];
+    // Los animales que se pueden domesticar se guardan aparte: hay que
+    // repasarlos cada poco y recorrer los miles de árboles del mapa no.
+    this.herds = this.map.nodes.filter((n) => n.herd);
+    this.herdCd = 0;
     this.setupStart();
   }
 
@@ -309,6 +313,18 @@ export class Game {
     return Math.max(0, dist(a.x, a.y, b.x, b.y) - (a.radius || 0.3) - (b.radius || 0.3));
   }
 
+  /**
+   * Distancia de una unidad al borde de la casilla centrada en (cx,cy). Es la
+   * medida que decide si un aldeano está pegado a un recurso: al centro de la
+   * casilla nunca se puede llegar (el árbol o la mina la ocupan), así que
+   * medirla desde ahí dejaba a los aldeanos trabajando desde lejos.
+   */
+  tileEdgeDist(a, cx, cy) {
+    const dx = Math.max(0, Math.abs(a.x - cx) - 0.5);
+    const dy = Math.max(0, Math.abs(a.y - cy) - 0.5);
+    return Math.max(0, Math.hypot(dx, dy) - (a.radius || 0.3));
+  }
+
   isEnemy(ownerA, ownerB) { return ownerA !== ownerB; }
 
   findEnemyNear(owner, x, y, r, unitsOnly = false) {
@@ -358,7 +374,7 @@ export class Game {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const n = m.nodeAtTile(sx + dx, sy + dy);
           if (!n || !n.alive || n.res !== res || n.amount <= 0) continue;
-          const d = dist(x, y, n.x + 0.5, n.y + 0.5);
+          const d = dist(x, y, n.fx, n.fy);
           if (d < bestD) { bestD = d; best = n; }
         }
       }
@@ -413,8 +429,8 @@ export class Game {
     for (const res of B.dropoff) {
       const node = this.findResourceNear(building.cx, building.cy, res, radius, player);
       if (!node) continue;
-      const nx = node.kind === 'building' ? node.cx : node.x + 0.5;
-      const ny = node.kind === 'building' ? node.cy : node.y + 0.5;
+      const nx = node.kind === 'building' ? node.cx : node.fx;
+      const ny = node.kind === 'building' ? node.cy : node.fy;
       const d = dist(building.cx, building.cy, nx, ny);
       if (d < bestD) { bestD = d; best = node; }
     }
@@ -425,7 +441,7 @@ export class Game {
     if (target.kind === 'building') {
       return { res: 'food', rate: 'farm', x: target.cx, y: target.cy, amount: target.farmAmount || 0 };
     }
-    return { res: target.res, rate: target.rate, x: target.x + 0.5, y: target.y + 0.5, amount: target.amount };
+    return { res: target.res, rate: target.rate, x: target.fx, y: target.fy, amount: target.amount };
   }
 
   consumeResource(target, amount) {
@@ -441,9 +457,98 @@ export class Game {
       const wasTree = target.kind === 'tree';
       if (this.net && !this.isGuest) this.netDepleted.push(target.id);
       this.map.removeNode(target);
-      if (wasTree) this.fx.decal(target.x + 0.5, target.y + 0.5, 'stump');
-      else this.fx.puff(target.x + 0.5, target.y + 0.5, 5);
+      this.dropFromSelection(target);
+      if (wasTree) this.fx.decal(target.fx, target.fy, 'stump');
+      else this.fx.puff(target.fx, target.fy, 5);
     }
+  }
+
+  /** Saca del cuadro de selección algo que acaba de desaparecer o cambiar de dueño. */
+  dropFromSelection(e) {
+    const i = this.selection.indexOf(e);
+    if (i >= 0) this.selection.splice(i, 1);
+    e.selected = false;
+  }
+
+  // --- Rebaños --------------------------------------------------------------
+
+  /**
+   * Las ovejas se domestican solas: pasan al bando del jugador que tenga la
+   * unidad más cercana dentro de su radio, y cambian de dueño si otro se acerca
+   * más tarde. Mientras nadie ronde, se quedan con el último bando que las tuvo.
+   */
+  updateHerds(dt) {
+    if (!this.herds.length) return;
+    this.herdCd -= dt;
+    const retame = this.herdCd <= 0;
+    if (retame) this.herdCd = 0.4;
+    for (const n of this.herds) {
+      if (!n.alive) continue;
+      if (retame) this.tameHerdNode(n);
+      if (n.task) this.moveHerdNode(n, dt);
+    }
+  }
+
+  tameHerdNode(n) {
+    let best = null, bestD = Infinity;
+    for (const u of this.unitsNear(n.fx, n.fy, n.tame)) {
+      if (u.dead) continue;
+      const d = dist(n.fx, n.fy, u.x, u.y);
+      if (d < bestD) { bestD = d; best = u; }
+    }
+    if (!best || best.owner === n.owner) return;
+    n.owner = best.owner;
+    n.task = null;
+    // Ya no es mía: no puede seguir seleccionada ni recibiendo órdenes.
+    if (n.selected && n.owner !== this.human.id) this.dropFromSelection(n);
+  }
+
+  /**
+   * Movimiento del rebaño: en línea recta, sin buscar camino. Si se topa con
+   * algo intenta deslizarse por un eje y, si tampoco puede, se detiene: una
+   * oveja no rodea un bosque, se queda donde la deja el obstáculo.
+   */
+  moveHerdNode(n, dt) {
+    const t = n.task;
+    const d = dist(n.fx, n.fy, t.x, t.y);
+    if (d < 0.12) { n.task = null; return; }
+    const step = Math.min(d, (n.speed || 0.7) * dt);
+    const dx = ((t.x - n.fx) / d) * step, dy = ((t.y - n.fy) / d) * step;
+    if (!this.stepHerdNode(n, dx, dy)
+      && !this.stepHerdNode(n, dx, 0)
+      && !this.stepHerdNode(n, 0, dy)) {
+      n.task = null;
+    }
+  }
+
+  stepHerdNode(n, dx, dy) {
+    if (!dx && !dy) return false;
+    const nx = n.fx + dx, ny = n.fy + dy;
+    const m = this.map;
+    if (nx < 0.5 || ny < 0.5 || nx > m.size - 0.5 || ny > m.size - 0.5) return false;
+    const tx = Math.floor(nx), ty = Math.floor(ny);
+    const sameTile = tx === n.x && ty === n.y;
+    // Fuera de su casilla sólo puede pasar a terreno libre y sin otro recurso.
+    if (!sameTile && (!m.isPassable(tx, ty) || m.nodeIndexAt(tx, ty) >= 0)) return false;
+    const ox = n.fx, oy = n.fy;
+    n.fx = nx; n.fy = ny;
+    if (!m.retileNode(n)) { n.fx = ox; n.fy = oy; return false; }
+    return true;
+  }
+
+  /** Manda el rebaño seleccionado a un punto del mapa. */
+  commandHerd(animals, x, y, player = this.human) {
+    const list = animals.filter((a) => a && a.herd && a.alive && a.owner === player.id);
+    if (!list.length) return;
+    if (this.isGuest) {
+      this.netSend({ c: 'herd', ids: list.map((a) => a.id), x, y });
+      return;
+    }
+    const spots = this.formationSpots(x, y, list.length);
+    list.forEach((a, i) => {
+      const s = spots[i] || { x, y };
+      a.task = { x: s.x, y: s.y };
+    });
   }
 
   // --- Combate --------------------------------------------------------------
@@ -605,13 +710,18 @@ export class Game {
       } else {
         // Nodo de recursos.
         if (u.type === 'villager') u.task = { type: 'gather', target };
-        else u.task = { type: 'move', x: target.x + 0.5, y: target.y + 0.5 };
+        else u.task = { type: 'move', x: target.fx, y: target.fy };
       }
     }
   }
 
   /** Detener: cancela lo que estuvieran haciendo las unidades. */
   commandStop(units) {
+    const animals = units.filter((a) => a && a.herd && a.alive && a.owner === this.human.id);
+    if (animals.length) {
+      if (this.isGuest) this.netSend({ c: 'herdstop', ids: animals.map((a) => a.id) });
+      else for (const a of animals) a.task = null;
+    }
     const list = units.filter((u) => u.kind === 'unit' && u.owner === this.human.id);
     if (!list.length) return;
     if (this.isGuest) { this.netSend({ c: 'stop', ids: list.map((u) => u.id) }); return; }
@@ -620,7 +730,8 @@ export class Game {
 
   /** Eliminar lo seleccionado (unidades o edificios propios). */
   commandDelete(entities) {
-    const list = entities.filter((e) => e.owner === this.human.id && !e.dead);
+    const list = entities.filter((e) => (e.kind === 'unit' || e.kind === 'building')
+      && e.owner === this.human.id && !e.dead);
     if (!list.length) return;
     if (this.isGuest) { this.netSend({ c: 'delete', ids: list.map((e) => e.id) }); return; }
     for (const e of list) {
@@ -828,6 +939,7 @@ export class Game {
 
     for (const u of this.units) u.update(this, dt);
     for (const b of this.buildings) b.update(this, dt);
+    this.updateHerds(dt);
 
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
