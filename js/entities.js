@@ -7,6 +7,11 @@ import {
 import { uid, clamp, dist } from './utils.js';
 import { findPath, ringTiles, nearestFree } from './path.js';
 
+// Hasta dónde puede estar un aldeano del borde del recurso para trabajarlo, y
+// hasta dónde se le deja llegar sin dejar de hacerlo (ver `inWorkRange`).
+const WORK_REACH = 0.45;
+const WORK_KEEP = 0.8;
+
 // --- Jugador ----------------------------------------------------------------
 
 export class Player {
@@ -158,7 +163,7 @@ export class Unit {
   get cls() { return UNITS[this.type].class; }
   get isMilitary() { return UNITS[this.type].class !== 'civilian'; }
 
-  stopTask() { this.task = null; this.path = null; }
+  stopTask() { this.task = null; this.path = null; this.workOn = null; }
 
   // --- Movimiento -----------------------------------------------------------
 
@@ -345,6 +350,25 @@ export class Unit {
 
   // --- Recolección ----------------------------------------------------------
 
+  /**
+   * ¿Está el aldeano pegado al recurso? La distancia se mide al borde de la
+   * casilla del recurso (o de la huella del edificio), no a su centro: al
+   * centro no se puede llegar y medir desde ahí dejaba a los aldeanos picando
+   * desde casilla y media de distancia.
+   *
+   * Con dos umbrales: uno para ponerse a trabajar y otro, más holgado, para
+   * seguir trabajando. Si no, el empujón que separa a los aldeanos amontonados
+   * los sacaba del alcance y se pasaban el rato entrando y saliendo.
+   */
+  inWorkRange(g, target, info) {
+    const d = target.kind === 'building'
+      ? g.edgeDist(this, target)
+      : g.tileEdgeDist(this, info.x, info.y);
+    const ok = d <= (this.workOn === target ? WORK_KEEP : WORK_REACH);
+    this.workOn = ok ? target : null;
+    return ok;
+  }
+
   doGather(g, dt, speed, player) {
     const target = this.task.target;
     if (!target || (target.alive === false) || (target.dead) || (target.farmAmount !== undefined && target.farmAmount <= 0)) {
@@ -353,9 +377,23 @@ export class Unit {
     }
     const info = g.gatherInfo(target);
     this.wantRes = info.res;
+    /*
+     * Si viene cargado con otro recurso, lo primero es dejarlo en el almacén:
+     * de ahí sale luego derecho al nuevo recurso. Se decide aquí y no al llegar
+     * porque, si no, el aldeano cruzaba el mapa hasta el recurso nuevo, volvía a
+     * descargar y tenía que hacer el viaje otra vez.
+     */
+    if (this.carryRes && this.carryRes !== info.res && this.carry > 0.5) {
+      const drop = g.findDropoff(player, this.carryRes, this.x, this.y);
+      if (drop) {
+        this.task = { type: 'deliver', target: drop, back: target };
+        this.path = null; this.repathCd = 0;
+        return;
+      }
+      this.carry = 0;
+    }
     const isBuilding = target.kind === 'building';
-    const near = isBuilding ? g.edgeDist(this, target) <= 0.9
-      : dist(this.x, this.y, info.x, info.y) <= 1.5;
+    const near = this.inWorkRange(g, target, info);
     if (!near) {
       if (!this.path && this.repathCd <= 0) {
         const goals = isBuilding
@@ -371,13 +409,9 @@ export class Unit {
       return;
     }
     this.path = null;
-    // Antes de cambiar de recurso conviene descargar lo que ya se lleva encima.
-    if (this.carryRes && this.carryRes !== info.res && this.carry > 0.5) {
-      const drop = g.findDropoff(player, this.carryRes, this.x, this.y);
-      if (drop) { this.task = { type: 'deliver', target: drop, back: target }; return; }
-      this.carry = 0;
-    }
     this.working = true;
+    // Un animal al que están sacrificando deja de andar.
+    if (target.herd && target.task) target.task = null;
     this.faceTo(info.x, info.y);
     this.attackAnim = this.attackAnim > 0 ? this.attackAnim : 0.6;
     const cap = player.stat('villager', 'carry');

@@ -166,8 +166,9 @@ export class Catalog {
     if (this.tab === 'terrain') return isChanged('terrain', key);
     if (this.lookChanged(key)) return true;
     if (this.tab === 'node') {
-      if (isChanged('node', key, 'amount')) return true;
-      const rate = RESOURCE_NODES[key]?.rate;
+      const def = RESOURCE_NODES[key];
+      if (fieldsFor('node', def).some((f) => isChanged('node', key, f.key))) return true;
+      const rate = def?.rate;
       return rate ? isChanged('rate', rate) : false;
     }
     const def = this.tab === 'unit' ? UNITS[key] : BUILDINGS[key];
@@ -409,6 +410,17 @@ export class Catalog {
     wrap.appendChild(this.group('Yacimiento', [this.field('node', key, def, {
       key: 'amount', label: 'Cantidad', type: 'number', min: 1, max: 20000, step: 10,
     })]));
+    // Los animales de rebaño (las ovejas) además se domestican y andan.
+    if (def.herd) {
+      wrap.appendChild(this.group('Rebaño', [
+        this.field('node', key, def, {
+          key: 'tame', label: 'Radio para domesticar', type: 'number', min: 1, max: 20, step: 0.5,
+        }),
+        this.field('node', key, def, {
+          key: 'speed', label: 'Velocidad', type: 'number', min: 0.1, max: 5, step: 0.05,
+        }),
+      ]));
+    }
     const rate = def.rate;
     if (rate && GATHER_RATE[rate] !== undefined) {
       const row = document.createElement('label');

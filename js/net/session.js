@@ -93,6 +93,18 @@ export class NetSession {
         break;
       }
       case 'stop': for (const u of mine(cmd.ids)) u.stopTask(); break;
+      case 'herd': {
+        const animals = (cmd.ids || []).map((id) => g.map.nodes[id]);
+        g.commandHerd(animals, cmd.x, cmd.y, player);
+        break;
+      }
+      case 'herdstop': {
+        for (const id of cmd.ids || []) {
+          const a = g.map.nodes[id];
+          if (a && a.herd && a.owner === player.id) a.task = null;
+        }
+        break;
+      }
       case 'delete':
         for (const e of mine(cmd.ids)) {
           if (e.kind === 'unit') g.killUnit(e, null); else g.killBuilding(e, null);
@@ -229,7 +241,20 @@ export class NetSession {
 
     for (const idx of snap.depleted) {
       const node = g.map.nodes[idx];
-      if (node && node.alive) g.map.removeNode(node);
+      if (node && node.alive) { g.map.removeNode(node); g.dropFromSelection(node); }
+    }
+
+    // Rebaños: el invitado no los simula, sólo copia dónde están y de quién son.
+    for (const hs of snap.herds) {
+      const n = g.map.nodes[hs.id];
+      if (!n || !n.alive) continue;
+      n.fx = hs.fx; n.fy = hs.fy;
+      n.amount = hs.amount;
+      g.map.retileNode(n);
+      if (n.owner !== hs.owner) {
+        n.owner = hs.owner;
+        if (n.selected && n.owner !== g.human.id) g.dropFromSelection(n);
+      }
     }
 
     // x/y apuntan al origen del vuelo para que la flecha salga bien orientada.

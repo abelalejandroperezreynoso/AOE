@@ -5,6 +5,7 @@ import {
   BUILD_ORDER, PLAYER_COLORS,
 } from './config.js';
 import { iconFor } from './sprites.js';
+import { NODE_LABELS as NODE_NAMES } from './data/overrides.js';
 import { fmtTime, clamp, dist } from './utils.js';
 
 const HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'A', 'S', 'D', 'F', 'G', 'H', 'Z', 'X', 'C', 'V', 'B', 'N'];
@@ -20,6 +21,16 @@ const CONTROL_SELECTOR = 'button, select, input, a, #minimap, .overlay, .panel';
 
 function isControl(target) {
   return !!(target && target.closest && target.closest(CONTROL_SELECTOR));
+}
+
+/** ¿Es un recurso del mapa (árbol, mina, oveja...) y no una unidad o edificio? */
+function isNode(e) {
+  return !!e && e.kind !== 'unit' && e.kind !== 'building' && e.res !== undefined;
+}
+
+/** ¿Es un animal de rebaño que ya está en mi bando? */
+function isMyAnimal(e, game) {
+  return isNode(e) && e.herd && e.alive && e.owner === game.human.id;
 }
 
 // --- Pantalla completa ------------------------------------------------------
@@ -511,7 +522,8 @@ export class UI {
 
   select(list) {
     for (const e of this.game.selection) e.selected = false;
-    this.game.selection = list.filter((e) => e && !e.dead);
+    // `alive === false` es un recurso ya agotado: una oveja que se comieron.
+    this.game.selection = list.filter((e) => e && !e.dead && e.alive !== false);
     for (const e of this.game.selection) e.selected = true;
     if (this.game.selection.length) this.audio.play('select');
     this.refreshSelection();
@@ -521,7 +533,9 @@ export class UI {
     const g = this.game;
     const e = this.r.entityAtScreen(x, y);
     if (!e) { if (!shift) this.select([]); return; }
-    if (e.kind === undefined) { // nodo de recursos
+    // Un recurso del mapa sólo enseña su ficha... salvo que sea un animal de mi
+    // rebaño, que se selecciona como cualquier otra cosa mía para poder moverlo.
+    if (isNode(e) && !isMyAnimal(e, g)) {
       this.select([]);
       this.showResourceInfo(e);
       return;
@@ -551,8 +565,15 @@ export class UI {
     // Con muchas unidades, prioriza las militares.
     const mil = list.filter((u) => u.isMilitary);
     if (mil.length) list = mil;
+    // El rebaño sólo entra si no había ninguna unidad: al encuadrar el ejército
+    // no se quiere arrastrar a las ovejas que pasaban por ahí.
+    const animals = list.length ? [] : this.r.animalsInBox(x0, y0, x1, y1, g.human.id);
+    if (animals.length) list = animals;
     if (shift) {
-      const set = new Set(g.selection.filter((e) => e.kind === 'unit'));
+      // Al añadir se respeta la familia de lo que ya había seleccionado:
+      // unidades con unidades y rebaño con rebaño.
+      const prev = g.selection.filter((e) => (animals.length ? isNode(e) : e.kind === 'unit'));
+      const set = new Set(prev);
       for (const u of list) set.add(u);
       list = [...set];
     }
@@ -572,7 +593,7 @@ export class UI {
   centerOnSelection() {
     const s = this.game.selection[0];
     if (!s) return;
-    this.r.centerOn(s.x ?? s.cx, s.y ?? s.cy);
+    this.r.centerOn(isNode(s) ? s.fx : (s.x ?? s.cx), isNode(s) ? s.fy : (s.y ?? s.cy));
   }
 
   deleteSelected() {
@@ -598,6 +619,15 @@ export class UI {
       return;
     }
 
+    // Rebaño: se lleva al punto señalado, como un pastor.
+    const animals = sel.filter((e) => isMyAnimal(e, g));
+    if (animals.length) {
+      g.commandHerd(animals, u, v);
+      this.r.markOrder(u, v, '#ffe9a8');
+      this.audio.play('order');
+      if (animals.length === sel.length) return;
+    }
+
     const target = this.r.entityAtScreen(x, y);
     const units = sel.filter((e) => e.kind === 'unit');
     if (target && target !== null && (target.kind === 'unit' || target.kind === 'building')) {
@@ -610,7 +640,7 @@ export class UI {
       }
     } else if (target && target.res) {
       g.commandTarget(units, target);
-      this.r.markOrder(target.x + 0.5, target.y + 0.5, '#ffdc6a');
+      this.r.markOrder(target.fx, target.fy, '#ffdc6a');
     } else {
       g.commandMove(units, u, v);
       this.r.markOrder(u, v, '#8fe08f');
@@ -661,7 +691,7 @@ export class UI {
    */
   selectionSignature() {
     const p = this.game.human;
-    return `${this.game.selection.map((e) => `${e.id}:${e.type}`).join(',')}|${p.age}|${p.techs.size}`;
+    return `${this.game.selection.map((e) => `${e.kind}${e.id}:${e.type}`).join(',')}|${p.age}|${p.techs.size}`;
   }
 
   refreshSelection() {
@@ -676,6 +706,14 @@ export class UI {
     info.innerHTML = ''; list.innerHTML = '';
     if (!sel.length) {
       info.innerHTML = '<div class="hint">Selecciona unidades o edificios con el clic izquierdo. Clic derecho para dar órdenes.</div>';
+      return;
+    }
+    if (sel.length === 1 && isNode(sel[0])) {
+      this.renderAnimalPanel(sel[0]);
+      return;
+    }
+    if (sel.length > 1 && isNode(sel[0])) {
+      this.renderHerdPanel(sel);
       return;
     }
     if (sel.length === 1) {
@@ -727,11 +765,61 @@ export class UI {
     }
   }
 
+  /** Ficha de un animal del rebaño: quién lo tiene y cuánta comida le queda. */
+  renderAnimalPanel(n) {
+    const g = this.game;
+    const info = this.el.selInfo;
+    const img = document.createElement('img');
+    img.className = 'portrait';
+    img.src = iconFor('node', n.kind, 0);
+    info.appendChild(img);
+    const box = document.createElement('div');
+    box.className = 'sel-text';
+    const owner = n.owner === null || n.owner === undefined ? null : g.players[n.owner];
+    const ownerLine = owner
+      ? `<div class="sel-owner" style="color:${PLAYER_COLORS[owner.colorIdx].light}">${owner.name}</div>`
+      : '<div class="sel-owner" style="color:#9c8a68">Sin dueño</div>';
+    box.innerHTML = `<div class="sel-name">${NODE_NAMES[n.kind] || n.kind}</div>
+      ${ownerLine}
+      <div class="stat-row"><span>${RES_NAME[n.res]}: ${Math.ceil(n.amount)}</span></div>
+      <div class="sel-desc">${owner && owner.isHuman
+    ? 'Clic derecho para llevarla a otro sitio. Se cambia de bando si otro jugador se le acerca más.'
+    : 'Acerca tus unidades para que se una a tu bando.'}</div>`;
+    info.appendChild(box);
+  }
+
+  /** Varios animales a la vez: sólo hace falta cuántos son y de qué clase. */
+  renderHerdPanel(sel) {
+    const info = this.el.selInfo, list = this.el.selList;
+    info.innerHTML = `<div class="sel-name">${sel.length} animales seleccionados</div>`;
+    const counts = {};
+    for (const n of sel) counts[n.kind] = (counts[n.kind] || 0) + 1;
+    for (const kind in counts) {
+      const b = document.createElement('button');
+      b.className = 'sel-chip';
+      b.innerHTML = `<img src="${iconFor('node', kind, 0)}"><span>${counts[kind]}</span>`;
+      b.title = NODE_NAMES[kind] || kind;
+      b.onclick = () => this.select(sel.filter((n) => n.kind === kind));
+      list.appendChild(b);
+    }
+  }
+
   /** Construye la lista de botones según lo que esté seleccionado. */
   commandList() {
     const g = this.game, p = g.human, sel = g.selection;
     const btns = [];
     if (!sel.length || sel[0].owner !== p.id) return btns;
+
+    // Rebaño: sólo se le puede mandar y parar.
+    const animals = sel.filter((e) => isMyAnimal(e, g));
+    if (animals.length === sel.length) {
+      btns.push({
+        icon: null, glyph: '✋', label: 'Detener',
+        tooltip: 'El rebaño se queda donde está.',
+        action: () => g.commandStop(animals),
+      });
+      return btns;
+    }
 
     const units = sel.filter((e) => e.kind === 'unit');
     const buildings = sel.filter((e) => e.kind === 'building');
@@ -996,14 +1084,13 @@ export class UI {
   }
 
   showResourceInfo(node) {
-    const names = {
-      tree: 'Árbol', gold: 'Mina de oro', stone: 'Cantera',
-      berries: 'Arbustos de bayas', sheep: 'Oveja', deer: 'Ciervo',
-    };
+    const extra = node.herd
+      ? 'Acerca tus unidades para que se una a tu bando y poder moverla.'
+      : 'Envía aldeanos con el clic derecho para recolectarlo.';
     this.el.selInfo.innerHTML = `<div class="sel-text">
-      <div class="sel-name">${names[node.kind] || node.kind}</div>
+      <div class="sel-name">${NODE_NAMES[node.kind] || node.kind}</div>
       <div class="stat-row"><span>${RES_NAME[node.res]}: ${Math.ceil(node.amount)}</span></div>
-      <div class="sel-desc">Envía aldeanos con el clic derecho para recolectarlo.</div></div>`;
+      <div class="sel-desc">${extra}</div></div>`;
     this.el.selList.innerHTML = '';
     this.el.commands.innerHTML = '';
     this.buttons = [];
