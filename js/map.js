@@ -55,18 +55,21 @@ export class GameMap {
 
   generate(playerCount) {
     const S = this.size, rng = this.rng;
-    const n1 = makeNoise(rng, 64), n2 = makeNoise(rng, 64);
+    const n1 = makeNoise(rng, 64), n2 = makeNoise(rng, 64), n3 = makeNoise(rng, 64);
 
     for (let y = 0; y < S; y++) {
       for (let x = 0; x < S; x++) {
         const h = fbm(n1, x / S * 6, y / S * 6, 4, 1, 0.55);
         const m = fbm(n2, x / S * 4 + 11, y / S * 4 + 7, 3, 1, 0.5);
+        // Los dos verdes se reparten con ruido fino, no al azar por casilla: así
+        // la hierba sale a manchas en vez de en tablero de ajedrez.
+        const g = fbm(n3, x / S * 14 + 5, y / S * 14 + 23, 2, 1, 0.5);
         let t;
         if (h < 0.30) t = 5;                       // agua
         else if (h < 0.345) t = 6;                 // orilla
         else if (m > 0.62) t = 2;                  // hierba frondosa
         else if (m < 0.36) t = 3;                  // tierra
-        else t = rng.next() < 0.35 ? 1 : 0;        // hierba
+        else t = g > 0.52 ? 1 : 0;                 // hierba
         this.terrain[this.idx(x, y)] = t;
       }
     }
@@ -78,7 +81,30 @@ export class GameMap {
 
     this.pickStarts(playerCount);
     this.clearStartAreas();
+    this.addBeaches();
     this.placeResources(playerCount);
+  }
+
+  /**
+   * Orla de arena donde la tierra toca el agua. Sin ella la costa es un corte
+   * seco de hierba a agua; con ella el mapa tiene ribera. Va después de aplanar
+   * las bases para que no salgan playas alrededor de un lago ya rellenado.
+   */
+  addBeaches() {
+    const S = this.size, rng = this.rng;
+    const wet = (x, y) => this.inBounds(x, y) && this.terrain[this.idx(x, y)] >= 5;
+    const beach = [];
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const i = this.idx(x, y);
+        if (this.terrain[i] >= 5) continue;
+        const side = wet(x - 1, y) || wet(x + 1, y) || wet(x, y - 1) || wet(x, y + 1);
+        const corner = wet(x - 1, y - 1) || wet(x + 1, y + 1) || wet(x - 1, y + 1) || wet(x + 1, y - 1);
+        // Las esquinas sólo a veces: así el borde de la playa sale mellado.
+        if (side || (corner && rng.chance(0.6))) beach.push(i);
+      }
+    }
+    for (const i of beach) this.terrain[i] = 4;
   }
 
   pickStarts(playerCount) {
@@ -211,14 +237,18 @@ export class GameMap {
     const ctx = this.canvas.getContext('2d');
     ctx.fillStyle = '#1d2a17';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    // El azar de cada rombo se guarda: el renderizador vuelve a dibujar los
-    // que se ven cuando la cámara está cerca, y deben salir igual que aquí.
+    /*
+     * El azar de cada rombo se guarda, porque el renderizador vuelve a pintar
+     * los que se ven cuando la cámara está cerca y deben salir igual que aquí.
+     * Va en ocho escalones en vez de continuo: así el renderizador puede hornear
+     * un rombo por escalón y copiarlo, en vez de dibujar la textura de cada uno.
+     */
     const rng = new Rng(this.seed ^ 0x9e3779b9);
     this.tileRnd = new Float32Array(S * S);
     for (let y = 0; y < S; y++) {
       for (let x = 0; x < S; x++) {
         const i = this.idx(x, y);
-        this.tileRnd[i] = rng.next();
+        this.tileRnd[i] = (rng.int(0, 7) + 0.5) / 8;
         const [sx, sy] = this.tileToCanvas(x, y);
         drawTerrainTile(ctx, sx, sy, this.terrainNames[this.terrain[i]], this.tileRnd[i]);
       }

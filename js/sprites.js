@@ -63,37 +63,253 @@ export const TERRAIN_COLORS = {
   dirt: '#93743f', sand: '#c2ad6b', water: '#2f5f9e', shallow: '#3f7cb8', road: '#8a7247',
 };
 
-/** Dibuja un rombo de terreno en el lienzo estático del mapa. */
+/*
+ * Familia de textura de cada terreno: la hierba se cubre de matas, lo seco de
+ * guijarros y el agua de olas. Varios nombres comparten familia porque lo que
+ * los distingue es el color, no el material.
+ */
+const TERRAIN_KIND = {
+  grass: 'grass', grass2: 'grass', grass3: 'grass',
+  dirt: 'dry', sand: 'dry', road: 'road', water: 'water', shallow: 'water',
+};
+
+/*
+ * Tonos derivados de cada terreno. Un rombo toca media docena (mancha clara,
+ * mancha oscura, brizna, guijarro...) y derivarlos cuesta más que pintarlos, así
+ * que se guardan hechos. El tono de cada rombo se redondea a cinco escalones
+ * para que la tabla sea pequeña: la variación sigue rompiendo el tono liso y ya
+ * no hay que calcular nada por rombo.
+ */
+const tileCache = new Map();
+
+function tileTones(terrain, level) {
+  const key = `${terrain}|${level}`;
+  const hit = tileCache.get(key);
+  if (hit) return hit;
+  const base = shade(TERRAIN_COLORS[terrain] || TERRAIN_COLORS.grass, (level / 4 - 0.5) * 0.08);
+  const t = {
+    base,
+    patchD: shade(base, -0.05), patchL: shade(base, 0.04),
+    blade: shade(base, 0.22), bladeD: shade(base, -0.26),
+    pebble: shade(base, -0.24), pebbleL: shade(base, 0.2),
+    hay: shade(mix(base, '#8a9a4a', 0.5), -0.05),
+    deep: shade(base, -0.06), sandy: mix(base, TERRAIN_COLORS.sand, 0.16),
+    rut: shade(base, -0.14), gravel: shade(base, 0.16),
+  };
+  tileCache.set(key, t);
+  return t;
+}
+
+/**
+ * Dibuja un rombo de terreno. Son miles —el lienzo del mapa los pinta todos y
+ * la cámara de cerca vuelve a pintar los que se ven— así que cada familia gasta
+ * cuatro o cinco trazos contados: las manchas rompen el tono liso y el resto de
+ * los detalles va agrupado en un único trazado, no uno por brizna.
+ */
 export function drawTerrainTile(ctx, sx, sy, terrain, rnd) {
-  let base = TERRAIN_COLORS[terrain] || TERRAIN_COLORS.grass;
-  base = shade(base, (rnd - 0.5) * 0.16);
+  const kind = TERRAIN_KIND[terrain] || 'grass';
+  // Cinco escalones de tono: menos variación que antes (era el doble), porque
+  // con textura encima ya no hace falta para que el suelo no parezca liso.
+  const T = tileTones(terrain, Math.round(rnd * 4));
+  const base = T.base;
+  const cx = sx, cy = sy + HH;
+  /*
+   * El rombo se pinta medio píxel más grande de lo que mide para que solape con
+   * sus vecinos: si se pinta justo, el suavizado de los cuatro bordes deja
+   * pasar el fondo y el suelo se lee como una rejilla de líneas oscuras.
+   */
+  const e = 0.6;
   ctx.beginPath();
-  ctx.moveTo(sx, sy);
-  ctx.lineTo(sx + HW, sy + HH);
-  ctx.lineTo(sx, sy + TILE_H);
-  ctx.lineTo(sx - HW, sy + HH);
+  ctx.moveTo(sx, sy - e);
+  ctx.lineTo(sx + HW + e, sy + HH);
+  ctx.lineTo(sx, sy + TILE_H + e);
+  ctx.lineTo(sx - HW - e, sy + HH);
   ctx.closePath();
   ctx.fillStyle = base;
   ctx.fill();
 
-  if (terrain === 'water' || terrain === 'shallow') {
-    ctx.strokeStyle = `rgba(255,255,255,${0.06 + rnd * 0.06})`;
-    ctx.lineWidth = 1;
+  // Azar repetible: el mismo rombo saca siempre los mismos números, que es lo
+  // que permite volver a dibujarlo idéntico al acercar la cámara.
+  const h = (n) => {
+    const v = Math.sin(rnd * 127.1 + n * 311.7) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  // Un punto dentro del rombo, con margen para que nada se salga del borde.
+  const spot = (n) => {
+    const u = 0.16 + h(n) * 0.68, v = 0.16 + h(n + 0.37) * 0.68;
+    return [cx + (u - v) * HW * 0.92, cy + (u + v - 1) * HH * 0.92];
+  };
+  ctx.lineCap = 'butt';
+
+  if (kind === 'grass') {
+    // Claro o calva: una mancha ancha que rompe el tono liso.
+    const [mx, my] = spot(1);
     ctx.beginPath();
-    ctx.moveTo(sx - 14, sy + HH + (rnd - 0.5) * 6);
-    ctx.quadraticCurveTo(sx, sy + HH + 4 + (rnd - 0.5) * 6, sx + 14, sy + HH + (rnd - 0.5) * 6);
-    ctx.stroke();
-  } else if (terrain !== 'road') {
-    // Mata de hierba / motas de tierra.
-    const n = 2 + Math.floor(rnd * 3);
-    for (let i = 0; i < n; i++) {
-      const a = (rnd * 97 + i * 53) % 1, b = (rnd * 41 + i * 29) % 1;
-      const px = sx + (a - 0.5) * 40, py = sy + HH + (b - 0.5) * 16;
-      ctx.fillStyle = terrain === 'sand' || terrain === 'dirt'
-        ? `rgba(0,0,0,.10)` : `rgba(${30 + a * 40 | 0},${90 + b * 60 | 0},30,.30)`;
-      ctx.fillRect(px, py, 2, terrain === 'sand' || terrain === 'dirt' ? 1 : 2);
+    ctx.ellipse(mx, my, 12 + h(0) * 9, 5 + h(9) * 3.4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = rnd > 0.5 ? T.patchL : T.patchD;
+    ctx.fill();
+    // Matas: todas las briznas del rombo en un solo trazado.
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = T.blade;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const [px, py] = spot(i * 7 + 2);
+      for (let k = -1; k <= 1; k++) {
+        ctx.moveTo(px + k * 1.7, py);
+        ctx.lineTo(px + k * 2.4, py - 2.2 - h(i + k * 0.3) * 1.6);
+      }
     }
+    ctx.stroke();
+    ctx.strokeStyle = T.bladeD;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const [px, py] = spot(i * 11 + 5);
+      ctx.moveTo(px, py); ctx.lineTo(px + 1.4, py - 2.6);
+      ctx.moveTo(px + 2.2, py); ctx.lineTo(px + 1.8, py - 2);
+    }
+    ctx.stroke();
+    if (rnd > 0.9) {
+      // Flores: van a puñados y sólo en algún rombo, para que se noten.
+      const [px, py] = spot(21);
+      ctx.fillStyle = h(3) > 0.5 ? '#e8e2b0' : '#d8cfe4';
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const fx = px + (h(i * 5) - 0.5) * 9, fy = py + (h(i * 5 + 2) - 0.5) * 5;
+        ctx.moveTo(fx + 1, fy); ctx.arc(fx, fy, 1, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    } else if (rnd < 0.06) {
+      // Canto rodado suelto.
+      const [px, py] = spot(31);
+      ctx.fillStyle = '#8a877e';
+      ctx.beginPath(); ctx.ellipse(px, py, 3.2, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#a8a49a';
+      ctx.beginPath(); ctx.ellipse(px - 0.8, py - 0.8, 1.6, 1, 0, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (kind === 'dry') {
+    // Mancha de polvo o de tierra apretada.
+    const [mx, my] = spot(3);
+    ctx.beginPath();
+    ctx.ellipse(mx, my, 12 + h(0) * 8, 5.4 + h(4) * 3, 0, 0, Math.PI * 2);
+    ctx.fillStyle = rnd > 0.5 ? T.patchL : T.patchD;
+    ctx.fill();
+    // Guijarros: la sombra de todos en un trazado y el brillo en otro.
+    ctx.fillStyle = T.pebble;
+    ctx.beginPath();
+    for (let i = 0; i < 7; i++) {
+      const [px, py] = spot(i * 9 + 4);
+      const r = 0.8 + h(i) * 0.8;
+      ctx.moveTo(px + r, py); ctx.arc(px, py, r, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.fillStyle = T.pebbleL;
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+      const [px, py] = spot(i * 9 + 4);
+      ctx.moveTo(px + 0.6, py - 0.7); ctx.arc(px - 0.4, py - 0.7, 0.6, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    if (rnd > 0.76) {
+      // Hierba seca agarrada a la tierra.
+      ctx.strokeStyle = T.hay;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const [px, py] = spot(17);
+      for (let k = -1; k <= 1; k++) {
+        ctx.moveTo(px + k * 1.8, py);
+        ctx.lineTo(px + k * 2.6, py - 3 - h(k + 2) * 1.6);
+      }
+      ctx.stroke();
+    }
+  } else if (kind === 'water') {
+    const shallowW = terrain === 'shallow';
+    // Fondo: en la orilla se transparenta la arena; en lo hondo, la sombra.
+    const [px, py] = spot(2);
+    ctx.beginPath();
+    ctx.ellipse(px, py, 13 + h(1) * 6, 5.5 + h(2) * 3, 0, 0, Math.PI * 2);
+    ctx.fillStyle = shallowW ? T.sandy : T.deep;
+    ctx.fill();
+    // Dos crestas de ola, con su sombra debajo para que tengan grueso.
+    const wave = (dy) => {
+      ctx.beginPath();
+      for (let i = 0; i < 2; i++) {
+        const yy = cy + (i - 0.5) * 7 + (h(i * 3) - 0.5) * 5 + dy;
+        ctx.moveTo(cx - 15, yy);
+        ctx.quadraticCurveTo(cx - 6, yy + 2.2, cx + 2, yy - 0.6);
+        ctx.quadraticCurveTo(cx + 9, yy - 2.6, cx + 16, yy - 0.4);
+      }
+      ctx.stroke();
+    };
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = 'rgba(12,34,64,.12)';
+    wave(1.3);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = `rgba(255,255,255,${shallowW ? 0.14 : 0.07 + h(4) * 0.05})`;
+    wave(0);
+    // Chispas de sol sobre el agua.
+    ctx.fillStyle = `rgba(255,255,255,${shallowW ? 0.22 : 0.16})`;
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const [gx, gy] = spot(i * 13 + 6);
+      ctx.moveTo(gx - 2, gy); ctx.lineTo(gx + 2, gy - 0.6); ctx.lineTo(gx + 2, gy + 0.4);
+    }
+    ctx.fill();
+  } else {
+    // Camino: dos rodadas y la grava del firme.
+    ctx.strokeStyle = T.rut; ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i < 2; i++) {
+      const off = (i - 0.5) * 7;
+      ctx.moveTo(cx - HW * 0.8, cy + off + HH * 0.4);
+      ctx.lineTo(cx + HW * 0.8, cy + off - HH * 0.4);
+    }
+    ctx.stroke();
+    ctx.fillStyle = T.gravel;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const [px, py] = spot(i * 9 + 8);
+      ctx.moveTo(px + 0.8, py); ctx.arc(px, py, 0.8, 0, Math.PI * 2);
+    }
+    ctx.fill();
   }
+}
+
+/*
+ * Rombos horneados. El terreno se repite —ocho tipos y ocho variantes de azar
+ * cada uno— así que en vez de volver a pintar las matas de hierba de cada rombo
+ * se hornea uno por variante y se copia. Copiar un mapa de bits cuesta una
+ * fracción de lo que cuesta dibujarlo, y de cerca sale nítido porque el horneado
+ * va a la resolución que pida la cámara.
+ *
+ * Las ocho variantes de un terreno van en una sola tira, no en ocho lienzos: un
+ * lienzo suelto por variante son cientos de objetos que el navegador tiene que
+ * mantener y subir a la tarjeta, y de la tira se copia igual de bien dando el
+ * recorte.
+ */
+const tileSheets = new Map();
+const TILE_PAD = 1;      // solape para que no se vea la junta entre rombos
+const TILE_VARIANTS = 8;
+const TW = TILE_W + TILE_PAD * 2, TH = TILE_H + TILE_PAD * 2;
+
+function terrainSheet(terrain) {
+  const hit = tileSheets.get(terrain);
+  if (hit) return hit;
+  const c = makeCanvas(TW * TILE_VARIANTS * quality, TH * quality);
+  const ctx = c.getContext('2d');
+  ctx.scale(quality, quality);
+  for (let i = 0; i < TILE_VARIANTS; i++) {
+    drawTerrainTile(ctx, i * TW + HW + TILE_PAD, TILE_PAD, terrain, (i + 0.5) / TILE_VARIANTS);
+  }
+  tileSheets.set(terrain, c);
+  return c;
+}
+
+/** Copia un rombo horneado. (sx, sy) es su esquina superior, como al dibujarlo. */
+export function drawTerrainSprite(ctx, sx, sy, terrain, rnd) {
+  const i = Math.min(TILE_VARIANTS - 1, Math.floor(rnd * TILE_VARIANTS));
+  ctx.drawImage(terrainSheet(terrain),
+    i * TW * quality, 0, TW * quality, TH * quality,
+    sx - HW - TILE_PAD, sy - TILE_PAD, TW, TH);
 }
 
 // --- Resolución de los sprites ----------------------------------------------
@@ -116,6 +332,7 @@ export function setSpriteQuality(q) {
   q = Math.max(1, Math.min(3, Math.round(q * 2) / 2));
   if (q === quality) return;
   quality = q;
+  tileSheets.clear();
   resCache.clear();
   unitCache.clear();
   buildCache.clear();
@@ -241,41 +458,158 @@ function drawResource(ctx, kind, variant, depleted, ox, oy) {
     }
     case 'gold': case 'stone': {
       const isGold = kind === 'gold';
-      shadowEllipse(ctx, ox + 2, oy + 2, 17, 8);
-      const rock = L.rock;
-      const hi = L.accent;
-      const parts = depleted ? [[0, 0, 10, 7]] : [[-8, 0, 12, 9], [8, -2, 11, 8], [0, -8, 13, 10]];
+      const [rockL, rock, rockD] = ramp(L.rock);
+      shadowEllipse(ctx, ox + 2, oy + 3, 17, 8);
+      /*
+       * Cada roca es un bloque facetado: cara de arriba a la luz, cara
+       * izquierda de medio tono y cara derecha en sombra. Tres caras planas
+       * dan más piedra que cualquier degradado, y el filo entre ellas es lo
+       * que se lee de lejos.
+       */
+      const parts = depleted
+        ? [[1, 0, 9, 7]]
+        : [[-9, 1, 11, 9], [9, -1, 10, 8], [0, -7, 12, 11]];
       for (const [px, py, pw, ph] of parts) {
+        const bx = ox + px, by = oy + py, t = shade(rock, (r(px) - 0.5) * 0.14);
+        const top = ph * 0.42;
+        // Falda de la roca.
         poly(ctx, [
-          [ox + px - pw, oy + py - 2], [ox + px - pw * 0.4, oy + py - ph],
-          [ox + px + pw * 0.5, oy + py - ph * 0.9], [ox + px + pw, oy + py - 1],
-          [ox + px + pw * 0.3, oy + py + 3], [ox + px - pw * 0.5, oy + py + 2],
-        ], shade(rock, -0.06 + r(px) * 0.2), 'rgba(0,0,0,.18)');
-        ctx.fillStyle = hi;
-        for (let i = 0; i < (isGold ? 4 : 2); i++) {
-          const a = r(px + i * 3), b = r(px + i * 7);
-          ctx.globalAlpha = isGold ? 0.95 : 0.5;
+          [bx - pw, by - top], [bx - pw * 0.55, by + 2.4],
+          [bx + pw * 0.5, by + 3], [bx + pw, by - top * 0.8],
+        ], shade(t, -0.12));
+        poly(ctx, [
+          [bx + pw * 0.1, by - top - 0.4], [bx + pw, by - top * 0.8],
+          [bx + pw * 0.5, by + 3], [bx + pw * 0.05, by + 2.8],
+        ], shade(t, -0.3));
+        // Cara superior, la que mira al sol.
+        poly(ctx, [
+          [bx - pw, by - top], [bx - pw * 0.35, by - ph],
+          [bx + pw * 0.45, by - ph * 0.92], [bx + pw, by - top * 0.8],
+          [bx + pw * 0.1, by - top - 0.4],
+        ], shade(t, 0.12));
+        // Aristas: una clara arriba y otra oscura donde rompe la cara.
+        ctx.strokeStyle = shade(t, 0.3); ctx.lineWidth = 0.9; ctx.lineCap = 'butt';
+        ctx.beginPath();
+        ctx.moveTo(bx - pw + 0.6, by - top - 0.4);
+        ctx.lineTo(bx - pw * 0.35, by - ph + 0.6);
+        ctx.lineTo(bx + pw * 0.45, by - ph * 0.92 + 0.6);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(0,0,0,.22)';
+        ctx.beginPath();
+        ctx.moveTo(bx + pw * 0.1, by - top - 0.4);
+        ctx.lineTo(bx + pw * 0.1, by + 2.8);
+        ctx.stroke();
+        /*
+         * La veta: el oro va en pepitas redondas y brillantes, muy visibles;
+         * la piedra, en facetas angulosas del mismo gris pero más claro. Así
+         * se distinguen de un vistazo dos montones de la misma forma.
+         */
+        if (isGold) {
+          ctx.fillStyle = L.accent;
           ctx.beginPath();
-          ctx.ellipse(ox + px + (a - 0.5) * pw, oy + py - ph * 0.5 + (b - 0.5) * 5, 2, 1.6, 0, 0, Math.PI * 2);
+          for (let i = 0; i < 4; i++) {
+            const a = r(px + i * 3), b = r(px + i * 7);
+            const gx = bx + (a - 0.6) * pw * 0.9, gy = by - top - 1 - b * (ph - top) * 0.7;
+            ctx.moveTo(gx + 1.7, gy); ctx.arc(gx, gy, 1.5 + a * 0.6, 0, Math.PI * 2);
+          }
+          ctx.fill();
+          ctx.fillStyle = shade(L.accent, 0.35);
+          ctx.beginPath();
+          for (let i = 0; i < 4; i++) {
+            const a = r(px + i * 3), b = r(px + i * 7);
+            const gx = bx + (a - 0.6) * pw * 0.9, gy = by - top - 1 - b * (ph - top) * 0.7;
+            ctx.moveTo(gx + 0.4, gy - 0.5); ctx.arc(gx - 0.5, gy - 0.6, 0.7, 0, Math.PI * 2);
+          }
+          ctx.fill();
+        } else {
+          ctx.fillStyle = L.accent;
+          ctx.globalAlpha = 0.4;
+          ctx.beginPath();
+          for (let i = 0; i < 3; i++) {
+            const a = r(px + i * 5), b = r(px + i * 11);
+            const gx = bx + (a - 0.6) * pw * 0.8, gy = by - top - 1 - b * (ph - top) * 0.6;
+            ctx.moveTo(gx - 1.6, gy + 1); ctx.lineTo(gx, gy - 1.3); ctx.lineTo(gx + 1.7, gy + 0.4);
+          }
           ctx.fill();
           ctx.globalAlpha = 1;
         }
       }
+      // Cascajo al pie del montón.
+      ctx.fillStyle = shade(rockD, -0.06);
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) {
+        const a = r(i * 13), b = r(i * 17);
+        const gx = ox + (a - 0.5) * 30, gy = oy + 1 + (b - 0.5) * 5;
+        ctx.moveTo(gx + 1.6, gy); ctx.ellipse(gx, gy, 1.6 + a, 1 + a * 0.5, 0, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      void rockL;
       break;
     }
     case 'berries': {
+      const [bushL, bush, bushD] = ramp(L.bush);
       shadowEllipse(ctx, ox + 2, oy + 2, 14, 6);
-      for (let i = 0; i < 3; i++) {
-        const bx = ox + (i - 1) * 9, by = oy - 4 - (i === 1 ? 4 : 0);
-        ctx.beginPath(); ctx.ellipse(bx, by, 9, 8, 0, 0, Math.PI * 2);
-        ctx.fillStyle = shade(L.bush, (r(i) - 0.5) * 0.25); ctx.fill();
-        if (!depleted) {
-          for (let k = 0; k < 5; k++) {
-            ctx.beginPath();
-            ctx.arc(bx + (r(i * 5 + k) - 0.5) * 12, by + (r(i * 3 + k) - 0.5) * 10, 1.8, 0, Math.PI * 2);
-            ctx.fillStyle = L.berry; ctx.fill();
-          }
+      // Cepa: tres varas que salen del suelo y sostienen la mata.
+      ctx.strokeStyle = '#6b5233'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      ctx.beginPath();
+      for (let i = -1; i <= 1; i++) {
+        ctx.moveTo(ox + i * 2.4, oy);
+        ctx.lineTo(ox + i * 5.5, oy - 7 - r(i + 2) * 3);
+      }
+      ctx.stroke();
+      /*
+       * Mata por capas, como la copa de un árbol pero a ras de suelo: masa en
+       * sombra abajo, cuerpo en medio y remates a la luz arriba.
+       */
+      const clumps = [
+        [-9, -4, 6.5, bushD], [9, -4, 6, bushD], [0, -3, 7.5, bushD],
+        [-5, -8, 6.5, bush], [5, -8, 6, bush], [0, -10, 6.5, bush],
+        [-4, -12, 4.6, bushL], [4, -11, 4.2, bushL],
+      ];
+      for (const [bx, by, br, tone] of clumps) {
+        const k = 0.9 + r(bx + by) * 0.2;
+        ctx.beginPath();
+        ctx.ellipse(ox + bx, oy + by, br * k, br * k * 0.82, 0, 0, Math.PI * 2);
+        ctx.fillStyle = depleted ? shade(tone, -0.12) : shade(tone, (r(bx) - 0.5) * 0.1);
+        ctx.fill();
+      }
+      if (depleted) {
+        // Sin fruto: quedan los rabillos pelados.
+        ctx.strokeStyle = shade(bushD, -0.2); ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+          const a = r(i * 7) * Math.PI * 2;
+          ctx.moveTo(ox + Math.cos(a) * 7, oy - 8 + Math.sin(a) * 4);
+          ctx.lineTo(ox + Math.cos(a) * 9, oy - 9 + Math.sin(a) * 5);
         }
+        ctx.stroke();
+        break;
+      }
+      // Bayas: van en racimos, no sueltas, y cada una con su reflejo.
+      const berryD = shade(L.berry, -0.3), berryL = shade(L.berry, 0.4);
+      for (let c = 0; c < 4; c++) {
+        const cxb = ox + (r(c * 3) - 0.5) * 20, cyb = oy - 5 - r(c * 5) * 8;
+        ctx.fillStyle = berryD;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const bx = cxb + (r(c * 7 + i) - 0.5) * 5, by = cyb + (r(c * 11 + i) - 0.5) * 4;
+          ctx.moveTo(bx + 2.1, by + 0.4); ctx.arc(bx, by + 0.4, 2.1, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.fillStyle = L.berry;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const bx = cxb + (r(c * 7 + i) - 0.5) * 5, by = cyb + (r(c * 11 + i) - 0.5) * 4;
+          ctx.moveTo(bx + 1.9, by); ctx.arc(bx, by, 1.9, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.fillStyle = berryL;
+        ctx.beginPath();
+        for (let i = 0; i < 3; i++) {
+          const bx = cxb + (r(c * 7 + i) - 0.5) * 5, by = cyb + (r(c * 11 + i) - 0.5) * 4;
+          ctx.moveTo(bx - 0.1, by - 0.7); ctx.arc(bx - 0.6, by - 0.7, 0.7, 0, Math.PI * 2);
+        }
+        ctx.fill();
       }
       break;
     }
@@ -2176,6 +2510,8 @@ export function iconFor(kind, type, colorIdx = 0) {
  * volver a dibujarlos.
  */
 export function clearSpriteCaches() {
+  tileCache.clear();
+  tileSheets.clear();
   resCache.clear();
   unitCache.clear();
   palCache.clear();

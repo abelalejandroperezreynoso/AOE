@@ -3,18 +3,18 @@
 import { TILE_W, TILE_H, UNITS, BUILDINGS, PLAYER_COLORS } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, HW, HH,
-  drawSprite, paintUnit, paintBuilding, paintResource, setSpriteQuality, drawTerrainTile,
+  drawSprite, paintUnit, paintBuilding, paintResource, setSpriteQuality, drawTerrainSprite,
 } from './sprites.js';
 import { clamp, dist } from './utils.js';
 
 const Z_PX = 18; // píxeles de altura por unidad de "z" en el mundo
 /*
- * Tope de rombos que se redibujan por fotograma antes de tirar del lienzo
- * horneado. Medido sobre el propio juego: hasta ~1000 rombos redibujarlos
- * cuesta lo mismo que copiar el lienzo (y a partir de zoom 2 sale más barato,
- * porque ampliar un mapa de bits es más caro que rellenar unos polígonos);
- * pasado ese punto la copia gana de calle. De cerca nunca se llega al tope, y
- * de lejos la copia se reduce en pantalla y ya se ve bien.
+ * Tope de rombos que se copian uno a uno por fotograma antes de tirar del lienzo
+ * horneado del mapa entero. Medido sobre el propio juego: hasta ~1000 rombos
+ * sale igual o mejor que copiar el lienzo grande, porque ampliar un mapa de bits
+ * de millones de píxeles cuesta más que copiar mil recortes pequeños; pasado ese
+ * punto gana el lienzo. De cerca nunca se llega al tope, y de lejos el lienzo se
+ * reduce en pantalla y ya se ve bien.
  */
 const MAX_TILES = 1000;
 
@@ -152,11 +152,11 @@ export class Renderer {
   /**
    * El terreno está horneado en un solo lienzo del tamaño del mapa, que a
    * pantalla completa mide decenas de millones de píxeles: no cabe guardarlo a
-   * más resolución. En su lugar, cuando la cámara lo ampliaría se vuelven a
-   * dibujar los rombos visibles, que son vectores y salen nítidos a cualquier
-   * escala. Se hace sólo si son pocos: de lejos entra medio mapa en pantalla y
-   * el lienzo horneado, que allí se reduce, se ve igual de bien y cuesta un
-   * único `drawImage`.
+   * más resolución. En su lugar, cuando la cámara lo ampliaría se copian rombo a
+   * rombo los que se ven, desde una tabla de rombos horneados a la resolución de
+   * la pantalla. Se hace sólo si son pocos: de lejos entra medio mapa y el
+   * lienzo grande, que allí se reduce, se ve igual de bien y cuesta un único
+   * `drawImage`.
    */
   drawTerrain(ctx, b) {
     const m = this.game.map;
@@ -168,14 +168,22 @@ export class Renderer {
     // El fondo del lienzo horneado, para que el borde del mapa se vea igual.
     ctx.fillStyle = '#1d2a17';
     ctx.fillRect(0, 0, m.canvas.width, m.canvas.height);
+    /*
+     * Los rombos se copian sin interpolar: están horneados a la resolución que
+     * pide la cámara, así que la copia es casi uno a uno y el filtro no aporta
+     * nada, pero filtrar setecientos rombos por fotograma cuesta lo suyo donde
+     * el lienzo no va por tarjeta gráfica.
+     */
+    ctx.imageSmoothingEnabled = false;
     const names = m.terrainNames;
     for (let y = b.y0; y <= b.y1; y++) {
       for (let x = b.x0; x <= b.x1; x++) {
         const i = m.idx(x, y);
         const [sx, sy] = m.tileToCanvas(x, y);
-        drawTerrainTile(ctx, sx, sy, names[m.terrain[i]], m.tileRnd[i]);
+        drawTerrainSprite(ctx, sx, sy, names[m.terrain[i]], m.tileRnd[i]);
       }
     }
+    ctx.imageSmoothingEnabled = true;
   }
 
   drawDecals(ctx, b) {
