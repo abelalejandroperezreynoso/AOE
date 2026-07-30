@@ -288,12 +288,15 @@ export const UPGRADES = {
 };
 
 // Recursos del mapa.
+// `herd` marca los animales que se pueden domesticar: pasan al bando de quien
+// tenga unidades cerca (dentro de `tame` casillas) y se pueden mover por el
+// mapa como un rebaño, a `speed` casillas por segundo.
 export const RESOURCE_NODES = {
   tree: { res: 'wood', amount: 100, rate: 'wood', blocking: true },
   gold: { res: 'gold', amount: 800, rate: 'gold', blocking: true },
   stone: { res: 'stone', amount: 500, rate: 'stone', blocking: true },
   berries: { res: 'food', amount: 200, rate: 'berries', blocking: true },
-  sheep: { res: 'food', amount: 110, rate: 'sheep', blocking: false },
+  sheep: { res: 'food', amount: 110, rate: 'sheep', blocking: false, herd: true, tame: 5, speed: 0.7 },
   deer: { res: 'food', amount: 140, rate: 'deer', blocking: false },
 };
 

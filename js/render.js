@@ -215,13 +215,20 @@ export class Renderer {
   drawSelectionMarkers(ctx) {
     const g = this.game;
     for (const e of g.selection) {
-      if (e.dead) continue;
-      const col = PLAYER_COLORS[g.players[e.owner].colorIdx].light;
+      if (e.dead || e.alive === false) continue;
+      const owner = e.owner === null || e.owner === undefined ? g.human.id : e.owner;
+      const col = PLAYER_COLORS[g.players[owner].colorIdx].light;
       ctx.strokeStyle = col; ctx.lineWidth = 2;
       if (e.kind === 'unit') {
         const [mx, my] = this.worldToCanvas(e.x, e.y);
         ctx.beginPath();
         ctx.ellipse(mx, my, 13 * (e.radius / 0.3), 6.5 * (e.radius / 0.3), 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (e.kind !== 'building') {
+        // Animal del rebaño: lleva el mismo cerco que una unidad.
+        const [mx, my] = this.worldToCanvas(e.fx, e.fy);
+        ctx.beginPath();
+        ctx.ellipse(mx, my, 15, 7.5, 0, 0, Math.PI * 2);
         ctx.stroke();
       } else {
         const s = e.size;
@@ -256,8 +263,11 @@ export class Renderer {
       for (let x = b.x0; x <= b.x1; x++) {
         const n = m.nodeAtTile(x, y);
         if (!n || !n.alive) continue;
-        if (!g.isExplored(x, y)) continue;
-        list.push({ d: x + y, t: 'node', e: n });
+        // Los recursos fijos se recuerdan una vez explorados; los animales se
+        // mueven, así que sólo se ven donde alcanza la vista (los propios siempre).
+        const mine = n.owner === g.human.id;
+        if (!mine && !(n.herd ? g.isVisible(x, y) : g.isExplored(x, y))) continue;
+        list.push({ d: n.fx + n.fy, t: 'node', e: n });
       }
     }
     for (const bd of g.buildings) {
@@ -288,9 +298,17 @@ export class Renderer {
   }
 
   drawNode(ctx, n) {
-    const [mx, my] = this.worldToCanvas(n.x + 0.5, n.y + 0.5);
+    const [mx, my] = this.worldToCanvas(n.fx, n.fy);
     const kind = n.kind;
     const depleted = n.amount < n.max * 0.34;
+    // Los animales domesticados llevan al cuello la cinta del color de su dueño.
+    if (n.owner !== null && n.owner !== undefined) {
+      const col = PLAYER_COLORS[this.game.players[n.owner].colorIdx];
+      ctx.strokeStyle = col.main; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(mx, my, 11, 5.5, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(mx, my, 12.5, 6.3, 0, 0, Math.PI * 2); ctx.stroke();
+    }
     if (this.sharp) paintResource(ctx, mx, my, kind, n.variant, depleted);
     else drawSprite(ctx, resourceSprite(kind, n.variant, depleted), mx, my);
   }
@@ -320,7 +338,7 @@ export class Renderer {
     }
 
     const dmg = b.hp < b.maxHp - 0.5;
-    if (!b.built || b.selected || (dmg && this.showHealthFor(b))) {
+    if (!b.built || dmg || this.showHealthFor(b)) {
       const [cx, cy] = this.worldToCanvas(b.cx, b.cy);
       const topY = cy - (b.size * TILE_H) / 2 - (b.type === 'castle' ? 90 : b.type === 'tower' ? 58 : 46);
       this.healthBar(ctx, cx, topY, 26 + b.size * 8, b.hp / b.maxHp, b.owner);
@@ -362,17 +380,28 @@ export class Renderer {
       ctx.fillStyle = col;
       ctx.fillRect(mx + (u.dir > 0 ? -13 : 8), my - 34, 6, 5);
     }
-    if (u.selected || (u.hp < u.maxHp - 0.5 && this.showHealthFor(u))) {
+    // La vida se ve siempre que la unidad esté herida, sea de quien sea: en una
+    // batalla hay que poder saber a qué enemigo le queda menos.
+    if (u.hp < u.maxHp - 0.5 || this.showHealthFor(u)) {
       this.healthBar(ctx, mx, my - 44, 22, u.hp / u.maxHp, u.owner);
     }
   }
 
+  /**
+   * Barra de vida. Debajo lleva una línea del color del jugador: en un combate
+   * con las dos barras juntas es lo que dice de quién es cada una.
+   */
   healthBar(ctx, x, y, w, frac, owner) {
     frac = clamp(frac, 0, 1);
-    ctx.fillStyle = 'rgba(0,0,0,.6)';
-    ctx.fillRect(x - w / 2 - 1, y - 1, w + 2, 6);
+    ctx.fillStyle = 'rgba(0,0,0,.65)';
+    ctx.fillRect(x - w / 2 - 1, y - 1, w + 2, 8);
     ctx.fillStyle = frac > 0.6 ? '#4fbf4f' : frac > 0.3 ? '#e0b52c' : '#d2453c';
     ctx.fillRect(x - w / 2, y, w * frac, 4);
+    const p = this.game.players[owner];
+    if (p) {
+      ctx.fillStyle = PLAYER_COLORS[p.colorIdx].main;
+      ctx.fillRect(x - w / 2, y + 4.5, w, 2);
+    }
   }
 
   drawProjectile(ctx, p) {
@@ -614,6 +643,17 @@ export class Renderer {
       mctx.fillStyle = PLAYER_COLORS[g.players[u.owner].colorIdx].main;
       mctx.fillRect(px - 1.5, py - 1.2, 3, 2.6);
     }
+    // Los rebaños se pintan aquí y no en el mapa horneado: se mueven y cambian
+    // de dueño. Sin domesticar salen del color de la comida, como los demás.
+    for (const n of g.herds) {
+      if (!n.alive) continue;
+      const mine = n.owner === g.human.id;
+      if (!mine && !g.isVisible(n.x, n.y)) continue;
+      const [px, py] = toMini(n.fx, n.fy);
+      mctx.fillStyle = n.owner === null || n.owner === undefined
+        ? '#d24a3a' : PLAYER_COLORS[g.players[n.owner].colorIdx].light;
+      mctx.fillRect(px - 1.5, py - 1, 3, 2.2);
+    }
 
     // Rectángulo de la vista.
     const corners = [
@@ -656,6 +696,16 @@ export class Renderer {
       }
     }
     if (best) return best;
+    // Los animales del rebaño andan por el mapa, así que su casilla no basta:
+    // se busca al más cercano al punto tocado.
+    let animal = null, animalD = 0.75;
+    for (const n of g.herds) {
+      if (!n.alive) continue;
+      if (n.owner !== g.human.id && !g.isVisible(n.x, n.y)) continue;
+      const d = dist(u, v, n.fx, n.fy);
+      if (d < animalD) { animalD = d; animal = n; }
+    }
+    if (animal) return animal;
     const tx = Math.floor(u), ty = Math.floor(v);
     const id = g.map.inBounds(tx, ty) ? g.map.occupied[g.map.idx(tx, ty)] : 0;
     if (id) {
@@ -665,6 +715,20 @@ export class Renderer {
     const node = g.map.nodeAtTile(tx, ty);
     if (node && g.isExplored(tx, ty)) return node;
     return null;
+  }
+
+  /** Animales del rebaño de un jugador dentro del rectángulo de selección. */
+  animalsInBox(x0, y0, x1, y1, ownerId) {
+    const minX = Math.min(x0, x1), maxX = Math.max(x0, x1);
+    const minY = Math.min(y0, y1), maxY = Math.max(y0, y1);
+    const out = [];
+    for (const n of this.game.herds) {
+      if (!n.alive || n.owner !== ownerId) continue;
+      const [mx, my] = this.worldToScreen(n.fx, n.fy);
+      const cy = my - 10 * this.cam.zoom;
+      if (mx >= minX && mx <= maxX && cy >= minY && cy <= maxY) out.push(n);
+    }
+    return out;
   }
 
   unitsInBox(x0, y0, x1, y1, ownerId) {
