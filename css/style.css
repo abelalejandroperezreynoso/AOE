@@ -48,14 +48,26 @@ html, body {
 
 /* ---------- Superposiciones ---------- */
 
+/*
+ * Las tarjetas se centran con `margin: auto`, no con `align-items: center`:
+ * centrado por alineación, lo que no cabe se sale por arriba y no hay forma de
+ * llegar a él con el dedo (el navegador sólo deja desplazar hacia abajo). Con
+ * márgenes automáticos se centra igual cuando sobra sitio y, cuando no,
+ * la tarjeta empieza arriba y se desplaza entera.
+ */
 .overlay {
   position: fixed; inset: 0;
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-start; justify-content: center;
   background: radial-gradient(circle at 50% 30%, rgba(60,44,26,.55), rgba(8,6,4,.94));
   z-index: 50;
-  padding: 20px;
+  padding:
+    calc(16px + var(--sa-top)) calc(16px + var(--sa-right))
+    calc(16px + var(--sa-bottom)) calc(16px + var(--sa-left));
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
+.overlay > * { margin: auto; flex: none; }
 
 #main-menu {
   background:
@@ -63,8 +75,10 @@ html, body {
     linear-gradient(180deg, #241a10, #0e0b07);
 }
 
+/* Al ancho de la caja de la superposición, que ya descuenta su relleno y las
+   zonas seguras: con `96vw` la tarjeta más el relleno no cabían en un móvil. */
 .menu-card {
-  width: min(760px, 96vw);
+  width: min(760px, 100%);
   background: var(--panel);
   border: 2px solid var(--panel-edge);
   border-radius: 12px;
@@ -73,7 +87,7 @@ html, body {
   text-align: center;
 }
 
-.menu-card.small { width: min(380px, 92vw); }
+.menu-card.small { width: min(380px, 100%); }
 
 .menu-card h1 {
   margin: 0 0 4px;
@@ -178,8 +192,8 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 /* ---------- Catálogo ---------- */
 
 .catalog-card {
-  width: min(1100px, 96vw);
-  height: min(760px, 92vh);
+  width: min(1100px, 100%);
+  height: min(760px, 100%);
   display: flex; flex-direction: column;
   background: var(--panel);
   border: 2px solid var(--panel-edge);
@@ -296,10 +310,29 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .catalog-foot { margin: 10px 0 0; font-size: 11.5px; color: #8e7c5c; text-align: center; }
 
 @media (max-width: 780px) {
-  .catalog-card { height: 94vh; padding: 12px; }
+  .catalog-card { height: 100%; padding: 12px; }
   .catalog-body { flex-direction: column; }
-  .catalog-side { width: 100%; height: 190px; }
+  /* En columna, la lista se lleva una fracción del alto y la ficha el resto.
+     Sin `min-height: 0` la ficha no puede encogerse por debajo de su contenido
+     y se desbordaba por abajo de la tarjeta, encima del pie. */
+  .catalog-side { width: 100%; height: 38%; min-height: 110px; flex: none; }
+  .catalog-detail { min-height: 0; }
   .cat-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .catalog-card { padding: 9px 10px 8px; }
+  .catalog-top { gap: 8px; margin-bottom: 8px; }
+  .catalog-top h2 { font-size: 19px; }
+  .catalog-top-right button { padding: 6px 10px; font-size: 12.5px; }
+  .catalog-tabs { gap: 4px; margin-bottom: 8px; }
+  .catalog-tabs button { padding: 6px 11px; font-size: 13px; }
+  .catalog-detail { padding: 10px 12px; }
+  .cat-head { gap: 10px; margin-bottom: 10px; }
+  .cat-head h3 { font-size: 17px; }
+  /* El pie sólo explica cómo va el catálogo: en un móvil el sitio lo necesita
+     la lista, y lo mismo se cuenta en la ayuda. */
+  .catalog-foot { display: none; }
 }
 
 /* ---------- Sala de espera ---------- */
@@ -760,6 +793,49 @@ button.cmd, button.qitem, button.prod { margin: 0; }
 .panel td:first-child { color: var(--gold-l); width: 40%; font-weight: bold; }
 .panel ul { padding-left: 20px; font-size: 13px; line-height: 1.7; color: #d5c6a2; }
 .panel .primary { margin-top: 16px; width: 100%; }
+
+/* ---------- Menús en pantallas pequeñas ---------- */
+
+/*
+ * En un teléfono la tarjeta del menú no cabe de una vez, así que se aprieta
+ * todo lo accesorio (relleno, títulos, interlineado) para que quepa lo que
+ * importa —las opciones y el botón de empezar— y el resto se alcance
+ * desplazando. Los desplegables van en dos columnas mientras haya sitio.
+ */
+@media (max-width: 480px) {
+  .overlay {
+    padding:
+      calc(10px + var(--sa-top)) calc(10px + var(--sa-right))
+      calc(10px + var(--sa-bottom)) calc(10px + var(--sa-left));
+  }
+  .menu-card { padding: 16px 14px 18px; border-radius: 10px; }
+  .menu-card h1 { font-size: clamp(24px, 8.5vw, 40px); letter-spacing: 1px; margin-bottom: 2px; }
+  .menu-card h2 { font-size: clamp(20px, 6.5vw, 28px); margin-bottom: 10px; }
+  .subtitle { font-size: 12px; margin-bottom: 14px; line-height: 1.4; }
+  .options { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  .options label { font-size: 12px; gap: 3px; }
+  .options select, .options input { padding: 7px 8px; font-size: 13.5px; }
+  button.primary { font-size: 16px; padding: 11px 20px; }
+  button.secondary, button.danger { margin-top: 6px; padding: 9px 14px; font-size: 14px; }
+  .menu-help { margin-top: 14px; padding: 10px 12px; }
+  .menu-help h3 { font-size: 14.5px; margin-bottom: 6px; }
+  .menu-help ul { font-size: 12.5px; line-height: 1.5; padding-left: 17px; }
+  .legal { font-size: 11px; margin-top: 8px; }
+  .stats { font-size: 13px; margin: 8px 0 14px; }
+  .stats td { padding: 4px 6px; }
+  .lobby-hint { font-size: 11.5px; }
+  .vol { font-size: 13px; margin-bottom: 12px; }
+}
+
+/* Apaisado: sobra ancho y falta alto, así que se recorta el alto de todo. */
+@media (max-height: 520px) {
+  .menu-card { padding: 14px 18px 16px; }
+  .menu-card h1 { font-size: clamp(22px, 5vw, 34px); }
+  .subtitle { margin-bottom: 10px; }
+  .options { margin-bottom: 10px; }
+  .menu-help { margin-top: 12px; padding: 10px 14px; }
+  .menu-help ul { line-height: 1.45; }
+}
 
 /* Adaptación a pantallas pequeñas */
 

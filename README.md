@@ -130,6 +130,7 @@ Detalles a tener en cuenta:
 | Eliminar lo seleccionado | Supr |
 | Pausa y menú | `P` o `Esc` |
 | Construir en cadena | Mantén Mayús al colocar un edificio |
+| Pastorear ovejas | Selecciona las tuyas y clic derecho donde quieras llevarlas |
 | Ayuda | `F1` |
 
 En **móvil y tablet**: un toque selecciona lo tuyo, un toque en el suelo da la
@@ -140,7 +141,9 @@ o aleja.
 
 1. **Economía.** Manda aldeanos a bayas, ovejas, ciervos, árboles, oro y piedra.
    Levanta molinos y campamentos junto a los yacimientos para acortar los viajes,
-   y granjas cuando se agote la caza.
+   y granjas cuando se agote la caza. Las **ovejas se domestican**: pasan al bando
+   de quien tenga unidades cerca —y cambian de dueño si se acerca otro—, así que
+   conviene llevarlas a la base antes de sacrificarlas.
 2. **Población.** Cada casa da 5 de población; el centro urbano, 5; el castillo, 20.
 3. **Edades.** Desde el centro urbano se avanza a Feudal, Castillos e Imperial.
    Cada edad exige edificios de la anterior y desbloquea unidades, edificios y

@@ -56,6 +56,9 @@ export const BUILDING_FIELDS = [
 
 export const NODE_FIELDS = [
   num('amount', 'Cantidad', { min: 1, max: 20000, group: 'Yacimiento' }),
+  // Sólo los tienen los animales de rebaño (las ovejas).
+  num('tame', 'Radio para domesticar', { min: 1, max: 20, step: 0.5, unit: 'casillas', group: 'Rebaño' }),
+  num('speed', 'Velocidad', { min: 0.1, max: 5, step: 0.05, unit: 'casillas/s', group: 'Rebaño' }),
 ];
 
 export const TERRAIN_LABELS = {
