@@ -26,8 +26,11 @@ const RAMPS = {
   '#5c5c58': ['#6d6d68', '#4c4c48'], // chimenea de la herrería
   '#8a6a3c': ['#a5854f', '#6d5330'], // tierra de labor
   '#a8c24a': ['#c0d868', '#7a9a34'], // surcos del cultivo
+  '#8f8a80': ['#a9a49a', '#6f6a62'], // zócalo de piedra
   // Tejados
-  '#a8452f': ['#c2543a', '#8a3423'], // teja roja (casa y molino)
+  '#b09a62': ['#c9b47c', '#8d7a4a'], // bálago (casa y molino)
+  '#a08a55': ['#bda66d', '#7f6d40'], // bálago viejo de los cobertizos
+  '#a8452f': ['#c2543a', '#8a3423'], // teja roja
   '#96442f': ['#a85a3d', '#7d3a2a'], // centro urbano
   '#7a3a2c': ['#8f4a37', '#5f2c21'], // cuartel
   '#4a6b3a': ['#5c8047', '#39522c'], // galería de tiro
@@ -55,6 +58,7 @@ export function ramp(color) {
 // --- Valores por defecto ----------------------------------------------------
 
 const SKIN = '#d9a878', LEGS = '#3e3a33', HELM = '#a7a9b0';
+const STONE = '#8f8a80';   // zócalo de piedra al pie de los muros
 const CLOTH = '#b9a279';   // lino del jubón que asoma bajo la armadura
 const LEATHER = '#7a5432'; // correas, cinturón y botas
 const PLUME = '#e0dcd2';   // crin del penacho
@@ -93,17 +97,20 @@ export const LOOK = {
   },
 
   building: {
-    towncenter: { wall: '#d8cba6', base: '#ab9668', roof: '#96442f', wood: '#8a6234', door: '#3b2a17' },
-    house: { wall: '#d8cba6', roof: '#a8452f', door: '#4d3620' },
-    mill: { wall: '#d8cba6', roof: '#a8452f', wood: '#6b4f2c', accent: '#ebe4c8' },
-    lumbercamp: { wall: '#8a6234', roof: '#5a4a31', accent: '#8f6a3c' },
-    miningcamp: { wall: '#8a6234', roof: '#5a4a31', accent: '#8c8f95' },
+    towncenter: {
+      wall: '#d8cba6', base: '#ab9668', roof: '#96442f', wood: '#8a6234',
+      stone: STONE, door: '#3b2a17',
+    },
+    house: { wall: '#d8cba6', roof: '#b09a62', wood: '#8a6234', stone: STONE, door: '#4d3620', ivy: '#3f6b32' },
+    mill: { wall: '#d8cba6', roof: '#b09a62', wood: '#6b4f2c', stone: STONE, accent: '#ebe4c8' },
+    lumbercamp: { wall: '#8a6234', roof: '#a08a55', accent: '#8f6a3c' },
+    miningcamp: { wall: '#8a6234', roof: '#a08a55', accent: '#8c8f95' },
     farm: { soil: '#8a6a3c', crop: '#a8c24a', fence: '#5b4426' },
-    barracks: { wall: '#d8cba6', roof: '#7a3a2c', door: '#4d3620', accent: '#d8d8d0' },
-    archeryrange: { wall: '#d8cba6', roof: '#4a6b3a', door: '#4d3620', accent: '#d8d8d0' },
-    stable: { wall: '#d8cba6', roof: '#6d5a3c', door: '#4d3620', accent: '#d8d8d0' },
-    siegeworkshop: { wall: '#d8cba6', roof: '#4f5560', door: '#4d3620', accent: '#d8d8d0' },
-    blacksmith: { wall: '#9a9a94', roof: '#43392e', chimney: '#5c5c58', accent: '#ff9a3c' },
+    barracks: { wall: '#d8cba6', roof: '#7a3a2c', wood: '#8a6234', stone: STONE, door: '#4d3620', accent: '#d8d8d0' },
+    archeryrange: { wall: '#d8cba6', roof: '#4a6b3a', wood: '#8a6234', stone: STONE, door: '#4d3620', accent: '#d8d8d0' },
+    stable: { wall: '#d8cba6', roof: '#6d5a3c', wood: '#8a6234', stone: STONE, door: '#4d3620', accent: '#d8d8d0' },
+    siegeworkshop: { wall: '#d8cba6', roof: '#4f5560', wood: '#8a6234', stone: STONE, door: '#4d3620', accent: '#d8d8d0' },
+    blacksmith: { wall: '#9a9a94', roof: '#43392e', wood: '#7a5c33', stone: STONE, chimney: '#5c5c58', accent: '#ff9a3c' },
     market: {
       ground: '#948763', wood: '#6b4f2c', counter: '#8a6a3c',
       stall1: '#c9553f', stall2: '#3f7fa8', stall3: '#c9a13f', stall4: '#6b8f4a',
@@ -152,8 +159,9 @@ export const LOOK_FIELDS = {
     color('wheel', 'Ruedas'), scale,
   ],
   building: [
-    color('wall', 'Muros'), color('base', 'Basamento'), color('roof', 'Tejado'),
-    color('wood', 'Madera'), color('door', 'Puerta'), color('chimney', 'Chimenea'),
+    color('wall', 'Muros'), color('base', 'Basamento'), color('stone', 'Zócalo'),
+    color('roof', 'Tejado'), color('wood', 'Madera'), color('door', 'Puerta'),
+    color('chimney', 'Chimenea'), color('ivy', 'Hiedra'),
     color('soil', 'Tierra'), color('crop', 'Cultivo'), color('fence', 'Cerca'),
     color('ground', 'Empedrado'), color('counter', 'Mostradores'), color('accent', 'Detalle'),
     color('stall1', 'Puesto 1'), color('stall2', 'Puesto 2'),
