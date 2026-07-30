@@ -113,6 +113,9 @@ export class UI {
     this.el.endScreen = id('end-screen');
     this.el.idleBtn = id('idle-villager');
     this.el.idleCount = id('idle-count');
+    this.el.selChip = id('selection-chip');
+    this.el.selIcon = id('selection-icon');
+    this.el.selCount = id('selection-count');
     this.el.speed = id('speed-label');
   }
 
@@ -133,6 +136,7 @@ export class UI {
     this.setupFullscreen();
     this.watchBars();
     this.el.idleBtn.onclick = () => this.selectIdleVillager();
+    this.el.selChip.onclick = () => { if (this.game.selection.length) this.select([]); };
     document.getElementById('btn-speed').onclick = () => this.cycleSpeed();
     document.getElementById('btn-help').onclick = () => {
       document.getElementById('help-panel').classList.toggle('hidden');
@@ -510,12 +514,19 @@ export class UI {
    * para sacar unidades de él— es demasiado corriente como para robarle el
    * toque. Para trabajar sobre unos cimientos que ya no quieres, basta con
    * deseleccionar tocando el suelo y volver a tocarlos.
+   *
+   * Las ovejas propias también cuentan, y aquí sí manda con el ratón: con
+   * aldeanos seleccionados, pulsar una oveja es mandarlos a por su comida, no
+   * cambiar la selección. Para pastorearla se pulsa sin aldeanos seleccionados.
    */
   canWorkOn(target) {
     const g = this.game;
+    const hasVillager = g.selection
+      .some((e) => e.kind === 'unit' && e.type === 'villager' && e.owner === g.human.id);
+    if (!hasVillager) return false;
+    if (isMyAnimal(target, g)) return true;
     if (!target || target.kind !== 'building' || target.owner !== g.human.id) return false;
-    if (target.built && target.type !== 'farm') return false;
-    return g.selection.some((e) => e.kind === 'unit' && e.type === 'villager' && e.owner === g.human.id);
+    return !target.built || target.type === 'farm';
   }
 
   // --- Selección ------------------------------------------------------------
@@ -533,6 +544,9 @@ export class UI {
     const g = this.game;
     const e = this.r.entityAtScreen(x, y);
     if (!e) { if (!shift) this.select([]); return; }
+    // Oveja propia con aldeanos seleccionados: se les manda a por ella en vez
+    // de soltarlos para seleccionarla.
+    if (isMyAnimal(e, g) && this.canWorkOn(e)) { this.rightClick(x, y, shift); return; }
     // Un recurso del mapa sólo enseña su ficha... salvo que sea un animal de mi
     // rebaño, que se selecciona como cualquier otra cosa mía para poder moverlo.
     if (isNode(e) && !isMyAnimal(e, g)) {
@@ -1283,6 +1297,8 @@ export class UI {
       this.el.idleBtn._v = idle;
     }
 
+    this.updateSelectionChip(g.selection);
+
     // Refrescar el panel si la selección cambió o si cambia lo que se puede pagar.
     const key = this.selectionSignature();
     if (key !== this.selectionKey) { this.selectionKey = key; this.refreshSelection(); }
@@ -1292,6 +1308,41 @@ export class UI {
     this.renderProduction();
     this.r.drawMinimap(this.mctx, this.el.minimap.width, this.el.minimap.height);
     this.edgeScroll(dt);
+  }
+
+  /**
+   * Ficha de lo que hay seleccionado: el icono de lo primero, cuántas cosas son
+   * y, al pulsarla, suelta la selección. Sin nada seleccionado desaparece. El
+   * icono cuesta generarlo, así que sólo se rehace cuando cambia la selección.
+   */
+  updateSelectionChip(sel) {
+    const g = this.game;
+    const first = sel[0];
+    const key = first ? `${sel.length}|${first.kind}|${first.type || ''}|${first.owner}` : '';
+    if (this.el.selChip._v === key) return;
+    this.el.selChip._v = key;
+    this.el.selChip.classList.toggle('hidden', !first);
+    if (!first) return;
+    const kind = first.kind === 'unit' ? 'unit' : first.kind === 'building' ? 'building' : 'node';
+    const type = kind === 'node' ? first.kind : first.type;
+    const owner = g.players[first.owner ?? g.human.id] || g.human;
+    this.el.selIcon.src = iconFor(kind, type, owner.colorIdx);
+    this.el.selCount.textContent = sel.length;
+    /*
+     * Con varios tipos a la vez el nombre del primero engañaría, así que se
+     * cuentan por clase; y si ni la clase coincide, por número. El texto no
+     * concuerda con nada («Selección: Oveja», no «Oveja seleccionada»): así vale
+     * igual para el aldeano y para la oveja sin andar mirando géneros.
+     */
+    const sameType = sel.every((e) => e.kind === first.kind && e.type === first.type);
+    const sameKind = sel.every((e) => e.kind === first.kind);
+    const name = kind === 'node'
+      ? (NODE_NAMES[type] || type)
+      : (kind === 'unit' ? UNITS[type] : BUILDINGS[type]).name;
+    const what = sameType ? `${name}${sel.length > 1 ? ` ×${sel.length}` : ''}`
+      : sameKind ? `${sel.length} ${kind === 'building' ? 'edificios' : kind === 'node' ? 'animales' : 'unidades'}`
+        : `${sel.length} elementos`;
+    this.el.selChip.title = `Selección: ${what} · pulsa para deseleccionar`;
   }
 
   updateAffordability() {
