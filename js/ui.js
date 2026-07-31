@@ -413,6 +413,10 @@ export class UI {
   /**
    * Control táctil: un toque selecciona lo propio o da la orden sobre lo
    * seleccionado, arrastrar mueve la cámara y pellizcar acerca o aleja.
+   *
+   * Construir no entra aquí: con el dedo, la única forma es arrastrar el
+   * edificio desde la barra de órdenes (ver barGesture*). El lienzo no coloca
+   * nada, así que un toque nunca planta un edificio por sorpresa.
    */
   bindTouch(c) {
     const pos = (t) => {
@@ -430,13 +434,6 @@ export class UI {
         start = pos(e.touches[0]);
         lastPan = start;
         moved = false;
-        if (this.game.placing) {
-          this.game.placing.tx = undefined;
-          const [u, v] = this.r.screenToWorld(start.x, start.y);
-          const size = BUILDINGS[this.game.placing.type].size;
-          this.game.placing.tx = Math.floor(u - size / 2 + 0.5);
-          this.game.placing.ty = Math.floor(v - size / 2 + 0.5);
-        }
       } else if (e.touches.length === 2) {
         pinch = spread(e.touches);
         moved = true;
@@ -453,16 +450,10 @@ export class UI {
       } else if (e.touches.length === 1 && lastPan) {
         const p = pos(e.touches[0]);
         if (Math.hypot(p.x - start.x, p.y - start.y) > 12) moved = true;
-        if (moved && !this.game.placing) {
+        if (moved) {
           this.r.cam.x -= (p.x - lastPan.x) / this.r.cam.zoom;
           this.r.cam.y -= (p.y - lastPan.y) / this.r.cam.zoom;
           this.r.clampCam();
-        }
-        if (this.game.placing) {
-          const [u, v] = this.r.screenToWorld(p.x, p.y);
-          const size = BUILDINGS[this.game.placing.type].size;
-          this.game.placing.tx = Math.floor(u - size / 2 + 0.5);
-          this.game.placing.ty = Math.floor(v - size / 2 + 0.5);
         }
         lastPan = p;
       }
@@ -474,7 +465,13 @@ export class UI {
       if (!start || moved) { start = null; lastPan = null; return; }
       const { x, y } = start;
       start = null; lastPan = null;
-      if (this.game.placing) { this.tryPlace(x, y, false); return; }
+      // Una colocación en marcha aquí sólo puede venir de un teclado o de un
+      // ratón en un aparato híbrido: el dedo no la continúa, la deshace.
+      if (this.game.placing) {
+        this.cancelPlacing();
+        this.notify('Arrastra el edificio desde la barra hasta el mapa');
+        return;
+      }
       if (this.pending === 'attackmove') { this.issueAttackMove(x, y); return; }
       const g = this.game;
       const target = this.r.entityAtScreen(x, y);
@@ -784,7 +781,7 @@ export class UI {
     }
     if (d.mode) return; // se recorrió la tira o se tiró de un botón sin edificio
     // Sin movimiento es un toque normal.
-    if (d.b.place && !d.b.disabled) { this.notify('Arrastra el edificio hasta el mapa'); return; }
+    if (d.b.place && !d.b.disabled) { this.notify('Arrastra el edificio desde la barra hasta el mapa'); return; }
     d.el._tapAt = performance.now();
     d.run();
   }
