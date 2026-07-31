@@ -5,7 +5,7 @@ import {
 } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
-  drawSprite,
+  drawSprite, unitDrawScale,
 } from './sprites.js';
 import {
   fieldsFor, getPath, setValue, reset, isChanged, defaultValue, countChanges,
@@ -198,7 +198,11 @@ export class Catalog {
     const MAX = 1.6;
     if (this.tab === 'unit') {
       const s = unitSprite(key, 0, 1, 0, false);
-      const sc = real ? size / (60 * MAX) : Math.min(size / (s.w - 4), size / (s.h - 4)) * 1.05;
+      // A escala real se enseña el tamaño con el que se pinta en el mapa, que
+      // no es el del dibujo: los muñecos van reducidos (ver unitDrawScale).
+      const sc = real
+        ? (size / (60 * MAX)) * unitDrawScale(key)
+        : Math.min(size / (s.w - 4), size / (s.h - 4)) * 1.05;
       drawSprite(ctx, s, size / 2, size - 6, sc);
     } else if (this.tab === 'building') {
       const s = buildingSprite(key, 0, 2);

@@ -1572,14 +1572,66 @@ export function unitSprite(type, colorIdx, dir, f, back = false) {
 }
 
 /** Pinta una unidad directamente, con (x, y) a sus pies. */
-export function paintUnit(ctx, x, y, type, colorIdx, dir, f, back = false) {
-  const sc = look('unit', type).scale || 1;
+export function paintUnit(ctx, x, y, type, colorIdx, dir, f, back = false, scale = 1) {
+  const sc = (look('unit', type).scale || 1) * scale;
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(sc, sc);
   if (dir < 0) ctx.scale(-1, 1);
   drawUnit(ctx, type, colorIdx, f, back);
   ctx.restore();
+}
+
+/*
+ * El muñeco está dibujado con el mismo detalle que un edificio y, a tamaño
+ * natural, quedaba desproporcionado: un aldeano era más alto que la puerta de
+ * la casa en la que entra. En el mundo se pinta reducido, y eso es lo que hace
+ * creíble el tamaño del pueblo. Las máquinas de asedio no se tocan: un ariete
+ * de verdad es así de grande al lado de un soldado.
+ *
+ * La reducción va al pintar, no al rasterizar el sprite: así los iconos de la
+ * botonera y las vistas previas del catálogo siguen saliendo a resolución
+ * completa, y el «Tamaño» del catálogo sigue significando lo mismo que antes.
+ */
+const HUMAN_SCALE = 0.68;
+
+/** Reducción con la que se pinta una unidad en el mundo (1 = tamaño de diseño). */
+export function unitDrawScale(type) {
+  return UNITS[type] && UNITS[type].class === 'siege' ? 1 : HUMAN_SCALE;
+}
+
+/*
+ * Silueta de cada clase de unidad en píxeles de diseño, medida desde los pies:
+ * media anchura, cuánto sube el cuerpo y cuánto sobresale por debajo. Con ella
+ * se le cuelga la barra de vida por encima de la cabeza y se sabe si un toque
+ * en la pantalla ha caído sobre el muñeco y no sobre el suelo que pisa. Por
+ * abajo llega hasta donde llega su sombra, que también es parte de la figura.
+ */
+const BODIES = {
+  civilian: { halfW: 11, top: 38, bottom: 7 },
+  infantry: { halfW: 13, top: 42, bottom: 7 },
+  archer: { halfW: 13, top: 40, bottom: 7 },
+  cavalry: { halfW: 17, top: 52, bottom: 8 },
+  siege: { halfW: 19, top: 38, bottom: 9 },
+};
+
+/** Silueta de una unidad en píxeles de mundo, ya con su tamaño real. */
+export function unitBody(type) {
+  const b = BODIES[UNITS[type] && UNITS[type].class] || BODIES.civilian;
+  const s = unitDrawScale(type) * (look('unit', type).scale || 1);
+  return { halfW: b.halfW * s, top: b.top * s, bottom: b.bottom * s };
+}
+
+/*
+ * Cuánto sube el dibujo de cada recurso por encima de su casilla, en píxeles.
+ * Un árbol tapa media pantalla por encima de donde tiene el tronco, y quien
+ * toca su copa está señalando el árbol.
+ */
+const NODE_TOP = { tree: 70, stump: 16, gold: 30, stone: 28, berries: 32, sheep: 26, deer: 34 };
+
+export function nodeTopHeight(kind) {
+  const l = look('node', kind === 'stump' ? 'tree' : kind);
+  return (NODE_TOP[kind] || 30) * (l.scale || 1);
 }
 
 // --- Sprites de edificios ---------------------------------------------------
@@ -3137,6 +3189,11 @@ function buildingGeom(type) {
     ox: size * HW + pad,
     oy: pad + topH,
   };
+}
+
+/** Cuánto sube el dibujo de un edificio por encima de su anclaje, en píxeles. */
+export function buildingTopHeight(type) {
+  return BUILDINGS[type] ? buildingGeom(type).topH : 52;
 }
 
 /** stage: 0 cimientos, 1 a medio construir, 2 terminado. */

@@ -4,11 +4,26 @@ import { TILE_W, TILE_H, UNITS, BUILDINGS, PLAYER_COLORS } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, HW, HH,
   drawSprite, paintUnit, paintBuilding, paintResource, setSpriteQuality, drawTerrainSprite,
+  unitDrawScale, unitBody, buildingTopHeight, nodeTopHeight,
 } from './sprites.js';
 import { LOOK } from './data/appearance.js';
-import { clamp, dist } from './utils.js';
+import { clamp } from './utils.js';
 
 const Z_PX = 18; // píxeles de altura por unidad de "z" en el mundo
+/*
+ * Holgura en píxeles de pantalla con la que se admite un toque que no ha caído
+ * justo encima de una unidad. Sólo entra cuando no hay nada exacto bajo el
+ * dedo, así que nunca le roba el toque a lo que sí se ha señalado.
+ */
+const TOUCH_SLOP = 12;
+/*
+ * Lo más alto que puede llegar un muñeco sobre sus pies, contando el tamaño
+ * máximo que admite el catálogo. Marca hasta dónde hay que buscar unidades
+ * alrededor del punto tocado.
+ */
+const MAX_UNIT_TOP = 60;
+// Silueta de un animal del rebaño: media anchura y lo que sobresale por debajo.
+const ANIMAL_HALF_W = 15, ANIMAL_BOTTOM = 5;
 /*
  * Tope de rombos que se copian uno a uno por fotograma antes de tirar del lienzo
  * horneado del mapa entero. Medido sobre el propio juego: hasta ~1000 rombos
@@ -104,9 +119,15 @@ export class Renderer {
     return [(mx - this.cam.x) * this.cam.zoom + this.w / 2, (my - this.cam.y) * this.cam.zoom + this.h / 2];
   }
 
+  screenToCanvas(sx, sy) {
+    return [
+      (sx - this.w / 2) / this.cam.zoom + this.cam.x,
+      (sy - this.h / 2) / this.cam.zoom + this.cam.y,
+    ];
+  }
+
   screenToWorld(sx, sy) {
-    const mx = (sx - this.w / 2) / this.cam.zoom + this.cam.x;
-    const my = (sy - this.h / 2) / this.cam.zoom + this.cam.y;
+    const [mx, my] = this.screenToCanvas(sx, sy);
     return this.canvasToWorld(mx, my);
   }
 
@@ -252,9 +273,11 @@ export class Renderer {
       const col = PLAYER_COLORS[g.players[owner].colorIdx].light;
       ctx.strokeStyle = col; ctx.lineWidth = 2;
       if (e.kind === 'unit') {
+        // El cerco abraza los pies del muñeco, así que sigue su mismo tamaño.
         const [mx, my] = this.worldToCanvas(e.x, e.y);
+        const r = (e.radius / 0.3) * unitDrawScale(e.type);
         ctx.beginPath();
-        ctx.ellipse(mx, my, 13 * (e.radius / 0.3), 6.5 * (e.radius / 0.3), 0, 0, Math.PI * 2);
+        ctx.ellipse(mx, my, 13 * r, 6.5 * r, 0, 0, Math.PI * 2);
         ctx.stroke();
       } else if (e.kind !== 'building') {
         // Animal del rebaño: lleva el mismo cerco que una unidad.
@@ -436,19 +459,21 @@ export class Renderer {
       ? (u.attackAnim > 0.25 ? 4 : 5)
       : (u.moving ? (Math.floor(u.anim) % 4) : 0);
     const colorIdx = g.players[u.owner].colorIdx;
+    const s = unitDrawScale(u.type);
     const [mx, my] = this.worldToCanvas(u.x, u.y);
-    if (this.sharp) paintUnit(ctx, mx, my, u.type, colorIdx, u.dir, frame, u.back);
-    else drawSprite(ctx, unitSprite(u.type, colorIdx, u.dir, frame, u.back), mx, my);
+    if (this.sharp) paintUnit(ctx, mx, my, u.type, colorIdx, u.dir, frame, u.back, s);
+    else drawSprite(ctx, unitSprite(u.type, colorIdx, u.dir, frame, u.back), mx, my, s);
 
     if (u.carry > 0.5 && u.carryRes) {
       const col = { food: '#d24a3a', wood: '#8a6234', gold: '#e0b52c', stone: '#b6b6b0' }[u.carryRes];
       ctx.fillStyle = col;
-      ctx.fillRect(mx + (u.dir > 0 ? -13 : 8), my - 34, 6, 5);
+      ctx.fillRect(mx + (u.dir > 0 ? -13 : 8) * s, my - 34 * s, 6 * s, 5 * s);
     }
     // La vida se ve siempre que la unidad esté herida, sea de quien sea: en una
-    // batalla hay que poder saber a qué enemigo le queda menos.
+    // batalla hay que poder saber a qué enemigo le queda menos. Va justo encima
+    // de la cabeza, que no está a la misma altura en un peón que en un jinete.
     if (u.hp < u.maxHp - 0.5 || this.showHealthFor(u)) {
-      this.healthBar(ctx, mx, my - 44, 22, u.hp / u.maxHp, u.owner);
+      this.healthBar(ctx, mx, my - unitBody(u.type).top - 8, 22 * s, u.hp / u.maxHp, u.owner);
     }
   }
 
@@ -662,39 +687,104 @@ export class Renderer {
 
   // --- Selección por pantalla ----------------------------------------------
 
+  /**
+   * Qué hay debajo de un punto de la pantalla. Todo lo que se dibuja —el
+   * muñeco, la copa del árbol, el tejado de la casa— está por encima del suelo
+   * que ocupa, así que el punto del mundo que cae bajo el dedo no es el de la
+   * cosa que se está viendo: se señala con lo que se ve, no con lo que se pisa.
+   *
+   * Primero se mira lo que está justo bajo el dedo y sólo al final se admite,
+   * para las unidades, lo que pasa cerca: así un toque preciso nunca se lo
+   * lleva el vecino, y uno impreciso tampoco se pierde.
+   */
   entityAtScreen(sx, sy) {
-    const g = this.game;
+    return this.unitAtScreen(sx, sy, 0)
+      || this.animalAtScreen(sx, sy, 0)
+      || this.groundAtScreen(sx, sy)
+      || this.unitAtScreen(sx, sy, TOUCH_SLOP)
+      || this.animalAtScreen(sx, sy, TOUCH_SLOP);
+  }
+
+  /**
+   * Unidad cuyo dibujo cubre el punto de la pantalla: tocarle la cabeza vale
+   * igual que tocarle los pies. `slop` ensancha la silueta en píxeles de
+   * pantalla, para el dedo. Sin holgura gana la que se pinta delante —la que se
+   * está viendo—; con holgura, la más cercana al toque.
+   */
+  unitAtScreen(sx, sy, slop) {
+    const g = this.game, z = this.cam.zoom;
     const [u, v] = this.screenToWorld(sx, sy);
-    let best = null, bestD = Infinity;
-    for (const un of g.unitsNear(u, v, 1.2)) {
+    /*
+     * La unidad tocada puede quedar varias casillas por delante del punto del
+     * mundo que hay bajo el dedo: subir D píxeles de lienzo mueve ese punto
+     * D/(2·HH) casillas en cada eje. Se recogen las candidatas de ese radio y
+     * se filtran una a una contra su silueta.
+     */
+    const reach = ((MAX_UNIT_TOP + slop / z) / (2 * HH)) * Math.SQRT2 + 0.5;
+    let best = null, bestScore = Infinity;
+    for (const un of g.unitsNear(u, v, reach)) {
+      if (un.dead) continue;
       if (un.owner !== g.human.id && !g.isVisible(un.x | 0, un.y | 0)) continue;
-      // Comprobación en pantalla: el "cuerpo" está por encima del punto del suelo.
+      const body = unitBody(un.type);
       const [mx, my] = this.worldToScreen(un.x, un.y);
-      const dx = Math.abs(mx - sx), dy = my - sy;
-      if (dx < 14 * this.cam.zoom && dy > -8 * this.cam.zoom && dy < 42 * this.cam.zoom) {
-        const d = dx + Math.abs(dy - 18);
-        if (d < bestD) { bestD = d; best = un; }
-      }
+      const dx = sx - mx, dy = my - sy; // dy > 0: por encima de los pies
+      if (Math.abs(dx) > body.halfW * z + slop) continue;
+      if (dy > body.top * z + slop || dy < -(body.bottom * z + slop)) continue;
+      const score = slop ? Math.hypot(dx, dy - (body.top * z) / 2) : -(un.x + un.y);
+      if (score < bestScore) { bestScore = score; best = un; }
     }
-    if (best) return best;
-    // Los animales del rebaño andan por el mapa, así que su casilla no basta:
-    // se busca al más cercano al punto tocado.
-    let animal = null, animalD = 0.75;
+    return best;
+  }
+
+  /**
+   * Animal del rebaño bajo el punto de la pantalla. Andan sueltos por el mapa,
+   * así que se comprueban igual que las unidades y no por la casilla que pisan.
+   */
+  animalAtScreen(sx, sy, slop) {
+    const g = this.game, z = this.cam.zoom;
+    let best = null, bestD = Infinity;
     for (const n of g.herds) {
       if (!n.alive) continue;
       if (n.owner !== g.human.id && !g.isVisible(n.x, n.y)) continue;
-      const d = dist(u, v, n.fx, n.fy);
-      if (d < animalD) { animalD = d; animal = n; }
+      const s = (LOOK.node[n.kind] && LOOK.node[n.kind].scale) || 1;
+      const top = nodeTopHeight(n.kind);
+      const [mx, my] = this.worldToScreen(n.fx, n.fy);
+      const dx = sx - mx, dy = my - sy;
+      if (Math.abs(dx) > ANIMAL_HALF_W * s * z + slop) continue;
+      if (dy > top * z + slop || dy < -(ANIMAL_BOTTOM * s * z + slop)) continue;
+      const d = Math.hypot(dx, dy - (top * z) / 2);
+      if (d < bestD) { bestD = d; best = n; }
     }
-    if (animal) return animal;
-    const tx = Math.floor(u), ty = Math.floor(v);
-    const id = g.map.inBounds(tx, ty) ? g.map.occupied[g.map.idx(tx, ty)] : 0;
-    if (id) {
-      const b = g.byId.get(id);
-      if (b && (b.owner === g.human.id || g.isExplored(tx, ty))) return b;
+    return best;
+  }
+
+  /**
+   * Edificio o recurso señalado. Los dos son altos y tapan el suelo que tienen
+   * detrás: al tocar el tejado de una casa o la copa de un árbol, el punto del
+   * mundo cae varias casillas más allá. Así que se baja por la pantalla desde
+   * el punto tocado y gana la primera huella cuyo dibujo llegue hasta el dedo.
+   */
+  groundAtScreen(sx, sy) {
+    const g = this.game;
+    const [u, v] = this.screenToWorld(sx, sy);
+    const cy = this.screenToCanvas(sx, sy)[1];
+    // 0,25 casillas por paso son 8 píxeles de lienzo hacia abajo; dieciséis
+    // pasos cubren de sobra lo que levanta el edificio más alto, el castillo.
+    for (let k = 0; k <= 16; k++) {
+      const t = k * 0.25;
+      const tx = Math.floor(u + t), ty = Math.floor(v + t);
+      if (!g.map.inBounds(tx, ty)) break;
+      const id = g.map.occupied[g.map.idx(tx, ty)];
+      const b = id ? g.byId.get(id) : null;
+      if (b && !b.dead && (b.owner === g.human.id || g.isExplored(tx, ty))) {
+        if (cy >= this.worldToCanvas(b.tx, b.ty)[1] - buildingTopHeight(b.type)) return b;
+      }
+      const n = g.map.nodeAtTile(tx, ty);
+      // Los animales ya se han mirado por su silueta, que es la que vale.
+      if (n && n.alive && !n.herd && g.isExplored(tx, ty)) {
+        if (cy >= this.worldToCanvas(n.fx, n.fy)[1] - nodeTopHeight(n.kind)) return n;
+      }
     }
-    const node = g.map.nodeAtTile(tx, ty);
-    if (node && g.isExplored(tx, ty)) return node;
     return null;
   }
 
@@ -720,7 +810,8 @@ export class Renderer {
     for (const u of g.units) {
       if (u.owner !== ownerId) continue;
       const [mx, my] = this.worldToScreen(u.x, u.y);
-      const cy = my - 16 * this.cam.zoom;
+      // El rectángulo atrapa a la unidad por la mitad del cuerpo, no por los pies.
+      const cy = my - unitBody(u.type).top * 0.45 * this.cam.zoom;
       if (mx >= minX && mx <= maxX && cy >= minY && cy <= maxY) out.push(u);
     }
     return out;

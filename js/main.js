@@ -49,7 +49,9 @@ function startGame(opts, net = null) {
       el('app').classList.remove('hidden');
       renderer = new Renderer(el('game'), game);
       ui = new UI(game, renderer, audio);
-      window.game = game; // útil para depurar desde la consola
+      // Útiles para depurar desde la consola.
+      window.game = game;
+      window.renderer = renderer;
 
       const start = game.map.starts[game.human.id] || game.map.starts[0];
       renderer.centerOn(start.x + 1, start.y + 1);
