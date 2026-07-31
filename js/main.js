@@ -34,12 +34,13 @@ function startGame(opts, net = null) {
     try {
       game = new Game(opts);
       if (net) {
-        const session = new NetSession(net.peer, net.role, game);
-        // Si se cae la conexión no hay ni ganador ni perdedor: se avisa y se
-        // cierra la partida, que sin el otro jugador no puede seguir.
+        const session = new NetSession(game, net.role, net.links);
+        // Si el invitado pierde al anfitrión no hay ni ganador ni perdedor: la
+        // partida no puede seguir sin quien la simula. Al anfitrión no le pasa:
+        // cuando se cae alguien, los demás continúan.
         session.onLost = () => {
           if (game.over) return;
-          ui.notify('Se ha perdido la conexión con el otro jugador.', 'bad');
+          ui.notify('Se ha perdido la conexión con el anfitrión.', 'bad');
           game.endGame(false, 'disconnect');
         };
       } else {
@@ -56,7 +57,11 @@ function startGame(opts, net = null) {
       ui.refreshSelection();
       if (net) {
         document.getElementById('btn-speed').classList.add('hidden');
-        ui.notify(`Partida contra ${game.players[net.role === 'host' ? 1 : 0].name}. ¡Suerte!`, 'good');
+        const rivals = game.players.filter((p) => p !== game.human && !p.defeated);
+        const quienes = rivals.length === 1
+          ? `contra ${rivals[0].name}`
+          : `de ${rivals.length + 1} jugadores`;
+        ui.notify(`Partida ${quienes}. ¡Suerte!`, 'good');
       } else {
         ui.notify('Reúne recursos, avanza de edad y derrota a tus rivales.', 'good');
       }
@@ -70,20 +75,21 @@ function startGame(opts, net = null) {
   }, 30));
 }
 
-// Multijugador: la sala entrega la conexión ya hecha y aquí sólo se arranca.
-const lobbyUi = new LobbyUI(({ peer, role, seed, mapSize, names, overrides }) => {
+// Multijugador: la sala entrega las conexiones ya hechas y aquí sólo se arranca.
+const lobbyUi = new LobbyUI((s) => {
   audio.ensure();
-  // En multijugador mandan los valores del anfitrión: si el invitado tiene
+  // En multijugador mandan los valores del anfitrión: si un invitado tiene
   // otros, se adoptan los del anfitrión mientras dure la partida.
-  if (role === 'guest' && overrides) adoptOverrides(overrides);
+  if (s.role === 'guest' && s.overrides) adoptOverrides(s.overrides);
   startGame({
-    opponents: 1,
+    playerCount: s.playerCount,
     difficulty: 'normal',
-    mapSize,
-    seed,
-    localPlayer: role === 'host' ? 0 : 1,
-    playerNames: names,
-  }, { peer, role });
+    mapSize: s.mapSize,
+    seed: s.seed,
+    localPlayer: s.localPlayer,
+    playerNames: s.names,
+    absent: s.absent,
+  }, { role: s.role, links: s.links });
 });
 
 let last = 0;

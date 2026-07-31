@@ -1,8 +1,10 @@
 // Lógica de la sala de espera, independiente de dónde se ejecute.
 //
-// Sólo sirve para que dos jugadores se encuentren y se pasen los datos de
+// Sólo sirve para que los jugadores se encuentren y se pasen los datos de
 // conexión: en cuanto la partida arranca, todo el tráfico va directo entre los
-// dos navegadores por WebRTC y este servicio deja de intervenir.
+// navegadores por WebRTC y este servicio deja de intervenir. El anfitrión puede
+// tener varias invitaciones abiertas a la vez, una por cada jugador al que
+// quiera meter en su partida (hasta ocho en total).
 //
 // El almacén se recibe por parámetro (Netlify Blobs en producción, un Map en
 // desarrollo). Cada clave tiene un único escritor, así que no hacen falta
@@ -13,7 +15,9 @@
 //   s/{destino}/{id}  mensaje de conexión, lo escribe el emisor y lo borra el receptor
 
 export const PLAYER_TTL = 12000;   // sin señales de vida, el jugador desaparece
-export const INVITE_TTL = 45000;
+// El anfitrión puede tardar en reunir a los ocho jugadores, así que una
+// invitación aguanta un buen rato antes de darse por caducada.
+export const INVITE_TTL = 180000;
 export const SIGNAL_TTL = 60000;
 const MAX_NAME = 20;
 const MAX_SIGNAL = 16000;          // una oferta o respuesta SDP ronda 1 KB
@@ -98,6 +102,7 @@ export async function handle(store, body, now = Date.now()) {
       if (!to || to === id) return fail(400, 'destinatario no válido');
       const target = await store.get(`p/${to}`);
       if (!target || now - target.lastSeen > PLAYER_TTL) return fail(404, 'ese jugador ya no está conectado');
+      if (target.busy) return fail(409, 'ese jugador ya está en otra partida');
       const inviteId = `${id}~${to}~${rnd(6)}`;
       await store.set(`i/${inviteId}`, {
         inviteId, from: id, fromName: me.name, to, toName: target.name, at: now,

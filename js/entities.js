@@ -586,7 +586,7 @@ export class Unit {
     }
     // Contraataque si estaba ocioso.
     if (!this.task && this.isMilitary && from) this.task = { type: 'attack', target: from };
-    else if (!this.task && !this.isMilitary && from && g.players[this.owner].isHuman === false) {
+    else if (!this.task && !this.isMilitary && from && g.isAi(this.owner)) {
       this.task = { type: 'attack', target: from };
     }
   }

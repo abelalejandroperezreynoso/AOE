@@ -1,9 +1,9 @@
-// Cliente de la sala de espera y establecimiento de la conexión entre los dos
-// jugadores.
+// Cliente de la sala de espera y establecimiento de las conexiones entre los
+// jugadores (hasta ocho por partida).
 //
 // El sondeo al servidor sólo ocurre mientras se está en la sala: en cuanto la
 // partida arranca se detiene, porque a partir de ahí todo va directo de un
-// navegador al otro.
+// navegador a otro.
 
 const ENDPOINT = '/api/lobby';
 const POLL_MS = 2000;
@@ -93,9 +93,12 @@ export class Lobby extends EventTarget {
 }
 
 /**
- * Conexión directa entre los dos navegadores. Se espera a reunir todos los
+ * Conexión directa entre dos navegadores. Se espera a reunir todos los
  * candidatos antes de enviar la oferta o la respuesta: así basta con dos
  * mensajes a través de la sala y no hay que ir mandándolos de uno en uno.
+ *
+ * El anfitrión abre una de estas por cada invitado; el invitado sólo abre la
+ * suya con el anfitrión.
  */
 export class Peer extends EventTarget {
   constructor() {
@@ -103,6 +106,11 @@ export class Peer extends EventTarget {
     this.pc = new RTCPeerConnection({ iceServers: ICE });
     this.channel = null;
     this.closed = false;
+    // Lo que llegue antes de que la partida esté montada se guarda y se
+    // entrega al arrancar: si no, se perderían las primeras órdenes o
+    // instantáneas mientras se genera el mundo.
+    this.hold = true;
+    this.held = [];
     this.pc.onconnectionstatechange = () => {
       const s = this.pc.connectionState;
       if (s === 'failed' || s === 'disconnected' || s === 'closed') this.emit('lost', s);
@@ -119,7 +127,21 @@ export class Peer extends EventTarget {
     channel.binaryType = 'arraybuffer';
     channel.onopen = () => this.emit('open');
     channel.onclose = () => this.emit('lost', 'canal cerrado');
-    channel.onmessage = (e) => this.emit('message', e.data);
+    channel.onmessage = (e) => {
+      // 'raw' llega siempre: la sala lo usa para oír la señal de arranque.
+      this.emit('raw', e.data);
+      if (!this.hold) { this.emit('message', e.data); return; }
+      this.held.push(e.data);
+      if (this.held.length > 80) this.held.shift();
+    };
+  }
+
+  /** La partida ya está montada: se entrega lo retenido y se deja de retener. */
+  release() {
+    this.hold = false;
+    const queued = this.held;
+    this.held = [];
+    for (const data of queued) this.emit('message', data);
   }
 
   /**

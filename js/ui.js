@@ -127,6 +127,11 @@ export class UI {
     };
     document.getElementById('btn-restart').onclick = () => location.reload();
     document.getElementById('btn-restart2').onclick = () => location.reload();
+    // El anfitrión eliminado puede quedarse mirando: su equipo sigue llevando
+    // la partida de los demás.
+    document.getElementById('btn-end-watch').onclick = () => {
+      this.el.endScreen.classList.add('hidden');
+    };
     const vol = document.getElementById('volume');
     vol.oninput = () => this.audio.setVolume(parseFloat(vol.value));
     this.setupFullscreen();
@@ -1382,10 +1387,16 @@ export class UI {
     title.textContent = cortada ? 'Partida interrumpida' : (won ? '¡Victoria!' : 'Derrota');
     title.className = cortada ? '' : (won ? 'win' : 'lose');
     const intro = cortada
-      ? 'Se ha perdido la conexión con el otro jugador, así que la partida no puede continuar.'
+      ? 'Se ha perdido la conexión con el anfitrión, así que la partida no puede continuar.'
       : (won ? 'Has conquistado a todos tus rivales.' : 'Tu civilización ha caído.');
+    // Si es el anfitrión quien cae, los demás siguen jugando en su equipo: se
+    // avisa de que salir ahora les cortaría la partida.
+    const sigue = g.keepsSimulating;
+    document.getElementById('btn-end-watch').classList.toggle('hidden', !sigue);
     document.getElementById('end-body').innerHTML = `
       <p>${intro}</p>
+      ${sigue ? '<p class="end-warn">Los demás siguen jugando desde tu equipo: si sales ahora, '
+        + 'la partida se les cortará. Puedes quedarte mirando hasta que termine.</p>' : ''}
       <table class="stats">
         <tr><td>Duración</td><td>${fmtTime(g.time)}</td></tr>
         <tr><td>Edad alcanzada</td><td>${AGES[g.human.age].name}</td></tr>
