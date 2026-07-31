@@ -183,9 +183,6 @@
       <!-- Los aldeanos en reposo son un dato más de la economía, así que se
            muestran con la misma ficha que los recursos, pero se pueden pulsar. -->
       <button id="idle-villager" class="res idle" title="Aldeanos en reposo [.]" aria-label="Aldeanos en reposo"><i class="dot idle"></i><span id="idle-count">0</span></button>
-      <!-- Qué hay seleccionado ahora mismo. Sólo aparece cuando hay algo, y al
-           pulsarlo se suelta la selección. -->
-      <button id="selection-chip" class="res hidden" title="Nada seleccionado" aria-label="Selección actual"><img id="selection-icon" alt=""><span id="selection-count">0</span></button>
     </div>
     <div class="right-group">
       <button id="btn-menu" class="tbtn" title="Menú [Esc]" aria-label="Menú">☰</button>
@@ -199,7 +196,8 @@
 
   <div id="bottombar">
     <div id="selection-panel">
-      <div id="sel-info"></div>
+      <!-- Pulsarlo suelta la selección. -->
+      <div id="sel-info" title="Pulsa para soltar la selección"></div>
       <div id="sel-list"></div>
       <div id="queue"></div>
     </div>
@@ -231,7 +229,7 @@
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
       <tr><td>Construir con el dedo</td><td>Única forma con el dedo: tira del edificio hacia arriba para sacarlo de la barra y suéltalo en el punto del mapa. Si lo sueltas sobre la barra no se coloca nada, y tocar el botón no deja nada preparado. Deslizando de lado se recorre la barra de órdenes</td></tr>
       <tr><td>Ovejas</td><td>Se unen al bando que tenga unidades cerca. Con aldeanos seleccionados, pulsarlas los manda a por comida; sin aldeanos, se seleccionan y se pastorean con el clic derecho</td></tr>
-      <tr><td>Ficha de la selección</td><td>Arriba, junto a los recursos: dice qué tienes seleccionado y lo suelta al pulsarla</td></tr>
+      <tr><td>Ficha de la selección</td><td>Abajo a la izquierda: dice qué tienes seleccionado y lo suelta al pulsarla</td></tr>
       <tr><td>Tira de producción</td><td>Arriba a la izquierda: lo que fabrica cada edificio. Clic para ir a él</td></tr>
     </table>
     <h2>Consejos</h2>
