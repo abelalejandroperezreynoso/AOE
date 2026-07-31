@@ -2621,12 +2621,12 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       // torre, que es donde se ven sin tapar la piedra.
       const caM = L.accent || '#ebe4c8';
       const cen = iso(x, y, 1.06, 1);
-      const cx = cen[0], cy = cen[1], th = 38, rb = 15, rt = 11.5;
+      const cx = cen[0], cy = cen[1], th = 54, rb = 18, rt = 13.5;
       // --- Anejo de piedra, con su tejado de teja y la escalera ---
       const an = iso(x, y, 0.04, 0.94);
-      isoPrism(ctx, an[0], an[1], 0.6, 0.68, 15, stoneL, stoneD, stone);
-      stoneTexture(ctx, an[0], an[1], 0.6, 0.68, 15);
-      roofOn(ctx, an[0], an[1], 0.6, 0.68, 15, 8, roofD, roofM, roofL, 'tile');
+      isoPrism(ctx, an[0], an[1], 0.62, 0.7, 19, stoneL, stoneD, stone);
+      stoneTexture(ctx, an[0], an[1], 0.62, 0.7, 19);
+      roofOn(ctx, an[0], an[1], 0.62, 0.7, 19, 9, roofD, roofM, roofL, 'tile');
       outerStairs(ctx, x, y, 0.12, 1.58, 3, stoneD, shade(stoneD, -0.18), stone, false);
       // --- Emparrado, a la derecha ---
       // Emparrado: cuatro pies, dos carreras y la parra por encima.
@@ -2657,7 +2657,7 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       }
       // --- Torre ---
       roundTower(ctx, cx, cy, rb, rt, th, wallL, wall, wallD);
-      coneRoof(ctx, cx, cy - th, rt + 2.6, 17, roofL, roofM, roofD);
+      coneRoof(ctx, cx, cy - th, rt + 3.5, 23, roofL, roofM, roofD);
       // Franja del jugador al pie, siguiendo la curva.
       ctx.save();
       ctx.beginPath();
@@ -2671,20 +2671,20 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       // Portalón de medio punto, con su rosca de ladrillo.
       ctx.fillStyle = shade(L.door || '#3b2a17', -0.2);
       ctx.beginPath();
-      ctx.moveTo(cx + 3, cy - 1); ctx.lineTo(cx + 3, cy - 10);
-      ctx.quadraticCurveTo(cx + 8, cy - 15, cx + 13, cy - 10);
-      ctx.lineTo(cx + 13, cy - 1); ctx.closePath(); ctx.fill();
+      ctx.moveTo(cx + 4, cy - 1); ctx.lineTo(cx + 4, cy - 11);
+      ctx.quadraticCurveTo(cx + 9.5, cy - 17, cx + 15, cy - 11);
+      ctx.lineTo(cx + 15, cy - 1); ctx.closePath(); ctx.fill();
       ctx.strokeStyle = shade(roofM, -0.1); ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.moveTo(cx + 2, cy - 1); ctx.lineTo(cx + 2, cy - 10);
-      ctx.quadraticCurveTo(cx + 8, cy - 16, cx + 14, cy - 10);
-      ctx.lineTo(cx + 14, cy - 1); ctx.stroke();
+      ctx.moveTo(cx + 3, cy - 1); ctx.lineTo(cx + 3, cy - 11);
+      ctx.quadraticCurveTo(cx + 9.5, cy - 18, cx + 16, cy - 11);
+      ctx.lineTo(cx + 16, cy - 1); ctx.stroke();
       // --- Aspas ---
       // Van clavadas en el árbol que asoma por la cara de delante, y pasan
       // por encima de la torre y del capirote.
-      const hub = [cx - 5, cy - th * 0.62];
+      const hub = [cx - 5, cy - th * 0.66];
       for (let i = 0; i < 4; i++) {
-        windSail(ctx, hub[0], hub[1], 0.46 + i * Math.PI / 2, 30, 8.4, wood, caM);
+        windSail(ctx, hub[0], hub[1], 0.46 + i * Math.PI / 2, 36, 9.6, wood, caM);
       }
       ctx.fillStyle = woodD;
       ctx.beginPath(); ctx.arc(hub[0], hub[1], 3.4, 0, Math.PI * 2); ctx.fill();
@@ -2692,7 +2692,7 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       ctx.beginPath(); ctx.arc(hub[0] - 0.8, hub[1] - 0.8, 1.4, 0, Math.PI * 2); ctx.fill();
       // Escudo del jugador. Va después de las aspas: si no, la lona lo tapa
       // justo cuando hace falta saber de quién es el molino.
-      const sh = [cx - 6, cy - 13];
+      const sh = [cx - 7, cy - 16];
       ctx.fillStyle = '#e8e2d2';
       ctx.beginPath();
       ctx.moveTo(sh[0] - 4.4, sh[1] - 5); ctx.lineTo(sh[0] + 4.4, sh[1] - 5);
@@ -2723,7 +2723,7 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
         ctx.fillStyle = stoneD;
         ctx.beginPath(); ctx.ellipse(p[0], p[1], r, r * 0.44, 0, 0, Math.PI); ctx.fill();
       }
-      for (const [u, v, sc] of [[0.66, 1.62, 0.9], [1.72, 1.42, 0.8], [0.42, 0.3, 0.75]]) {
+      for (const [u, v, sc] of [[0.66, 1.68, 0.9], [1.78, 1.46, 0.8], [0.3, 1.9, 0.75]]) {
         const p = iso(x, y, u, v);
         fern(ctx, p[0], p[1], sc, green);
       }
@@ -3103,7 +3103,10 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
 function buildingGeom(type) {
   const size = BUILDINGS[type].size;
   const pad = 14;
-  const topH = type === 'castle' ? 96 : type === 'tower' ? 62 : type === 'towncenter' ? 74 : 52;
+  // Hueco por encima del anclaje: lo marca la pieza más alta de cada
+  // edificio (las aspas del molino, la torre del homenaje del castillo...).
+  const topH = type === 'castle' ? 96 : type === 'towncenter' ? 74
+    : type === 'mill' ? 70 : type === 'tower' ? 62 : 52;
   return {
     size, pad, topH,
     w: size * TILE_W + pad * 2,
