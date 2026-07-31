@@ -2017,6 +2017,65 @@ function gableTimbers(ctx, a, b, apex, wood, woodD, style = 'plain') {
   }
 }
 
+/**
+ * Cesto de mimbre lastrado: la peana que sujeta el poste de la grúa del
+ * campamento maderero. Va tejido, de ahí las costillas y los aros.
+ */
+function wickerBase(ctx, cx, cy, r, h, wL, wM, wD) {
+  const top = r * 0.34;
+  poly(ctx, [[cx - r, cy], [cx - top, cy - h], [cx + top, cy - h], [cx + r, cy]], wM);
+  ctx.fillStyle = wM;
+  ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.4, 0, 0, Math.PI); ctx.fill();
+  // La mitad de sotavento, en sombra.
+  poly(ctx, [[cx + top * 0.2, cy - h], [cx + top, cy - h], [cx + r, cy],
+    [cx + r * 0.3, cy + r * 0.36]], shade(wM, -0.14));
+  ctx.fillStyle = wL;
+  ctx.beginPath(); ctx.ellipse(cx, cy - h, top, top * 0.44, 0, 0, Math.PI * 2); ctx.fill();
+  // Costillas del tejido, de la boca al asiento.
+  ctx.strokeStyle = wD; ctx.lineWidth = 0.8; ctx.lineCap = 'butt';
+  for (let i = -3; i <= 3; i++) {
+    const t = i / 3;
+    ctx.beginPath();
+    ctx.moveTo(cx + top * t, cy - h);
+    ctx.lineTo(cx + r * t, cy + Math.cos(t * 1.5) * r * 0.36);
+    ctx.stroke();
+  }
+  // Aros de mimbre.
+  for (const k of [0.34, 0.66, 0.92]) {
+    const rr = top + (r - top) * k;
+    ctx.strokeStyle = k > 0.6 ? shade(wD, 0.1) : wD;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - h * (1 - k), rr, rr * 0.4, 0, 0.15, Math.PI - 0.15);
+    ctx.stroke();
+  }
+}
+
+/** Borriquete: dos patas en aspa y su barrote, para aserrar encima. */
+function sawHorse(ctx, cx, cy, sc, wood, woodD) {
+  ctx.strokeStyle = woodD; ctx.lineWidth = 2 * sc; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - 6 * sc, cy); ctx.lineTo(cx + 4 * sc, cy - 13 * sc);
+  ctx.moveTo(cx + 6 * sc, cy); ctx.lineTo(cx - 4 * sc, cy - 13 * sc);
+  ctx.stroke();
+  ctx.strokeStyle = wood; ctx.lineWidth = 2.4 * sc;
+  ctx.beginPath();
+  ctx.moveTo(cx - 5 * sc, cy - 11 * sc); ctx.lineTo(cx + 5 * sc, cy - 11 * sc);
+  ctx.stroke();
+}
+
+/** Tronco tumbado, con su testa y sus anillos. */
+function log(ctx, cx, cy, len, r, tone) {
+  ctx.fillStyle = tone;
+  ctx.fillRect(cx - len / 2, cy - r, len, r * 2);
+  ctx.beginPath(); ctx.ellipse(cx + len / 2, cy, r * 0.55, r, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = shade(tone, -0.14);
+  ctx.fillRect(cx - len / 2, cy + r * 0.3, len, r * 0.7);
+  ctx.fillStyle = shade(tone, 0.24);
+  ctx.beginPath(); ctx.ellipse(cx - len / 2, cy, r * 0.55, r, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = shade(tone, -0.3); ctx.lineWidth = 0.7;
+  ctx.beginPath(); ctx.ellipse(cx - len / 2, cy, r * 0.26, r * 0.48, 0, 0, Math.PI * 2); ctx.stroke();
+}
+
 /** Leña apilada: troncos cortos con la testa a la vista. */
 function logPile(ctx, cx, cy, wood, woodL, woodD, sc = 1) {
   for (const [i, k] of [[0, 0], [1, 0], [2, 0], [0, 1], [1, 1]]) {
@@ -2237,7 +2296,7 @@ function battlements(ctx, x, y, w, d, h, top, left, right) {
  * el bando civil y el militar se distinguen de lejos.
  */
 const ROOFING = {
-  house: 'shingle', mill: 'thatch', lumbercamp: 'thatch', miningcamp: 'thatch',
+  house: 'shingle', mill: 'thatch', miningcamp: 'thatch',
 };
 
 function drawBuilding(ctx, type, colorIdx, x, y) {
@@ -2484,38 +2543,169 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       }
       break;
     }
-    case 'lumbercamp': case 'miningcamp': {
+    case 'lumbercamp': {
+      // No es un cobertizo: es un tajo de aserrar al raso. Manda la grúa de
+      // pértiga --el poste sobre su cesto de mimbre lastrado, con el
+      // contrapeso de piedras a un lado y el gancho al otro-- y alrededor se
+      // reparten el banco de aserrar, la pila de troncos, la tablazón y el
+      // carro. Los colores del jugador van en los anillos del poste y en el
+      // fardo, que es donde se ven sin ensuciar la madera.
+      const [soilL, soilM, soilD] = ramp(L.soil || '#a8926a');
+      const [wkL, wkM, wkD] = ramp(L.wicker || '#b08a52');
+      const bark = L.accent || '#8f6a3c';
+      // Suelo pisado y lleno de virutas.
+      const patch = (k) => [
+        [0.5, k], [s - 0.5, k], [s - k, 0.5], [s - k, s - 0.5],
+        [s - 0.5, s - k], [0.5, s - k], [k, s - 0.5], [k, 0.5],
+      ].map(([u, v]) => iso(x, y, u, v));
+      poly(ctx, patch(0.04), soilD);
+      poly(ctx, patch(0.2), soilM);
+      for (const [u, v, a] of [[1.2, 1.2, 0.4], [0.7, 1.5, 1.9], [1.55, 0.9, 0.8],
+        [1.0, 0.55, 2.4], [1.45, 1.5, 1.2], [0.55, 0.95, 0.3]]) {
+        const p = iso(x, y, u, v);
+        ctx.save();
+        ctx.translate(p[0], p[1]); ctx.rotate(a);
+        ctx.fillStyle = soilL;
+        ctx.fillRect(-3, -0.7, 6, 1.4);
+        ctx.restore();
+      }
+      // --- Carro de arrastre y el fardo del jugador ---
+      // Carro de troncos: un bastidor de varas tumbado y su rueda.
+      const cart = iso(x, y, 0.22, 0.66);
+      ctx.save();
+      ctx.translate(cart[0], cart[1] - 4);
+      ctx.rotate(0.46);
+      ctx.fillStyle = wood;
+      ctx.fillRect(-14, -6, 28, 2.2);
+      ctx.fillRect(-14, 1.4, 28, 2.2);
+      ctx.fillStyle = woodD;
+      for (const dx of [-11, -4, 3, 10]) ctx.fillRect(dx, -6, 2, 9.6);
+      ctx.fillStyle = woodL;
+      ctx.fillRect(-14, -6, 28, 1);
+      ctx.restore();
+      cartWheel(ctx, cart[0] + 13, cart[1] + 3, 5.5, wood, woodD);
+      // Fardo de tela con los colores del jugador, atado sobre un cajón.
+      const bale = iso(x, y, 0.06, 1.16);
+      crate(ctx, bale[0], bale[1], 0.75, wood, woodD);
+      ctx.fillStyle = col.main;
+      ctx.beginPath(); ctx.ellipse(bale[0] - 0.5, bale[1] - 7.4, 5.2, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = col.light;
+      ctx.beginPath(); ctx.ellipse(bale[0] - 2.4, bale[1] - 8.4, 1.9, 1.2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = col.dark;
+      ctx.fillRect(bale[0] - 5.6, bale[1] - 7.8, 10, 1.2);
+      // --- Grúa de pértiga ---
+      const cr = iso(x, y, 0.92, 0.7);
+      wickerBase(ctx, cr[0], cr[1], 13, 11, wkL, wkM, wkD);
+      const topY = cr[1] - 11 - 40;
+      // Poste, algo más delgado arriba que abajo.
+      poly(ctx, [[cr[0] - 3.4, cr[1] - 10], [cr[0] + 3.4, cr[1] - 10],
+        [cr[0] + 2.4, topY], [cr[0] - 2.4, topY]], wood);
+      poly(ctx, [[cr[0] + 0.8, cr[1] - 10], [cr[0] + 3.4, cr[1] - 10],
+        [cr[0] + 2.4, topY], [cr[0] + 0.6, topY]], woodD);
+      // Anillos del color del jugador: uno al pie y otro bajo la pértiga.
+      for (const [yy, rr] of [[cr[1] - 11, 4.6], [topY + 7, 3.6]]) {
+        ctx.fillStyle = col.main;
+        ctx.beginPath(); ctx.ellipse(cr[0], yy, rr, rr * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = col.dark;
+        ctx.beginPath(); ctx.ellipse(cr[0], yy, rr, rr * 0.5, 0, 0.2, Math.PI - 0.2); ctx.fill();
+      }
+      // Pértiga: el contrapeso cae del extremo corto y el gancho del largo.
+      const bA = [cr[0] - 24, topY + 10], bB = [cr[0] + 30, topY - 9];
+      ctx.strokeStyle = woodD; ctx.lineWidth = 4.4; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(bA[0], bA[1]); ctx.lineTo(bB[0], bB[1]); ctx.stroke();
+      ctx.strokeStyle = woodL; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(bA[0], bA[1] - 1.4); ctx.lineTo(bB[0], bB[1] - 1.4); ctx.stroke();
+      ctx.fillStyle = woodD;
+      ctx.beginPath(); ctx.ellipse(cr[0], topY + 1, 4, 3.4, 0, 0, Math.PI * 2); ctx.fill();
+      // Contrapeso: un cesto de piedras colgado de dos cuerdas.
+      ctx.strokeStyle = '#cfc4a8'; ctx.lineWidth = 0.9; ctx.lineCap = 'butt';
+      ctx.beginPath();
+      ctx.moveTo(bA[0] - 5, bA[1] + 1); ctx.lineTo(bA[0] - 1, bA[1] + 13);
+      ctx.moveTo(bA[0] + 6, bA[1] + 1); ctx.lineTo(bA[0] + 2, bA[1] + 13);
+      ctx.stroke();
+      const bw = [bA[0] + 0.5, bA[1] + 15];
+      ctx.fillStyle = wkD;
+      ctx.beginPath(); ctx.ellipse(bw[0], bw[1], 9, 4.6, 0, 0, Math.PI); ctx.fill();
+      ctx.fillStyle = wkM;
+      ctx.beginPath(); ctx.ellipse(bw[0], bw[1], 9, 3.6, 0, 0, Math.PI * 2); ctx.fill();
+      for (const [dx, dy, r] of [[-4, -1, 3], [1, -2.4, 3.4], [5, -0.6, 2.6]]) {
+        ctx.fillStyle = stone;
+        ctx.beginPath(); ctx.ellipse(bw[0] + dx, bw[1] + dy, r, r * 0.78, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = stoneL;
+        ctx.beginPath();
+        ctx.ellipse(bw[0] + dx - r * 0.3, bw[1] + dy - r * 0.3, r * 0.4, r * 0.3, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Gancho: del extremo largo cuelga un tronco a media altura.
+      ctx.strokeStyle = '#cfc4a8'; ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(bB[0], bB[1] + 1); ctx.lineTo(bB[0], bB[1] + 13); ctx.stroke();
+      log(ctx, bB[0], bB[1] + 16, 16, 3.4, bark);
+      // --- Banco de aserrar, con el tronco y la sierra ---
+      const bench = iso(x, y, 0.6, 1.6);
+      sawHorse(ctx, bench[0] - 13, bench[1] + 4, 1, wood, woodD);
+      sawHorse(ctx, bench[0] + 14, bench[1] - 3, 1, wood, woodD);
+      ctx.save();
+      ctx.translate(bench[0], bench[1] - 10);
+      ctx.rotate(-0.46);
+      log(ctx, 0, 0, 34, 3.6, bark);
+      ctx.restore();
+      // La sierra, cruzada sobre el tronco y con su empuñadura.
+      ctx.save();
+      ctx.translate(bench[0] + 3, bench[1] - 12.5);
+      ctx.rotate(-0.46);
+      ctx.fillStyle = '#a9adb5';
+      ctx.fillRect(-12, -1.2, 22, 1.4);
+      ctx.strokeStyle = '#7d818a'; ctx.lineWidth = 0.6;
+      for (let i = -11; i < 10; i += 1.8) {
+        ctx.beginPath(); ctx.moveTo(i, 0.2); ctx.lineTo(i + 0.9, 1.4); ctx.stroke();
+      }
+      ctx.fillStyle = woodD;
+      ctx.fillRect(10, -2, 3.4, 3.4);
+      ctx.restore();
+      // --- Pila de troncos entre dos caballetes ---
+      const rack = iso(x, y, 1.62, 0.78);
+      const stand = (dx) => {
+        ctx.strokeStyle = woodD; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(rack[0] + dx - 5, rack[1] + 4); ctx.lineTo(rack[0] + dx + 4, rack[1] - 14);
+        ctx.moveTo(rack[0] + dx + 5, rack[1] + 4); ctx.lineTo(rack[0] + dx - 4, rack[1] - 14);
+        ctx.stroke();
+      };
+      stand(-14);
+      for (const [dx, dy, t] of [[0, 0, 0], [0.5, -6.4, 1], [1, -12.4, 2]]) {
+        log(ctx, rack[0] + dx, rack[1] - 3 + dy, 26, 3.4, t === 2 ? shade(bark, 0.14) : t === 1 ? bark : shade(bark, -0.08));
+      }
+      stand(13);
+      // --- Tablazón aserrada, delante de todo ---
+      const planks = iso(x, y, 1.32, 1.56);
+      for (let i = 0; i < 3; i++) {
+        const tone = i % 2 ? shade(L.wood, 0.16) : shade(L.wood, 0.28);
+        ctx.fillStyle = tone;
+        ctx.fillRect(planks[0] - 13 + i * 1.6, planks[1] - 2 - i * 3, 26, 3);
+        ctx.strokeStyle = 'rgba(0,0,0,.22)'; ctx.lineWidth = 0.7;
+        ctx.strokeRect(planks[0] - 13 + i * 1.6, planks[1] - 2 - i * 3, 26, 3);
+      }
+      for (const [u, v, sc] of [[0.12, 1.7, 0.9], [1.86, 1.1, 0.8], [1.05, 0.12, 0.75]]) {
+        const p = iso(x, y, u, v);
+        fern(ctx, p[0], p[1], sc, green);
+      }
+      break;
+    }
+    case 'miningcamp': {
       const w = s * 0.55, h = 12;
       // Cobertizo abierto: cuatro postes, sin muros que valgan.
       isoPrism(ctx, x + 3, y + 2, w, w, h, woodL, woodD, wood);
       roofOn(ctx, x + 3, y + 2, w, w, h, 6, roofD, roofM, roofL, mat);
-      if (type === 'lumbercamp') {
-        for (let i = 0; i < 3; i++) {
-          const p = iso(x, y, 0.95 + i * 0.16, 1.35);
-          const tone = i % 2 ? shade(L.accent, -0.1) : L.accent;
-          ctx.fillStyle = tone;
-          ctx.fillRect(p[0] - 12, p[1] - 6 - i * 4, 24, 5);
-          ctx.strokeStyle = 'rgba(0,0,0,.2)'; ctx.lineWidth = 1;
-          ctx.strokeRect(p[0] - 12, p[1] - 6 - i * 4, 24, 5);
-          // Testa del tronco, con sus anillos.
-          ctx.fillStyle = shade(tone, 0.2);
-          ctx.beginPath();
-          ctx.ellipse(p[0] - 12, p[1] - 3.5 - i * 4, 1.8, 2.5, 0, 0, Math.PI * 2); ctx.fill();
-          ctx.strokeStyle = shade(tone, -0.3); ctx.lineWidth = 0.7;
-          ctx.beginPath();
-          ctx.ellipse(p[0] - 12, p[1] - 3.5 - i * 4, 0.9, 1.3, 0, 0, Math.PI * 2); ctx.stroke();
-        }
-      } else {
-        const p = iso(x, y, 1.05, 1.3);
-        for (const [dx, dy, r] of [[-8, 0, 6], [4, -3, 7], [10, 2, 5]]) {
-          ctx.beginPath(); ctx.ellipse(p[0] + dx, p[1] + dy, r, r * 0.75, 0, 0, Math.PI * 2);
-          ctx.fillStyle = L.accent; ctx.fill();
-          ctx.strokeStyle = 'rgba(0,0,0,.2)'; ctx.lineWidth = 1; ctx.stroke();
-          ctx.fillStyle = shade(L.accent, 0.22);
-          ctx.beginPath();
-          ctx.ellipse(p[0] + dx - r * 0.3, p[1] + dy - r * 0.3, r * 0.3, r * 0.22, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
+      const p = iso(x, y, 1.05, 1.3);
+      for (const [dx, dy, r] of [[-8, 0, 6], [4, -3, 7], [10, 2, 5]]) {
+        ctx.beginPath(); ctx.ellipse(p[0] + dx, p[1] + dy, r, r * 0.75, 0, 0, Math.PI * 2);
+        ctx.fillStyle = L.accent; ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,.2)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = shade(L.accent, 0.22);
+        ctx.beginPath();
+        ctx.ellipse(p[0] + dx - r * 0.3, p[1] + dy - r * 0.3, r * 0.3, r * 0.22, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
       bannerPole(ctx, x - s * 0.42 * HW, y + s * 0.52 * HH, 26, col);
       break;
