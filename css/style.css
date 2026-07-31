@@ -10,7 +10,7 @@
   --panel: linear-gradient(180deg, #3a2c1c 0%, #241a10 100%);
   --panel-edge: #7a5f36;
   --bar-h: 44px;
-  --bottom-h: 178px;
+  --bottom-h: 132px;
 
   /* Zonas seguras del dispositivo (muesca, barra de inicio...). Valen 0 en
      los navegadores que no las declaran, así que no cambian nada de escritorio. */
@@ -24,7 +24,8 @@
      dentro, y watchBars() reescribe --bottom-total con lo que mide de verdad. */
   --top-total: calc(var(--bar-h) + var(--sa-top));
   --bottom-total: calc(var(--bottom-h) + var(--sa-bottom));
-  /* Suelo de la barra inferior: en escritorio el minimapa necesita ese alto. */
+  /* Suelo de la barra inferior: por debajo de esto la ficha de selección
+     empieza a recortar lo que enseña. */
   --bottom-min: var(--bottom-h);
 
   --prod-h: 46px; /* alto total de la tira de producción, con bordes y relleno */
@@ -609,29 +610,6 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
   z-index: 10;
 }
 
-#minimap-panel {
-  width: 300px; flex: none;
-  display: flex; flex-direction: column; gap: 4px;
-  background: rgba(0,0,0,.35);
-  border: 1px solid #5b472c;
-  border-radius: 8px;
-  padding: 6px;
-}
-#minimap {
-  width: 100%;
-  /* Alto definido a 0 y que crezca: si no, su proporción propia (480×240)
-     marcaba el alto natural del panel y estiraba la barra de más. */
-  height: 0;
-  flex: 1 1 auto;
-  min-height: 0;
-  border-radius: 4px;
-  background: #0b110c;
-  cursor: pointer;
-  touch-action: manipulation;
-  image-rendering: auto;
-}
-.mm-hint { flex: none; font-size: 10.5px; color: #8e7c5c; text-align: center; }
-
 #selection-panel {
   width: 300px; flex: none;
   background: rgba(0,0,0,.3);
@@ -882,9 +860,8 @@ button.cmd, button.qitem, button.prod { margin: 0; }
 /* Adaptación a pantallas pequeñas */
 
 @media (max-width: 1000px) {
-  :root { --bottom-h: 158px; }
-  #minimap-panel { width: 190px; }
-  #selection-panel { width: 210px; }
+  :root { --bottom-h: 124px; }
+  #selection-panel { width: 260px; }
   #commands { grid-template-columns: repeat(auto-fill, 54px); grid-auto-rows: 54px; }
   .cmd { width: 54px; height: 54px; }
   .cmd img { width: 46px; height: 46px; }
@@ -925,9 +902,8 @@ button.cmd, button.qitem, button.prod { margin: 0; }
     flex-wrap: wrap; gap: 5px;
     padding: 5px calc(5px + var(--sa-right)) calc(5px + var(--sa-bottom)) calc(5px + var(--sa-left));
   }
-  #minimap-panel { width: 108px; height: 82px; padding: 3px; order: 1; }
   /* Alto mínimo, no fijo: con cola el panel crece en vez de recortar los datos. */
-  #selection-panel { width: calc(100% - 113px); min-height: 82px; padding: 4px 7px; gap: 3px; order: 2; }
+  #selection-panel { width: 100%; min-height: 82px; padding: 4px 7px; gap: 3px; order: 1; }
   #sel-info { min-height: 0; gap: 6px; }
   .portrait { width: 42px; height: 42px; }
   .sel-name { font-size: 13px; }
@@ -939,7 +915,7 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   .qitem { width: 24px; height: 24px; }
   .qcount { font-size: 12px; }
   #commands {
-    order: 3; flex-basis: 100%; height: auto;
+    order: 2; flex-basis: 100%; height: auto;
     grid-template-columns: repeat(auto-fill, 58px);
     grid-auto-rows: 58px; grid-auto-flow: column;
     overflow-x: auto; overflow-y: hidden;
@@ -947,7 +923,6 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   }
   .cmd { width: 58px; height: 58px; }
   .cmd img { width: 48px; height: 48px; }
-  .mm-hint { display: none; }
   .hint { font-size: 11px; }
   .prod { width: 34px; height: 34px; }
   .prod .pmore { font-size: 9px; }
@@ -964,8 +939,7 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   #selection-chip img { width: 18px; height: 18px; }
   .right-group { gap: 3px; }
   .tbtn { padding: 3px 5px; }
-  #minimap-panel { width: 96px; height: 78px; }
-  #selection-panel { width: calc(100% - 101px); min-height: 78px; }
+  #selection-panel { min-height: 78px; }
   .portrait { width: 38px; height: 38px; }
   #commands { grid-template-columns: repeat(auto-fill, 56px); grid-auto-rows: 56px; }
   .cmd { width: 56px; height: 56px; }
@@ -980,16 +954,15 @@ button.cmd, button.qitem, button.prod { margin: 0; }
    Los paneles se dejan estirar para no desperdiciar la franja que queda. */
 @media (max-height: 560px) {
   :root { --bottom-h: 118px; --bottom-min: 118px; }
-  #minimap-panel, #selection-panel { height: auto; }
+  #selection-panel { height: auto; }
   #commands { height: auto; grid-auto-rows: 48px; grid-template-columns: repeat(auto-fill, 48px); }
   .cmd { width: 48px; height: 48px; }
   .cmd img { width: 40px; height: 40px; }
-  .sel-desc, .mm-hint { display: none; }
+  .sel-desc { display: none; }
 }
 
 @media (max-height: 430px) {
   :root { --bar-h: 32px; --bottom-h: 96px; --bottom-min: 96px; }
-  #minimap-panel { width: 150px; }
   .portrait { width: 40px; height: 40px; }
   .sel-owner { display: none; }
   #commands { grid-auto-rows: 44px; grid-template-columns: repeat(auto-fill, 44px); }
