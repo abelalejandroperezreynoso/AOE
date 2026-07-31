@@ -511,18 +511,31 @@ export class UI {
       const g = this.game;
       const target = this.r.entityAtScreen(x, y);
       const mine = g.selection.length && g.selection[0].owner === g.human.id;
+      /*
+       * El toque sólo da órdenes a lo que se mueve. Con un edificio
+       * seleccionado manda la selección: un toque en el suelo la suelta y un
+       * toque en otra cosa se la queda, que es lo que se espera al andar
+       * mirando la base. Su única orden —el punto de reunión— se da
+       * manteniendo el dedo, igual que la descarga (ver `touchHold`).
+       */
+      const canOrder = mine && g.selection.some((e) => e.kind === 'unit' || isMyAnimal(e, g));
       // Tocar algo propio lo selecciona, salvo que lo que haya seleccionado
       // pueda trabajar en ello: mandar aldeanos a terminar unos cimientos es
       // una orden, no un cambio de selección.
-      if (mine && this.canWorkOn(target, false)) this.rightClick(x, y, false);
+      if (canOrder && this.canWorkOn(target, false)) this.rightClick(x, y, false);
       else if (target && target.kind && target.owner === g.human.id) {
         // Se queda con el edificio, que es lo que se ha pedido; pero si había
         // un aldeano cargado, se recuerda que la descarga está a un dedo
         // mantenido de distancia.
-        if (this.canDeposit(target)) this.holdHint();
+        if (this.canDeposit(target)) {
+          this.holdHint('deposit', 'Mantén pulsado el edificio para ir a descargar');
+        }
         this.clickSelect(x, y, false, 0, true);
-      } else if (mine) this.rightClick(x, y, false);
-      else this.clickSelect(x, y, false, 0, true);
+      } else if (canOrder) this.rightClick(x, y, false);
+      else {
+        if (mine) this.rallyHint();
+        this.clickSelect(x, y, false, 0, true);
+      }
       e.preventDefault();
     }, { passive: false });
 
@@ -534,9 +547,10 @@ export class UI {
 
   /**
    * Pulsación mantenida sobre el mapa: es el clic derecho del táctil. Da la
-   * orden a lo que se tenga seleccionado sin tocar la selección, así que un
-   * toque corto puede quedarse con lo suyo —seleccionar el edificio— y el
-   * dedo mantenido con lo otro —mandar al aldeano a descargar en él—.
+   * orden a lo que se tenga seleccionado sin tocar la selección, así que el
+   * toque corto se queda con la selección —coger un edificio, soltarlo,
+   * cambiar de unidad— y el dedo mantenido con las órdenes: mandar al aldeano
+   * cargado a descargar o plantar el punto de reunión de un cuartel.
    *
    * Devuelve si el gesto se ha consumido: sin nada propio seleccionado no hay
    * orden que dar, así que se deja pasar y el toque acaba seleccionando.
@@ -551,11 +565,23 @@ export class UI {
     return true;
   }
 
-  /** Aviso, una sola vez por partida, de para qué sirve mantener pulsado. */
-  holdHint() {
-    if (this.holdHinted) return;
-    this.holdHinted = true;
-    this.notify('Mantén pulsado el edificio para ir a descargar');
+  /** Aviso, una sola vez por partida y por motivo, de qué hace el dedo mantenido. */
+  holdHint(key, text) {
+    this.holdHinted = this.holdHinted || new Set();
+    if (this.holdHinted.has(key)) return;
+    this.holdHinted.add(key);
+    this.notify(text);
+  }
+
+  /**
+   * Al soltar un edificio con un toque, se recuerda dónde ha ido a parar su
+   * punto de reunión. Sólo con los que fabrican unidades: en una casa o una
+   * muralla la bandera no lleva a ninguna parte y el aviso sobraría.
+   */
+  rallyHint() {
+    const b = this.game.selection[0];
+    if (!b || b.kind !== 'building' || !b.built || !BUILDINGS[b.type].trains) return;
+    this.holdHint('rally', 'Mantén pulsado para poner el punto de reunión');
   }
 
   /**
