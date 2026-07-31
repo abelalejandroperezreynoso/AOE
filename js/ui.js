@@ -525,8 +525,20 @@ export class UI {
       .some((e) => e.kind === 'unit' && e.type === 'villager' && e.owner === g.human.id);
     if (!hasVillager) return false;
     if (isMyAnimal(target, g)) return true;
+    if (this.canDeposit(target)) return true;
     if (!target || target.kind !== 'building' || target.owner !== g.human.id) return false;
     return !target.built || target.type === 'farm';
+  }
+
+  /**
+   * ¿Alguno de los aldeanos seleccionados tiene algo que soltar en ese edificio?
+   * Señalar el centro urbano (o el molino, el campamento...) con un aldeano
+   * cargado es mandarlo a descargar, no cambiar la selección: para eso están
+   * ahí. El edificio se sigue seleccionando en cuanto el aldeano va de vacío.
+   */
+  canDeposit(target) {
+    const g = this.game;
+    return g.selection.some((e) => e.owner === g.human.id && g.acceptsCarry(target, e));
   }
 
   // --- Selección ------------------------------------------------------------
@@ -547,6 +559,8 @@ export class UI {
     // Oveja propia con aldeanos seleccionados: se les manda a por ella en vez
     // de soltarlos para seleccionarla.
     if (isMyAnimal(e, g) && this.canWorkOn(e)) { this.rightClick(x, y, shift); return; }
+    // Almacén propio con aldeanos cargados: se les manda a descargar.
+    if (this.canDeposit(e)) { this.rightClick(x, y, shift); return; }
     // Un recurso del mapa sólo enseña su ficha... salvo que sea un animal de mi
     // rebaño, que se selecciona como cualquier otra cosa mía para poder moverlo.
     if (isNode(e) && !isMyAnimal(e, g)) {
