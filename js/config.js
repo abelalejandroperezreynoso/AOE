@@ -154,9 +154,13 @@ export const BUILDINGS = {
     name: 'Molino', cost: { wood: 100 }, time: 20, hp: 480, size: 2, los: 5, age: 0,
     dropoff: ['food'], desc: 'Almacena comida y permite construir granjas.',
   },
+  // La granja se comporta como en el juego original: la trabaja un solo aldeano,
+  // que se coloca en el centro de la parcela, las unidades pasan por encima y,
+  // al agotarse, su aldeano la replanta solo si hay madera.
   farm: {
     name: 'Granja', cost: { wood: 60 }, time: 12, hp: 160, size: 2, los: 2, age: 0,
-    farm: 320, req: 'mill', desc: 'Fuente inagotable de comida (se agota y se reconstruye).',
+    farm: 320, req: 'mill', passable: true, single: true,
+    desc: 'La cultiva un aldeano desde el centro. Al agotarse se replanta sola si hay madera.',
   },
   lumbercamp: {
     name: 'Campamento maderero', cost: { wood: 100 }, time: 20, hp: 480, size: 2, los: 5, age: 0,

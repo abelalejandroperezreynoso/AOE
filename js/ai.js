@@ -212,7 +212,7 @@ export class AI {
     for (const v of idle) {
       let placed = false;
       for (const res of order) {
-        const node = g.findResourceNear(v.x, v.y, res, 26, p);
+        const node = g.findResourceNear(v.x, v.y, res, 26, p, v);
         if (node) {
           v.stopTask();
           v.task = { type: 'gather', target: node };
@@ -222,7 +222,8 @@ export class AI {
         }
       }
       if (!placed) {
-        const node = g.findResourceNear(v.x, v.y, 'wood', 40, p) || g.findResourceNear(v.x, v.y, 'food', 40, p);
+        const node = g.findResourceNear(v.x, v.y, 'wood', 40, p, v)
+          || g.findResourceNear(v.x, v.y, 'food', 40, p, v);
         if (node) { v.stopTask(); v.task = { type: 'gather', target: node }; }
       }
     }
@@ -239,7 +240,7 @@ export class AI {
         if (!t || t.type !== 'gather' || !t.target || v.carry > 2) continue;
         const res = t.target.kind === 'building' ? 'food' : t.target.res;
         if (res !== bestRes) continue;
-        const node = g.findResourceNear(v.x, v.y, worst, 30, p);
+        const node = g.findResourceNear(v.x, v.y, worst, 30, p, v);
         if (node) { v.stopTask(); v.task = { type: 'gather', target: node }; break; }
       }
     }

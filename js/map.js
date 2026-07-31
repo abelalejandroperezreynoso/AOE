@@ -30,6 +30,10 @@ export class GameMap {
     this.terrain = new Uint8Array(size * size);
     this.blocked = new Uint8Array(size * size);   // agua y recursos que bloquean
     this.occupied = new Int32Array(size * size);  // id del edificio que ocupa la celda
+    // Celdas de edificios por los que se puede andar (las granjas). Siguen
+    // contando como ocupadas —no se puede construir encima— pero no cierran el
+    // paso: las unidades cruzan un campo de cultivo como cruzan la hierba.
+    this.walkOver = new Uint8Array(size * size);
     this.nodeAt = new Int32Array(size * size);    // índice del recurso + 1
     this.nodes = [];
     this.starts = [];
@@ -46,7 +50,7 @@ export class GameMap {
   isPassable(x, y) {
     if (!this.inBounds(x, y)) return false;
     const i = this.idx(x, y);
-    return !this.blocked[i] && !this.occupied[i];
+    return !this.blocked[i] && (!this.occupied[i] || !!this.walkOver[i]);
   }
 
   /** Sólo el terreno: útil para saber si se puede construir. */
@@ -65,6 +69,31 @@ export class GameMap {
   nodeAtTile(x, y) {
     const i = this.nodeIndexAt(x, y);
     return i >= 0 ? this.nodes[i] : null;
+  }
+
+  /** Marca la huella de un edificio como ocupada. */
+  occupy(b, passable = false) {
+    for (let y = b.ty; y < b.ty + b.size; y++) {
+      for (let x = b.tx; x < b.tx + b.size; x++) {
+        if (!this.inBounds(x, y)) continue;
+        const i = this.idx(x, y);
+        this.occupied[i] = b.id;
+        this.walkOver[i] = passable ? 1 : 0;
+      }
+    }
+  }
+
+  /** Libera la huella de un edificio que desaparece. */
+  vacate(b) {
+    for (let y = b.ty; y < b.ty + b.size; y++) {
+      for (let x = b.tx; x < b.tx + b.size; x++) {
+        if (!this.inBounds(x, y)) continue;
+        const i = this.idx(x, y);
+        if (this.occupied[i] !== b.id) continue;
+        this.occupied[i] = 0;
+        this.walkOver[i] = 0;
+      }
+    }
   }
 
   // --- Generación -----------------------------------------------------------
