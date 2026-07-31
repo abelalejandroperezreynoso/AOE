@@ -114,9 +114,6 @@ export class UI {
     this.el.endScreen = id('end-screen');
     this.el.idleBtn = id('idle-villager');
     this.el.idleCount = id('idle-count');
-    this.el.selChip = id('selection-chip');
-    this.el.selIcon = id('selection-icon');
-    this.el.selCount = id('selection-count');
     this.el.speed = id('speed-label');
   }
 
@@ -135,7 +132,16 @@ export class UI {
     this.setupFullscreen();
     this.watchBars();
     this.el.idleBtn.onclick = () => this.selectIdleVillager();
-    this.el.selChip.onclick = () => { if (this.game.selection.length) this.select([]); };
+    /*
+     * Pulsar la ficha de abajo suelta la selección. Antes era un botón más en
+     * la barra de arriba, lejos de donde se está mirando; aquí se pulsa lo
+     * mismo que se quiere soltar. Los botones de dentro —los montones de una
+     * selección múltiple— siguen a lo suyo.
+     */
+    this.el.selInfo.onclick = (e) => {
+      if (e.target.closest('button')) return;
+      if (this.game.selection.length) this.select([]);
+    };
     document.getElementById('btn-speed').onclick = () => this.cycleSpeed();
     document.getElementById('btn-help').onclick = () => {
       document.getElementById('help-panel').classList.toggle('hidden');
@@ -839,10 +845,13 @@ export class UI {
     const g = this.game, sel = g.selection;
     const info = this.el.selInfo, list = this.el.selList;
     info.innerHTML = ''; list.innerHTML = '';
-    if (!sel.length) {
-      info.innerHTML = '<div class="hint">Selecciona unidades o edificios con el clic izquierdo. Clic derecho para dar órdenes.</div>';
-      return;
-    }
+    /*
+     * Sin nada seleccionado la barra entera se retira: lo único que enseñaba
+     * era un recordatorio de cómo se juega, y a cambio se comía una franja de
+     * mapa en todo momento. watchBars() se entera sola y el lienzo crece.
+     */
+    this.el.bottombar.classList.toggle('hidden', !sel.length);
+    if (!sel.length) return;
     if (sel.length === 1 && isNode(sel[0])) {
       this.renderAnimalPanel(sel[0]);
       return;
@@ -1419,8 +1428,6 @@ export class UI {
       this.el.idleBtn._v = idle;
     }
 
-    this.updateSelectionChip(g.selection);
-
     // Refrescar el panel si la selección cambió o si cambia lo que se puede pagar.
     const key = this.selectionSignature();
     if (key !== this.selectionKey) { this.selectionKey = key; this.refreshSelection(); }
@@ -1429,41 +1436,6 @@ export class UI {
     this.renderQueue();
     this.renderProduction();
     this.edgeScroll(dt);
-  }
-
-  /**
-   * Ficha de lo que hay seleccionado: el icono de lo primero, cuántas cosas son
-   * y, al pulsarla, suelta la selección. Sin nada seleccionado desaparece. El
-   * icono cuesta generarlo, así que sólo se rehace cuando cambia la selección.
-   */
-  updateSelectionChip(sel) {
-    const g = this.game;
-    const first = sel[0];
-    const key = first ? `${sel.length}|${first.kind}|${first.type || ''}|${first.owner}` : '';
-    if (this.el.selChip._v === key) return;
-    this.el.selChip._v = key;
-    this.el.selChip.classList.toggle('hidden', !first);
-    if (!first) return;
-    const kind = first.kind === 'unit' ? 'unit' : first.kind === 'building' ? 'building' : 'node';
-    const type = kind === 'node' ? first.kind : first.type;
-    const owner = g.players[first.owner ?? g.human.id] || g.human;
-    this.el.selIcon.src = iconFor(kind, type, owner.colorIdx);
-    this.el.selCount.textContent = sel.length;
-    /*
-     * Con varios tipos a la vez el nombre del primero engañaría, así que se
-     * cuentan por clase; y si ni la clase coincide, por número. El texto no
-     * concuerda con nada («Selección: Oveja», no «Oveja seleccionada»): así vale
-     * igual para el aldeano y para la oveja sin andar mirando géneros.
-     */
-    const sameType = sel.every((e) => e.kind === first.kind && e.type === first.type);
-    const sameKind = sel.every((e) => e.kind === first.kind);
-    const name = kind === 'node'
-      ? (NODE_NAMES[type] || type)
-      : (kind === 'unit' ? UNITS[type] : BUILDINGS[type]).name;
-    const what = sameType ? `${name}${sel.length > 1 ? ` ×${sel.length}` : ''}`
-      : sameKind ? `${sel.length} ${kind === 'building' ? 'edificios' : kind === 'node' ? 'animales' : 'unidades'}`
-        : `${sel.length} elementos`;
-    this.el.selChip.title = `Selección: ${what} · pulsa para deseleccionar`;
   }
 
   updateAffordability() {
