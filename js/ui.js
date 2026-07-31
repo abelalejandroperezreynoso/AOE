@@ -1,4 +1,4 @@
-// Interfaz de usuario: HUD, panel de órdenes, minimapa y control con ratón/teclado.
+// Interfaz de usuario: HUD, panel de órdenes y control con ratón, teclado y dedo.
 
 import {
   UNITS, BUILDINGS, TECHS, UPGRADES, AGES, RESOURCES, RES_NAME,
@@ -19,7 +19,7 @@ const DRAG_LIFT = 56;
  * desplaza la cámara, aunque esté pegado al borde. Sólo los controles en sí,
  * no los paneles que los contienen: el fondo de una barra sigue desplazando.
  */
-const CONTROL_SELECTOR = 'button, select, input, a, #minimap, .overlay, .panel';
+const CONTROL_SELECTOR = 'button, select, input, a, .overlay, .panel';
 
 function isControl(target) {
   return !!(target && target.closest && target.closest(CONTROL_SELECTOR));
@@ -101,8 +101,6 @@ export class UI {
     this.el.pop = id('res-pop');
     this.el.age = id('age-label');
     this.el.clock = id('clock');
-    this.el.minimap = id('minimap');
-    this.mctx = this.el.minimap.getContext('2d');
     this.el.commands = id('commands');
     this.el.selInfo = id('sel-info');
     this.el.selList = id('sel-list');
@@ -123,8 +121,6 @@ export class UI {
   }
 
   buildStatic() {
-    this.el.minimap.width = 480;
-    this.el.minimap.height = 240;
     document.getElementById('btn-menu').onclick = () => this.togglePause();
     document.getElementById('btn-resume').onclick = () => this.togglePause();
     document.getElementById('btn-resign').onclick = () => {
@@ -365,27 +361,6 @@ export class UI {
     }, { passive: false });
 
     this.bindTouch(c);
-
-    // Minimapa
-    const mm = this.el.minimap;
-    const mmGoto = (e, order) => {
-      const rect = mm.getBoundingClientRect();
-      const px = (e.clientX - rect.left) / rect.width * mm.width;
-      const py = (e.clientY - rect.top) / rect.height * mm.height;
-      const [u, v] = this.r.minimapToWorld(px, py, mm.width, mm.height);
-      if (order) {
-        this.game.commandMove(this.game.selection.filter((s) => s.kind === 'unit' && s.owner === 0), u, v);
-        this.r.markOrder(u, v);
-      } else this.r.centerOn(u, v);
-    };
-    mm.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      if (e.button === 2) mmGoto(e, true);
-      else { this.mmDrag = true; mmGoto(e, false); }
-    });
-    mm.addEventListener('contextmenu', (e) => e.preventDefault());
-    window.addEventListener('mouseup', () => { this.mmDrag = false; });
-    window.addEventListener('mousemove', (e) => { if (this.mmDrag) mmGoto(e, false); });
 
     // Teclado
     window.addEventListener('keydown', (e) => {
@@ -1226,7 +1201,7 @@ export class UI {
     const r = el.getBoundingClientRect();
     const tw = t.offsetWidth, th = t.offsetHeight;
     // Con el dedo la ficha se apoya sobre la barra inferior completa, no sobre
-    // el botón: así no tapa el panel de selección ni el minimapa.
+    // el botón: así no tapa el panel de selección.
     const anchor = touch ? this.el.bottombar.getBoundingClientRect() : r;
     const cx = touch ? window.innerWidth / 2 : r.left + r.width / 2;
     t.style.left = `${clamp(cx - tw / 2, m, Math.max(m, window.innerWidth - tw - m))}px`;
@@ -1456,7 +1431,6 @@ export class UI {
 
     this.renderQueue();
     this.renderProduction();
-    this.r.drawMinimap(this.mctx, this.el.minimap.width, this.el.minimap.height);
     this.edgeScroll(dt);
   }
 
