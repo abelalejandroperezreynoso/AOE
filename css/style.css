@@ -921,7 +921,9 @@ button.cmd, button.qitem, button.prod { margin: 0; }
     overflow-x: auto; overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
   }
-  .cmd { width: 58px; height: 58px; }
+  /* La tira se recorre de lado; el tirón hacia arriba es para sacar el edificio
+     al mapa, así que ese eje lo gestiona el juego y no el navegador. */
+  .cmd { width: 58px; height: 58px; touch-action: pan-x; }
   .cmd img { width: 48px; height: 48px; }
   .mm-hint { display: none; }
   .hint { font-size: 11px; }
