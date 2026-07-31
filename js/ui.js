@@ -11,6 +11,8 @@ import { fmtTime, clamp, dist } from './utils.js';
 const HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'A', 'S', 'D', 'F', 'G', 'H', 'Z', 'X', 'C', 'V', 'B', 'N'];
 const MARKET_RATE = { sell: 0.8, buy: 1.4 };
 const QUEUE_ICONS = 6; // iconos que se dibujan de la cola; el resto los dice el contador
+// Cuánto se levanta la maqueta por encima del dedo al arrastrar un edificio.
+const DRAG_LIFT = 56;
 
 /**
  * Elementos que se pulsan o se arrastran: mientras el puntero esté encima no se
@@ -416,6 +418,17 @@ export class UI {
     // Si el puntero abandona la ventana, se detiene el desplazamiento de borde.
     document.addEventListener('mouseleave', () => { if (this.mouse) this.mouse.out = true; });
     document.addEventListener('mouseenter', () => { if (this.mouse) this.mouse.out = false; });
+    /*
+     * Cierre del arrastre de construcción pase lo que pase: si el botón
+     * desaparece a media faena —la botonera se rehace al cambiar la selección—
+     * o el navegador no concede la captura del puntero, el «pointerup» no llega
+     * al botón y el edificio se quedaría pegado al dedo.
+     */
+    window.addEventListener('pointerup', (e) => {
+      if (this.dragPlace && this.dragPlace.id === e.pointerId) this.dragPlaceEnd(e);
+    });
+    window.addEventListener('pointercancel', () => this.dragPlaceCancel());
+
     // Al girar el móvil o cambiar el tamaño, la ficha quedaría descolocada.
     window.addEventListener('resize', () => this.hideTooltip());
     window.addEventListener('orientationchange', () => this.hideTooltip());
@@ -697,6 +710,82 @@ export class UI {
     document.body.classList.remove('cursor-build');
   }
 
+  /*
+   * Construir con el dedo: el edificio se arrastra desde su botón hasta el sitio
+   * del mapa y se suelta ahí. Antes había que tocar el botón y después el mapa,
+   * y ese segundo toque se confundía con cualquier otro: se colocaban edificios
+   * sin querer y no quedaba claro que el juego estuviera esperando un sitio.
+   *
+   * La maqueta se dibuja un poco por encima del dedo (DRAG_LIFT), que si no
+   * queda tapada justo por la mano; y como el botón está en la barra de abajo,
+   * así asoma en cuanto el dedo entra en el lienzo.
+   *
+   * Con ratón no cambia nada: se pulsa el botón y luego el mapa, con Mayús para
+   * encadenar varios.
+   */
+  dragPlaceStart(el, type, e) {
+    // La captura mantiene los eventos en el botón aunque el dedo se vaya al
+    // lienzo; si el navegador no la da, la red de seguridad de bindInput cierra
+    // el arrastre igualmente.
+    try { el.setPointerCapture(e.pointerId); } catch { /* no pasa nada */ }
+    this.dragPlace = { el, type, id: e.pointerId, x0: e.clientX, y0: e.clientY, armed: false };
+  }
+
+  dragPlaceMove(e) {
+    const d = this.dragPlace;
+    if (!d || d.id !== e.pointerId) return;
+    if (!d.armed) {
+      const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+      if (Math.hypot(dx, dy) < 14) return;
+      // De lado se está recorriendo la tira de órdenes, no sacando el edificio.
+      if (Math.abs(dx) > Math.abs(dy)) { this.dragPlaceCancel(); return; }
+      d.armed = true;
+      this.hideTooltip();
+      this.startPlacing(d.type);
+      this.audio.play('click');
+    }
+    this.dragPlaceGhost(e);
+  }
+
+  /** Lleva la maqueta al punto del lienzo que toca; fuera de él, la esconde. */
+  dragPlaceGhost(e) {
+    const pl = this.game.placing;
+    if (!pl) return null;
+    const r = this.el.canvas.getBoundingClientRect();
+    const x = clamp(e.clientX - r.left, 0, r.width);
+    const y = e.clientY - r.top - DRAG_LIFT;
+    if (y < 0 || y > r.height) { pl.tx = undefined; return null; }
+    const [u, v] = this.r.screenToWorld(x, y);
+    const size = BUILDINGS[pl.type].size;
+    pl.tx = Math.floor(u - size / 2 + 0.5);
+    pl.ty = Math.floor(v - size / 2 + 0.5);
+    return { x, y };
+  }
+
+  dragPlaceEnd(e) {
+    const d = this.dragPlace;
+    if (!d || d.id !== e.pointerId) return;
+    this.dragPlace = null;
+    try { d.el.releasePointerCapture(e.pointerId); } catch { /* ya estaba suelto */ }
+    if (!d.armed) {
+      // Un toque suelto no coloca nada: se explica el gesto y se deja todo como estaba.
+      this.notify('Arrastra el edificio hasta el mapa');
+      return;
+    }
+    const at = this.dragPlaceGhost(e);
+    // Soltar sobre la barra —o con la maqueta escondida— es desistir.
+    if (at) this.tryPlace(at.x, at.y, false);
+    this.cancelPlacing();
+  }
+
+  dragPlaceCancel() {
+    const d = this.dragPlace;
+    if (!d) return;
+    this.dragPlace = null;
+    try { d.el.releasePointerCapture(d.id); } catch { /* ya estaba suelto */ }
+    if (d.armed) this.cancelPlacing();
+  }
+
   tryPlace(x, y, keepGoing) {
     const g = this.game;
     const pl = g.placing;
@@ -866,6 +955,7 @@ export class UI {
             cost: B.cost,
             tooltip: `${B.name}\n${B.desc}`,
             disabled: !p.canAfford(B.cost),
+            place: type, // con el dedo se arrastra desde aquí hasta el mapa
             action: () => this.startPlacing(type),
           });
         }
@@ -1040,8 +1130,15 @@ export class UI {
         if (e.pointerType === 'mouse') return;
         el._tapFrom = { x: e.clientX, y: e.clientY };
         this.showTooltip(b, el, true);
+        if (b.place && !b.disabled) this.dragPlaceStart(el, b.place, e);
       });
-      el.addEventListener('pointercancel', () => { el._tapFrom = null; this.hideTooltip(); });
+      el.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'mouse') return;
+        this.dragPlaceMove(e);
+      });
+      el.addEventListener('pointercancel', () => {
+        el._tapFrom = null; this.hideTooltip(); this.dragPlaceCancel();
+      });
       /*
        * La orden se ejecuta al levantar el dedo, sin esperar al «click» que
        * sintetiza el navegador: en iOS ese click llega tarde o no llega cuando
@@ -1054,6 +1151,7 @@ export class UI {
         this.hideTooltip();
         const from = el._tapFrom;
         el._tapFrom = null;
+        if (this.dragPlace && this.dragPlace.id === e.pointerId) { this.dragPlaceEnd(e); return; }
         if (!from || Math.hypot(e.clientX - from.x, e.clientY - from.y) > 12) return;
         el._tapAt = performance.now();
         run();
