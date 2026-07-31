@@ -242,7 +242,7 @@ export class Catalog {
 
     if (this.tab === 'terrain') {
       title.textContent = TERRAIN_LABELS[key] || key;
-      sub.textContent = 'Color con el que se pinta este terreno en el mapa y en el minimapa.';
+      sub.textContent = 'Color con el que se pinta este terreno en el mapa.';
       box.appendChild(this.terrainForm(key));
     } else if (this.tab === 'node') {
       const def = RESOURCE_NODES[key];

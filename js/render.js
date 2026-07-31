@@ -25,7 +25,7 @@ export class Renderer {
     this.ctx = canvas.getContext('2d', { alpha: false });
     this.game = game;
     this.cam = { x: 0, y: 0, zoom: 1 };
-    this.minZoom = 0.42; this.maxZoom = 2.0;
+    this.minZoom = 0.3; this.maxZoom = 3.5; // resize() ajusta el mínimo al mapa
     this.fog = makeCanvas(64, 64);
     this.fogCtx = this.fog.getContext('2d');
     this.fogBlur = makeCanvas(64, 64);
@@ -49,6 +49,19 @@ export class Renderer {
     // según lo cerca que esté la cámara (ver `render`).
     setSpriteQuality(dpr);
     this.w = w; this.h = h;
+    /*
+     * Hasta dónde se puede alejar la cámara: lo justo para que quepa el mapa
+     * entero con un margen. Sin minimapa, esa es la vista de conjunto —de dónde
+     * viene el rival, dónde queda el bosque—, así que depende del mapa y de la
+     * pantalla, no de un número fijo. El suelo evita que en un teléfono con un
+     * mapa grande las unidades acaben siendo motas de polvo.
+     */
+    const m = this.game.map;
+    if (m) {
+      const fit = Math.min(w / (m.size * TILE_W), h / (m.size * TILE_H + TILE_H));
+      this.minZoom = clamp(fit * 0.95, 0.12, 0.5);
+      this.clampCam();
+    }
     const fw = Math.ceil(w / this.fogScale) + this.fogMargin * 2;
     const fh = Math.ceil(h / this.fogScale) + this.fogMargin * 2;
     this.fog.width = fw; this.fog.height = fh;
@@ -627,90 +640,6 @@ export class Renderer {
 
   tick(dt) {
     if (this.orderMark) this.orderMark.life -= dt;
-  }
-
-  // --- Minimapa -------------------------------------------------------------
-
-  drawMinimap(mctx, w, h) {
-    const g = this.game, S = g.map.size;
-    mctx.clearRect(0, 0, w, h);
-    mctx.fillStyle = '#0b110c';
-    mctx.fillRect(0, 0, w, h);
-    const sx = w / (S * 2), sy = h / (S * 2);
-    const toMini = (u, v) => [(u - v + S) * sx, (u + v) * sy];
-
-    mctx.drawImage(g.map.minimap, 0, 0, w, h);
-
-    // Niebla.
-    mctx.save();
-    mctx.fillStyle = 'rgba(0,0,0,.72)';
-    for (let y = 0; y < S; y++) {
-      for (let x = 0; x < S; x++) {
-        const i = y * S + x;
-        if (g.fogExplored[i]) continue;
-        const [px, py] = toMini(x, y);
-        mctx.fillRect(px - sx - 0.5, py - 0.5, sx * 2 + 1, sy * 2 + 1);
-      }
-    }
-    mctx.fillStyle = 'rgba(0,0,0,.32)';
-    for (let y = 0; y < S; y++) {
-      for (let x = 0; x < S; x++) {
-        const i = y * S + x;
-        if (!g.fogExplored[i] || g.fogVisible[i]) continue;
-        const [px, py] = toMini(x, y);
-        mctx.fillRect(px - sx - 0.5, py - 0.5, sx * 2 + 1, sy * 2 + 1);
-      }
-    }
-    mctx.restore();
-
-    // Edificios y unidades.
-    for (const b of g.buildings) {
-      if (b.owner !== g.human.id && !g.isExplored(b.cx | 0, b.cy | 0)) continue;
-      const [px, py] = toMini(b.cx, b.cy);
-      mctx.fillStyle = PLAYER_COLORS[g.players[b.owner].colorIdx].light;
-      const r = 1.5 + b.size * 0.8;
-      mctx.fillRect(px - r, py - r * 0.6, r * 2, r * 1.2);
-    }
-    for (const u of g.units) {
-      if (u.owner !== g.human.id && !g.isVisible(u.x | 0, u.y | 0)) continue;
-      const [px, py] = toMini(u.x, u.y);
-      mctx.fillStyle = PLAYER_COLORS[g.players[u.owner].colorIdx].main;
-      mctx.fillRect(px - 1.5, py - 1.2, 3, 2.6);
-    }
-    // Los rebaños se pintan aquí y no en el mapa horneado: se mueven y cambian
-    // de dueño. Sin domesticar salen del color de la comida, como los demás.
-    for (const n of g.herds) {
-      if (!n.alive) continue;
-      const mine = n.owner === g.human.id;
-      if (!mine && !g.isVisible(n.x, n.y)) continue;
-      const [px, py] = toMini(n.fx, n.fy);
-      mctx.fillStyle = n.owner === null || n.owner === undefined
-        ? '#d24a3a' : PLAYER_COLORS[g.players[n.owner].colorIdx].light;
-      mctx.fillRect(px - 1.5, py - 1, 3, 2.2);
-    }
-
-    // Rectángulo de la vista.
-    const corners = [
-      this.screenToWorld(0, 0), this.screenToWorld(this.w, 0),
-      this.screenToWorld(this.w, this.h), this.screenToWorld(0, this.h),
-    ];
-    mctx.strokeStyle = 'rgba(255,255,255,.85)';
-    mctx.lineWidth = 1.4;
-    mctx.beginPath();
-    corners.forEach(([u, v], i) => {
-      const [px, py] = toMini(u, v);
-      if (i === 0) mctx.moveTo(px, py); else mctx.lineTo(px, py);
-    });
-    mctx.closePath();
-    mctx.stroke();
-  }
-
-  minimapToWorld(px, py, w, h) {
-    const S = this.game.map.size;
-    const sx = w / (S * 2), sy = h / (S * 2);
-    const a = px / sx - S;   // u - v
-    const bb = py / sy;      // u + v
-    return [(a + bb) / 2, (bb - a) / 2];
   }
 
   // --- Selección por pantalla ----------------------------------------------

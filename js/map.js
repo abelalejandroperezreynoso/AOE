@@ -2,7 +2,7 @@
 
 import { TILE_W, TILE_H, RESOURCE_NODES } from './config.js';
 import { Rng, makeNoise, fbm, clamp } from './utils.js';
-import { drawTerrainTile, makeCanvas, TERRAIN_COLORS } from './sprites.js';
+import { drawTerrainTile, makeCanvas } from './sprites.js';
 
 const HW = TILE_W / 2, HH = TILE_H / 2;
 
@@ -279,39 +279,10 @@ export class GameMap {
         drawTerrainTile(ctx, sx, sy, this.terrainNames[this.terrain[i]], this.tileRnd[i]);
       }
     }
-    this.buildMinimap();
   }
 
   /** Coordenadas dentro del lienzo estático (esquina superior del rombo). */
   tileToCanvas(x, y) {
     return [this.originX + (x - y) * HW, (x + y) * HH];
-  }
-
-  buildMinimap() {
-    const S = this.size;
-    const w = 512, h = 256;
-    this.minimap = makeCanvas(w, h);
-    const ctx = this.minimap.getContext('2d');
-    ctx.clearRect(0, 0, w, h);
-    const colors = this.terrainNames.map((n) => TERRAIN_COLORS[n]);
-    const sx = w / (S * 2), sy = h / (S * 2);
-    for (let y = 0; y < S; y++) {
-      for (let x = 0; x < S; x++) {
-        const px = (x - y + S) * sx, py = (x + y) * sy;
-        ctx.fillStyle = colors[this.terrain[this.idx(x, y)]];
-        ctx.fillRect(px - sx - 0.5, py - 0.5, sx * 2 + 1, sy * 2 + 1);
-      }
-    }
-    // Recursos visibles en el minimapa. Los rebaños no: se mueven, así que los
-    // pinta el renderizador en cada fotograma con el color de su dueño.
-    for (const n of this.nodes) {
-      if (n.herd) continue;
-      const px = (n.x - n.y + S) * sx, py = (n.x + n.y) * sy;
-      ctx.fillStyle = n.kind === 'tree' ? '#28541f'
-        : n.kind === 'gold' ? '#e0b52c'
-          : n.kind === 'stone' ? '#c8c8c2'
-            : '#d24a3a';
-      ctx.fillRect(px - sx, py - sy * 0.5, sx * 2, sy * 1.5);
-    }
   }
 }
