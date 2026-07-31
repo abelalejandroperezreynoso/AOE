@@ -2668,17 +2668,40 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       ctx.fillStyle = col.main; ctx.fill();
       ctx.strokeStyle = col.dark; ctx.lineWidth = 1; ctx.stroke();
       ctx.restore();
-      // Portalón de medio punto, con su rosca de ladrillo.
+      // Portalón de medio punto, con su rosca de ladrillo. Está abierto en la
+      // panza de un cilindro, así que no puede dibujarse como un rectángulo
+      // plano: las jambas se sitúan por su ángulo sobre la torre, el umbral
+      // sigue la curva del pie --y por eso la jamba de fuera arranca más
+      // arriba que la de dentro-- y el arco se peralta sobre las dos.
+      const dA = 0.2, dB = 0.78;
+      const dx0 = (t) => cx + rb * Math.sin(t);
+      const dy0 = (t) => cy + rb * 0.4 * Math.cos(t);
+      const dh = 15;
+      const doorPath = (grow) => {
+        ctx.beginPath();
+        ctx.moveTo(dx0(dA) - grow, dy0(dA) + grow * 0.4);
+        for (let i = 1; i <= 8; i++) {
+          const t = dA + ((dB - dA) * i) / 8;
+          ctx.lineTo(dx0(t) + (i === 8 ? grow : 0), dy0(t) + (i === 8 ? grow * 0.4 : 0));
+        }
+        ctx.lineTo(dx0(dB) + grow, dy0(dB) - dh);
+        ctx.quadraticCurveTo((dx0(dA) + dx0(dB)) / 2,
+          (dy0(dA) + dy0(dB)) / 2 - dh - 7 - grow, dx0(dA) - grow, dy0(dA) - dh);
+        ctx.closePath();
+      };
+      ctx.fillStyle = shade(roofM, -0.06);
+      doorPath(1.6); ctx.fill();
       ctx.fillStyle = shade(L.door || '#3b2a17', -0.2);
-      ctx.beginPath();
-      ctx.moveTo(cx + 4, cy - 1); ctx.lineTo(cx + 4, cy - 11);
-      ctx.quadraticCurveTo(cx + 9.5, cy - 17, cx + 15, cy - 11);
-      ctx.lineTo(cx + 15, cy - 1); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = shade(roofM, -0.1); ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.moveTo(cx + 3, cy - 1); ctx.lineTo(cx + 3, cy - 11);
-      ctx.quadraticCurveTo(cx + 9.5, cy - 18, cx + 16, cy - 11);
-      ctx.lineTo(cx + 16, cy - 1); ctx.stroke();
+      doorPath(0); ctx.fill();
+      // Dovelas de la rosca.
+      ctx.strokeStyle = shade(roofD, -0.1); ctx.lineWidth = 0.8;
+      for (let i = 0; i <= 5; i++) {
+        const t = dA + ((dB - dA) * i) / 5;
+        const bx = dx0(t), by = dy0(t) - dh;
+        const k = 1 - Math.abs(i / 5 - 0.5) * 2;
+        ctx.beginPath();
+        ctx.moveTo(bx, by - k * 6.4); ctx.lineTo(bx, by - k * 6.4 - 1.8); ctx.stroke();
+      }
       // --- Aspas ---
       // Van clavadas en el árbol que asoma por la cara de delante, y pasan
       // por encima de la torre y del capirote.
