@@ -306,7 +306,9 @@ export class Renderer {
       if (bd.cx < b.x0 - 4 || bd.cx > b.x1 + 4 || bd.cy < b.y0 - 4 || bd.cy > b.y1 + 4) continue;
       const mine = bd.owner === g.human.id;
       if (!mine && !g.isExplored(bd.cx | 0, bd.cy | 0)) continue;
-      list.push({ d: bd.cx + bd.cy, t: 'building', e: bd });
+      // Las granjas son suelo pintado: van debajo de todo lo que tienen cerca,
+      // porque por encima de ellas se anda y no pueden tapar a nadie.
+      list.push({ d: bd.cx + bd.cy - (bd.passable ? 8 : 0), t: 'building', e: bd });
     }
     for (const u of g.units) {
       if (u.x < b.x0 - 2 || u.x > b.x1 + 2 || u.y < b.y0 - 2 || u.y > b.y1 + 2) continue;

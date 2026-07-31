@@ -5,7 +5,7 @@ import {
   CARRY_CAPACITY, GATHER_RATE, START_RESOURCES,
 } from './config.js';
 import { uid, clamp, dist } from './utils.js';
-import { findPath, ringTiles, nearestFree } from './path.js';
+import { findPath, ringTiles, areaTiles, nearestFree } from './path.js';
 
 // Hasta dónde puede estar un aldeano del borde del recurso para trabajarlo, y
 // hasta dónde se le deja llegar sin dejar de hacerlo (ver `inWorkRange`).
@@ -361,8 +361,10 @@ export class Unit {
    * los sacaba del alcance y se pasaban el rato entrando y saliendo.
    */
   inWorkRange(g, target, info) {
+    // En una granja se trabaja desde dentro, plantado en el centro de la
+    // parcela, así que la distancia se mide al centro y no al borde.
     const d = target.kind === 'building'
-      ? g.edgeDist(this, target)
+      ? (target.passable ? dist(this.x, this.y, info.x, info.y) : g.edgeDist(this, target))
       : g.tileEdgeDist(this, info.x, info.y);
     const ok = d <= (this.workOn === target ? WORK_KEEP : WORK_REACH);
     this.workOn = ok ? target : null;
@@ -375,6 +377,13 @@ export class Unit {
       this.findNextResource(g, player);
       return;
     }
+    const isBuilding = target.kind === 'building';
+    if (isBuilding) {
+      // Una granja recién sembrada hay que levantarla antes de cultivarla.
+      if (!target.built) { this.task = { type: 'build', target }; return; }
+      // Un aldeano por granja: si ya la lleva otro, este se busca la vida.
+      if (target.def.single && !g.claimFarm(target, this)) { this.findNextResource(g, player); return; }
+    }
     const info = g.gatherInfo(target);
     this.wantRes = info.res;
     /*
@@ -382,12 +391,15 @@ export class Unit {
      * por el almacén. Lo que llevaba encima se pierde al empezar a recolectar el
      * otro recurso (más abajo), igual que en el juego original.
      */
-    const isBuilding = target.kind === 'building';
     const near = this.inWorkRange(g, target, info);
     if (!near) {
       if (!this.path && this.repathCd <= 0) {
+        // A la granja se entra: el destino son sus propias casillas, no el
+        // anillo de alrededor como en el resto de edificios.
         const goals = isBuilding
-          ? ringTiles(g.map, target.tx, target.ty, target.size, target.size, 1)
+          ? (target.passable
+            ? areaTiles(g.map, target.tx, target.ty, target.size, target.size)
+            : ringTiles(g.map, target.tx, target.ty, target.size, target.size, 1))
           : ringTiles(g.map, target.x, target.y, 1, 1, 1);
         if (!goals.length || !this.setDestination(g, info.x, info.y, goals)) {
           this.findNextResource(g, player); return;
@@ -426,9 +438,9 @@ export class Unit {
     if (prev && !prev.dead && prev.alive !== false) {
       const px = prev.kind === 'building' ? prev.cx : prev.x;
       const py = prev.kind === 'building' ? prev.cy : prev.y;
-      next = g.findResourceNear(px, py, want, 14, player);
+      next = g.findResourceNear(px, py, want, 14, player, this);
     }
-    if (!next) next = g.findResourceNear(this.x, this.y, want, 22, player);
+    if (!next) next = g.findResourceNear(this.x, this.y, want, 22, player, this);
     if (next) this.task = { type: 'gather', target: next };
     else {
       // Si lleva carga, al menos la entrega.
@@ -482,7 +494,10 @@ export class Unit {
     const d = g.edgeDist(this, b);
     if (d > 0.8) {
       if (!this.path && this.repathCd <= 0) {
-        const goals = ringTiles(g.map, b.tx, b.ty, b.size, b.size, 1);
+        // La granja se siembra desde dentro, que es donde luego se cultiva.
+        const goals = b.passable
+          ? areaTiles(g.map, b.tx, b.ty, b.size, b.size)
+          : ringTiles(g.map, b.tx, b.ty, b.size, b.size, 1);
         if (!goals.length || !this.setDestination(g, b.cx, b.cy, goals)) { this.chainOrIdle(g, player, b); return; }
       }
       if (this.path) this.followPath(g, dt, speed);
@@ -516,7 +531,7 @@ export class Unit {
    *  3. Si no hay nada de lo anterior, se queda libre.
    */
   chainOrIdle(g, player, finished) {
-    const job = g.autoGatherJob(player, finished);
+    const job = g.autoGatherJob(player, finished, this);
     if (job) {
       this.task = { type: 'gather', target: job };
       this.path = null; this.repathCd = 0;
@@ -616,9 +631,14 @@ export class Building {
     this.dead = false;
     this.smoke = 0;
     if (BUILDINGS[type].farm) this.farmAmount = BUILDINGS[type].farm;
+    // Granjas: el aldeano que la tiene reservada (ver `farmerOf` en game.js).
+    this.farmer = null;
   }
 
   get def() { return BUILDINGS[this.type]; }
+
+  /** ¿Se puede andar por encima? Las granjas sí; el resto de edificios no. */
+  get passable() { return !!BUILDINGS[this.type].passable; }
 
   addProgress(amount, player, g) {
     if (this.built) return;

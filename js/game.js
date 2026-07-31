@@ -202,18 +202,21 @@ export class Game {
     const s = B.size;
     if (tx < 0 || ty < 0 || tx + s > this.map.size || ty + s > this.map.size) return null;
     const b = new Building(type, player.id, tx, ty, player);
+    this.map.occupy(b, b.passable);
     for (let y = ty; y < ty + s; y++) {
       for (let x = tx; x < tx + s; x++) {
-        this.map.occupied[this.map.idx(x, y)] = b.id;
         const n = this.map.nodeAtTile(x, y);
         if (n) this.map.removeNode(n);
       }
     }
     // Desaloja a quien quedase dentro de la huella: si no, quedaría atrapado.
-    for (const u of this.units) {
-      if (u.x < tx || u.x >= tx + s || u.y < ty || u.y >= ty + s) continue;
-      const free = nearestFree(this.map, Math.floor(u.x), Math.floor(u.y), 10);
-      if (free) { u.x = free.x + 0.5; u.y = free.y + 0.5; u.path = null; u.repathCd = 0; }
+    // Por una granja se puede andar, así que ahí no hay a quién desalojar.
+    if (!b.passable) {
+      for (const u of this.units) {
+        if (u.x < tx || u.x >= tx + s || u.y < ty || u.y >= ty + s) continue;
+        const free = nearestFree(this.map, Math.floor(u.x), Math.floor(u.y), 10);
+        if (free) { u.x = free.x + 0.5; u.y = free.y + 0.5; u.path = null; u.repathCd = 0; }
+      }
     }
     this.buildings.add(b);
     player.buildings.add(b);
@@ -254,11 +257,7 @@ export class Game {
     if (from && from.owner !== undefined) this.players[from.owner].stats.kills++;
     this.byId.delete(b.id);
     if (this.net && !this.isGuest) this.netRemoved.push(b.id);
-    for (let y = b.ty; y < b.ty + b.size; y++) {
-      for (let x = b.tx; x < b.tx + b.size; x++) {
-        if (this.map.occupied[this.map.idx(x, y)] === b.id) this.map.occupied[this.map.idx(x, y)] = 0;
-      }
-    }
+    this.map.vacate(b);
     this.fx.debris(b.cx, b.cy, 10 + b.size * 6);
     this.fx.decal(b.cx, b.cy, 'rubble');
     if (this.audio) this.audio.play('collapse');
@@ -411,14 +410,100 @@ export class Game {
     return list.slice(0, count).map((e) => e.u);
   }
 
-  /** Recurso más cercano del tipo pedido (búsqueda en espiral). */
-  findResourceNear(x, y, res, radius, player) {
+  // --- Granjas --------------------------------------------------------------
+
+  /*
+   * Una granja la trabaja un aldeano y sólo uno, como en el juego original. En
+   * vez de apuntarse y darse de baja en cada cambio de orden —que se escapa por
+   * mil sitios: el aldeano muere, se le manda a otra cosa, se le convierte en
+   * constructor...— la reserva se comprueba al vuelo: la granja recuerda a su
+   * aldeano y éste la ocupa mientras siga teniéndola como tarea.
+   */
+
+  /** Aldeano que ocupa la granja ahora mismo, o null si está libre. */
+  farmerOf(b) {
+    const f = b.farmer;
+    if (!f || f.dead || f.owner !== b.owner) { b.farmer = null; return null; }
+    const t = f.task;
+    const working = !!t && (
+      (t.type === 'gather' && t.target === b)
+      || (t.type === 'deliver' && t.back === b)
+      || (t.type === 'build' && t.target === b));
+    if (!working) { b.farmer = null; return null; }
+    return f;
+  }
+
+  /** ¿Puede `u` ponerse a cultivar esta granja? */
+  farmFree(b, u) {
+    const f = this.farmerOf(b);
+    return !f || f === u;
+  }
+
+  /** Reserva la granja para `u`. Devuelve false si ya la trabaja otro. */
+  claimFarm(b, u) {
+    if (!this.farmFree(b, u)) return false;
+    b.farmer = u;
+    return true;
+  }
+
+  /**
+   * Orden para el aldeano al que se le señala una granja. Si ya la trabaja
+   * otro, se le manda a la granja libre más cercana; si no hay ninguna, se
+   * queda al lado y se avisa de por qué no se ha puesto a cultivar.
+   */
+  farmTask(farm, u) {
+    if (this.claimFarm(farm, u)) return { type: 'gather', target: farm };
+    const other = this.findResourceNear(farm.cx, farm.cy, 'food', 14, this.players[u.owner], u);
+    if (other) return { type: 'gather', target: other };
+    if (this.players[u.owner].isHuman && this.ui) {
+      this.ui.notify('Esa granja ya la trabaja otro aldeano.', 'warn');
+    }
+    return { type: 'move', x: farm.cx, y: farm.cy };
+  }
+
+  /**
+   * Replanta una granja agotada en el mismo sitio, con el aldeano que la
+   * cultivaba. Es lo que hace el juego original: si hay madera, el aldeano
+   * siembra otra vez sin que haya que decírselo; si no la hay, se queda parado.
+   */
+  reseedFarm(player, spot, farmer) {
+    if (!farmer || farmer.dead || farmer.owner !== player.id) return null;
+    const cost = BUILDINGS.farm.cost;
+    if (!this.canPlace('farm', spot.tx, spot.ty, player)) return null;
+    if (!player.canAfford(cost)) {
+      if (player.isHuman && this.ui) this.ui.notify('Madera insuficiente para replantar la granja.', 'warn');
+      return null;
+    }
+    player.pay(cost);
+    const b = this.createBuilding('farm', player, spot.tx, spot.ty, false);
+    if (!b) { player.refund(cost); return null; }
+    // La parcela ya es suya: nadie más se pone a cultivarla mientras la levanta.
+    b.farmer = farmer;
+    // Si le pilló yendo a descargar, primero suelta la comida y a la vuelta
+    // siembra: dar media vuelta con el cesto lleno sería tirar el viaje.
+    if (farmer.task && farmer.task.type === 'deliver' && farmer.carry > 0) {
+      farmer.task.back = b;
+    } else {
+      farmer.stopTask();
+      farmer.task = { type: 'build', target: b };
+      farmer.repathCd = 0;
+    }
+    return b;
+  }
+
+  /**
+   * Recurso más cercano del tipo pedido (búsqueda en espiral). `unit` es el
+   * aldeano que va a trabajarlo: sirve para descartar las granjas que ya está
+   * cultivando otro.
+   */
+  findResourceNear(x, y, res, radius, player, unit = null) {
     const m = this.map;
     const sx = Math.floor(x), sy = Math.floor(y);
     let best = null, bestD = Infinity;
     if (res === 'food' && player) {
       for (const b of player.buildings) {
         if (b.type !== 'farm' || !b.built || b.farmAmount <= 0) continue;
+        if (!this.farmFree(b, unit)) continue;
         const d = dist(x, y, b.cx, b.cy);
         if (d < bestD && d < radius) { bestD = d; best = b; }
       }
@@ -485,18 +570,20 @@ export class Game {
    * construye una granja se queda cultivándola.
    * Devuelve el nodo (o la granja) o null si no hay nada cerca.
    */
-  autoGatherJob(player, building) {
+  autoGatherJob(player, building, unit = null) {
     if (!building || building.dead || !building.built) return null;
     const B = BUILDINGS[building.type];
     if (!B) return null;
-    if (building.type === 'farm') return building.farmAmount > 0 ? building : null;
+    if (building.type === 'farm') {
+      return building.farmAmount > 0 && this.farmFree(building, unit) ? building : null;
+    }
     // El centro urbano almacena de todo, así que no hay un recurso "suyo".
     if (!B.dropoff || building.type === 'towncenter') return null;
 
     const radius = (B.los || 5) + 3;
     let best = null, bestD = Infinity;
     for (const res of B.dropoff) {
-      const node = this.findResourceNear(building.cx, building.cy, res, radius, player);
+      const node = this.findResourceNear(building.cx, building.cy, res, radius, player, unit);
       if (!node) continue;
       const nx = node.kind === 'building' ? node.cx : node.fx;
       const ny = node.kind === 'building' ? node.cy : node.fy;
@@ -520,8 +607,13 @@ export class Game {
 
   depleteResource(target) {
     if (target.kind === 'building') {
+      // Granja agotada: se lleva la parcela y su aldeano vuelve a sembrarla.
+      const farmer = this.farmerOf(target);
+      const player = this.players[target.owner];
+      const spot = { tx: target.tx, ty: target.ty };
       target.farmAmount = 0;
       this.killBuilding(target, null);
+      this.reseedFarm(player, spot, farmer);
     } else if (target.alive) {
       const wasTree = target.kind === 'tree';
       if (this.net && !this.isGuest) this.netDepleted.push(target.id);
@@ -771,7 +863,7 @@ export class Game {
         if (target.owner === u.owner) {
           if (!target.built && u.type === 'villager') u.task = { type: 'build', target };
           else if (this.acceptsCarry(target, u)) u.task = { type: 'deliver', target, back };
-          else if (target.type === 'farm' && u.type === 'villager') u.task = { type: 'gather', target };
+          else if (target.type === 'farm' && u.type === 'villager') u.task = this.farmTask(target, u);
           else if (target.hp < target.maxHp && u.type === 'villager') u.task = { type: 'build', target };
           else u.task = { type: 'move', x: target.cx, y: target.cy };
         } else {
