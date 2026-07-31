@@ -154,8 +154,10 @@ Detalles a tener en cuenta:
 | Ayuda | `F1` |
 
 En **móvil y tablet**: un toque selecciona lo tuyo, un toque en el suelo da la
-orden a lo que tengas seleccionado, arrastrar mueve la cámara y pellizcar acerca
-o aleja.
+orden a lo que tengas seleccionado, **mantener el dedo** un momento da la orden
+sin cambiar la selección —así se manda a un aldeano cargado a descargar en el
+centro urbano, el molino o un campamento, que con un toque corto se
+seleccionan—, arrastrar mueve la cámara y pellizcar acerca o aleja.
 
 ### Bucle de juego
 
