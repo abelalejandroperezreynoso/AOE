@@ -382,6 +382,19 @@ export class Game {
     return best;
   }
 
+  /**
+   * ¿Ese edificio le sirve al aldeano para soltar lo que lleva encima? Con esto,
+   * señalar el centro urbano (o un molino, campamento...) con un aldeano cargado
+   * es la orden de ir a depositar, no la de plantarse al lado.
+   */
+  acceptsCarry(b, u) {
+    if (!b || b.kind !== 'building' || !b.built || b.dead) return false;
+    if (!u || u.type !== 'villager' || u.owner !== b.owner) return false;
+    if (!(u.carry > 0.5) || !u.carryRes) return false;
+    const d = BUILDINGS[b.type].dropoff;
+    return !!d && d.includes(u.carryRes);
+  }
+
   findDropoff(player, res, x, y) {
     let best = null, bestD = Infinity;
     for (const b of player.buildings) {
@@ -694,10 +707,14 @@ export class Game {
     }
     for (const u of units) {
       if (u.kind !== 'unit') continue;
+      // El recurso al que estaba dedicado, para volver a él después de descargar.
+      const prev = u.task;
+      const back = prev && (prev.type === 'gather' ? prev.target : prev.type === 'deliver' ? prev.back : null);
       u.stopTask();
       if (target.kind === 'building') {
         if (target.owner === u.owner) {
           if (!target.built && u.type === 'villager') u.task = { type: 'build', target };
+          else if (this.acceptsCarry(target, u)) u.task = { type: 'deliver', target, back };
           else if (target.type === 'farm' && u.type === 'villager') u.task = { type: 'gather', target };
           else if (target.hp < target.maxHp && u.type === 'villager') u.task = { type: 'build', target };
           else u.task = { type: 'move', x: target.cx, y: target.cy };
