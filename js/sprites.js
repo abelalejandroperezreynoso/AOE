@@ -1972,12 +1972,16 @@ function cartWheel(ctx, cx, cy, r, wood, woodD) {
   ctx.beginPath(); ctx.ellipse(cx, cy, r * 0.2, r * 0.19, 0, 0, Math.PI * 2); ctx.fill();
 }
 
-/** Escalera exterior de madera, subiendo a lo largo del eje v hacia el fondo. */
-function outerStairs(ctx, x, y, u0, v0, n, wood, woodD, woodL) {
+/**
+ * Escalera exterior subiendo a lo largo del eje v hacia el fondo. `rail` pone
+ * el pasamanos, que sobra cuando la escalera muere contra un muro.
+ */
+function outerStairs(ctx, x, y, u0, v0, n, wood, woodD, woodL, rail = true) {
   for (let i = n - 1; i >= 0; i--) {
     const p = iso(x, y, u0, v0 - i * 0.15);
     isoPrism(ctx, p[0], p[1], 0.52, 0.15, 3.4 * (i + 1), woodL, woodD, wood);
   }
+  if (!rail) return;
   // Pasamanos: dos postes y el listón que los une.
   const a = iso(x, y, u0, v0 + 0.1), b = iso(x, y, u0, v0 - n * 0.15);
   ctx.strokeStyle = woodD; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
@@ -2015,6 +2019,111 @@ function gableTimbers(ctx, a, b, apex, wood, woodD, style = 'plain') {
     beam(lerp2(a, b, 0.84), lerp2(mid, apex, 0.72), 1.8, woodD);
     beam(lerp2(a, apex, 0.34), lerp2(b, apex, 0.34), 1.6, woodD);
   }
+}
+
+/**
+ * Torre redonda de mampostería, algo más estrecha arriba que abajo. Se pinta
+ * como un tronco de cono: cuerpo, sombra al costado de sotavento, hiladas
+ * curvas y algún sillar suelto, que es lo que la separa de un tubo liso.
+ */
+function roundTower(ctx, cx, cy, rb, rt, h, sL, sM, sD) {
+  const yT = cy - h;
+  ctx.fillStyle = sM;
+  ctx.beginPath();
+  ctx.moveTo(cx - rb, cy);
+  ctx.ellipse(cx, cy, rb, rb * 0.4, 0, Math.PI, 0, true);
+  ctx.lineTo(cx + rt, yT);
+  ctx.ellipse(cx, yT, rt, rt * 0.42, 0, 0, Math.PI, true);
+  ctx.closePath(); ctx.fill();
+  // El costado que no ve el sol.
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = shade(sM, -0.12);
+  ctx.fillRect(cx + rb * 0.34, yT - rt, rb, h + rb);
+  ctx.fillStyle = shade(sM, 0.1);
+  ctx.fillRect(cx - rb, yT - rt, rb * 0.42, h + rb);
+  // Hiladas: arcos que siguen la curva de la torre.
+  ctx.strokeStyle = sD; ctx.lineWidth = 0.8;
+  const rows = Math.max(3, Math.round(h / 7));
+  for (let i = 1; i <= rows; i++) {
+    const k = i / (rows + 0.5), yy = cy - h * k, rr = rb + (rt - rb) * k;
+    ctx.beginPath(); ctx.ellipse(cx, yy, rr, rr * 0.4, 0, 0.1, Math.PI - 0.1); ctx.stroke();
+    // Un par de juntas verticales por hilada, a matajunta.
+    for (const t of [-0.55 + (i % 2) * 0.3, 0.25 + (i % 2) * 0.3]) {
+      const px = cx + rr * t;
+      ctx.beginPath();
+      ctx.moveTo(px, yy); ctx.lineTo(px, yy + h / (rows + 0.5)); ctx.stroke();
+    }
+  }
+  ctx.restore();
+  ctx.fillStyle = sL;
+  ctx.beginPath(); ctx.ellipse(cx, yT, rt, rt * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+}
+
+/** Capirote cónico de teja: coronas de hiladas y tejas a la radial. */
+function coneRoof(ctx, cx, cy, r, h, tL, tM, tD) {
+  const apex = cy - h;
+  // La silueta es la unión del alero (elipse entera) y el triángulo hasta la
+  // aguja; dibujarlas como dos trozos del mismo trazo las funde en una sola.
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, r, r * 0.42, 0, 0, Math.PI * 2);
+  // El triángulo va en el mismo sentido de giro que la elipse: si no, con la
+  // regla de no-cero se restarían y el capirote saldría hueco.
+  ctx.moveTo(cx, apex);
+  ctx.lineTo(cx + r, cy + 1);
+  ctx.lineTo(cx - r, cy + 1);
+  ctx.closePath();
+  ctx.fillStyle = tM; ctx.fill();
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = shade(tM, -0.16);
+  ctx.fillRect(cx + r * 0.28, apex, r * 1.2, h + r);
+  ctx.fillStyle = tL;
+  ctx.fillRect(cx - r * 1.1, apex, r * 0.55, h + r);
+  // Tejas a la radial, de la aguja al alero.
+  ctx.strokeStyle = tD; ctx.lineWidth = 0.9; ctx.lineCap = 'butt';
+  for (let i = 0; i <= 14; i++) {
+    const a = Math.PI * (i / 14);
+    ctx.beginPath();
+    ctx.moveTo(cx, apex);
+    ctx.lineTo(cx - Math.cos(a) * r, cy + Math.sin(a) * r * 0.42);
+    ctx.stroke();
+  }
+  // Coronas de hiladas, cada vez más cerradas hacia arriba.
+  for (let i = 1; i <= 5; i++) {
+    const k = i / 5.8, rr = r * (1 - k), yy = cy - h * k;
+    ctx.strokeStyle = i % 2 ? tD : shade(tM, 0.12);
+    ctx.beginPath(); ctx.ellipse(cx, yy, rr, rr * 0.42, 0, 0, Math.PI); ctx.stroke();
+  }
+  ctx.restore();
+  // Alero y aguja.
+  ctx.strokeStyle = tD; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.42, 0, 0, Math.PI); ctx.stroke();
+  ctx.fillStyle = tD;
+  ctx.beginPath(); ctx.ellipse(cx, apex - 1, 1.8, 2.6, 0, 0, Math.PI * 2); ctx.fill();
+}
+
+/** Aspa del molino: la vara maestra y la lona atada a los travesaños. */
+function windSail(ctx, hx, hy, a, len, wide, wood, canvas) {
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(a);
+  ctx.fillStyle = wood;
+  ctx.fillRect(0, -1.1, len, 2.2);
+  // La lona va por un costado de la vara, más ancha por fuera.
+  poly(ctx, [[len * 0.14, -1], [len * 0.99, -1],
+    [len * 0.99, -wide], [len * 0.14, -wide * 0.62]], canvas, shade(canvas, -0.22));
+  ctx.strokeStyle = shade(canvas, -0.16); ctx.lineWidth = 0.7;
+  for (let i = 1; i < 6; i++) {
+    const t = 0.14 + (0.85 * i) / 6;
+    ctx.beginPath();
+    ctx.moveTo(len * t, -1); ctx.lineTo(len * t, -wide * (0.62 + 0.38 * i / 6));
+    ctx.stroke();
+  }
+  ctx.strokeStyle = shade(wood, 0.1); ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(len * 0.14, -wide * 0.62); ctx.lineTo(len * 0.99, -wide); ctx.stroke();
+  ctx.restore();
 }
 
 /**
@@ -2296,7 +2405,7 @@ function battlements(ctx, x, y, w, d, h, top, left, right) {
  * el bando civil y el militar se distinguen de lejos.
  */
 const ROOFING = {
-  house: 'shingle', mill: 'thatch', miningcamp: 'thatch',
+  house: 'shingle', miningcamp: 'thatch',
 };
 
 function drawBuilding(ctx, type, colorIdx, x, y) {
@@ -2505,41 +2614,118 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       break;
     }
     case 'mill': {
-      const w = s * 0.7, h = 20;
-      const faces = timberBlock(ctx, x + 2, y, w, w, h, M);
-      roofOn(ctx, x + 2, y, w, w, h, 10, roofD, roofM, roofL, mat);
-      faceDoor(ctx, faces[0].a, faces[0].b, h, 0.62, 0.62, wood, woodD, '#3b2a17');
-      // Aspas, clavadas en el hastial que da a la cámara.
-      const c0 = faceAt(faces[1].a, faces[1].b, h, 0.5, 0.52);
+      // Molino de torre: un cilindro de mampostería encalada con su capirote
+      // de teja y las aspas enteladas clavadas en la cara de delante. Detrás
+      // y a la izquierda, el anejo con su escalera de piedra; a la derecha,
+      // el emparrado. La franja y el escudo del jugador van al pie de la
+      // torre, que es donde se ven sin tapar la piedra.
+      const caM = L.accent || '#ebe4c8';
+      const cen = iso(x, y, 1.06, 1);
+      const cx = cen[0], cy = cen[1], th = 38, rb = 15, rt = 11.5;
+      // --- Anejo de piedra, con su tejado de teja y la escalera ---
+      const an = iso(x, y, 0.04, 0.94);
+      isoPrism(ctx, an[0], an[1], 0.6, 0.68, 15, stoneL, stoneD, stone);
+      stoneTexture(ctx, an[0], an[1], 0.6, 0.68, 15);
+      roofOn(ctx, an[0], an[1], 0.6, 0.68, 15, 8, roofD, roofM, roofL, 'tile');
+      outerStairs(ctx, x, y, 0.12, 1.58, 3, stoneD, shade(stoneD, -0.18), stone, false);
+      // --- Emparrado, a la derecha ---
+      // Emparrado: cuatro pies, dos carreras y la parra por encima.
+      const pg = iso(x, y, 1.62, 0.78);
+      const posts = [[-14, 7], [4, 16], [10, -2], [-8, -11]];
+      for (const [dx, dy] of posts) {
+        ctx.fillStyle = woodD;
+        ctx.fillRect(pg[0] + dx, pg[1] + dy - 15, 2, 15);
+      }
+      ctx.strokeStyle = wood; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(pg[0] - 13, pg[1] - 8); ctx.lineTo(pg[0] + 5, pg[1] + 1);
+      ctx.moveTo(pg[0] - 7, pg[1] - 26); ctx.lineTo(pg[0] + 11, pg[1] - 17);
+      ctx.moveTo(pg[0] - 13, pg[1] - 8); ctx.lineTo(pg[0] - 7, pg[1] - 26);
+      ctx.moveTo(pg[0] + 5, pg[1] + 1); ctx.lineTo(pg[0] + 11, pg[1] - 17);
+      ctx.stroke();
+      ctx.strokeStyle = woodL; ctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const t = i / 4;
+        ctx.beginPath();
+        ctx.moveTo(pg[0] - 13 + t * 6, pg[1] - 8 - t * 18);
+        ctx.lineTo(pg[0] + 5 + t * 6, pg[1] + 1 - t * 18);
+        ctx.stroke();
+      }
+      for (const [dx, dy, r] of [[-10, -16, 4.4], [-2, -22, 4], [6, -12, 3.8],
+        [0, -6, 4.2], [8, -20, 3.4]]) {
+        ivy(ctx, pg[0] + dx, pg[1] + dy, r, green);
+      }
+      // --- Torre ---
+      roundTower(ctx, cx, cy, rb, rt, th, wallL, wall, wallD);
+      coneRoof(ctx, cx, cy - th, rt + 2.6, 17, roofL, roofM, roofD);
+      // Franja del jugador al pie, siguiendo la curva.
       ctx.save();
-      ctx.translate(c0[0], c0[1]);
-      ctx.strokeStyle = wood; ctx.lineWidth = 2.4;
-      for (let i = 0; i < 4; i++) {
-        const a = i * Math.PI / 2 + 0.4;
-        ctx.beginPath(); ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(a) * 12, Math.sin(a) * 12); ctx.stroke();
-      }
-      // La tela va translúcida; se multiplica la opacidad en vez de fijarla
-      // para no pisar el desvanecido de los edificios a medio construir.
-      ctx.fillStyle = L.accent;
-      ctx.globalAlpha *= 0.75;
-      for (let i = 0; i < 4; i++) {
-        const a = i * Math.PI / 2 + 0.4;
-        ctx.beginPath();
-        ctx.ellipse(Math.cos(a) * 8, Math.sin(a) * 8, 4.2, 2.2, a, 0, Math.PI * 2); ctx.fill();
-      }
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rb, rb * 0.4, 0, 0, Math.PI);
+      ctx.lineTo(cx - rb, cy - 6);
+      ctx.ellipse(cx, cy - 6, rb, rb * 0.4, 0, Math.PI, 0, true);
+      ctx.closePath();
+      ctx.fillStyle = col.main; ctx.fill();
+      ctx.strokeStyle = col.dark; ctx.lineWidth = 1; ctx.stroke();
       ctx.restore();
-      // Sacos de grano a la puerta.
-      const yard = iso(x + 2, y, w * 0.94, w + 0.12);
-      for (const [dx, dy, r] of [[0, 0, 4.6], [9, 3, 4]]) {
-        ctx.fillStyle = L.accent;
-        ctx.beginPath();
-        ctx.ellipse(yard[0] + dx, yard[1] + dy - r * 0.6, r * 0.8, r, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = shade(L.accent, -0.18);
-        ctx.beginPath();
-        ctx.ellipse(yard[0] + dx + r * 0.4, yard[1] + dy - r * 0.5, r * 0.35, r * 0.8, 0, 0, Math.PI * 2);
-        ctx.fill();
+      // Portalón de medio punto, con su rosca de ladrillo.
+      ctx.fillStyle = shade(L.door || '#3b2a17', -0.2);
+      ctx.beginPath();
+      ctx.moveTo(cx + 3, cy - 1); ctx.lineTo(cx + 3, cy - 10);
+      ctx.quadraticCurveTo(cx + 8, cy - 15, cx + 13, cy - 10);
+      ctx.lineTo(cx + 13, cy - 1); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = shade(roofM, -0.1); ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(cx + 2, cy - 1); ctx.lineTo(cx + 2, cy - 10);
+      ctx.quadraticCurveTo(cx + 8, cy - 16, cx + 14, cy - 10);
+      ctx.lineTo(cx + 14, cy - 1); ctx.stroke();
+      // --- Aspas ---
+      // Van clavadas en el árbol que asoma por la cara de delante, y pasan
+      // por encima de la torre y del capirote.
+      const hub = [cx - 5, cy - th * 0.62];
+      for (let i = 0; i < 4; i++) {
+        windSail(ctx, hub[0], hub[1], 0.46 + i * Math.PI / 2, 30, 8.4, wood, caM);
+      }
+      ctx.fillStyle = woodD;
+      ctx.beginPath(); ctx.arc(hub[0], hub[1], 3.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = woodL;
+      ctx.beginPath(); ctx.arc(hub[0] - 0.8, hub[1] - 0.8, 1.4, 0, Math.PI * 2); ctx.fill();
+      // Escudo del jugador. Va después de las aspas: si no, la lona lo tapa
+      // justo cuando hace falta saber de quién es el molino.
+      const sh = [cx - 6, cy - 13];
+      ctx.fillStyle = '#e8e2d2';
+      ctx.beginPath();
+      ctx.moveTo(sh[0] - 4.4, sh[1] - 5); ctx.lineTo(sh[0] + 4.4, sh[1] - 5);
+      ctx.lineTo(sh[0] + 4.4, sh[1] + 1.6);
+      ctx.quadraticCurveTo(sh[0], sh[1] + 7, sh[0] - 4.4, sh[1] + 1.6);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = col.main;
+      ctx.beginPath();
+      ctx.moveTo(sh[0] - 4.4, sh[1] - 5); ctx.lineTo(sh[0] + 1, sh[1] - 5);
+      ctx.lineTo(sh[0] - 4.4, sh[1] + 3.4); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(sh[0] + 4.4, sh[1] - 1.4); ctx.lineTo(sh[0] + 4.4, sh[1] + 1.6);
+      ctx.quadraticCurveTo(sh[0], sh[1] + 7, sh[0] - 1.6, sh[1] + 4.6);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = shade('#e8e2d2', -0.3); ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(sh[0] - 4.4, sh[1] - 5); ctx.lineTo(sh[0] + 4.4, sh[1] - 5);
+      ctx.lineTo(sh[0] + 4.4, sh[1] + 1.6);
+      ctx.quadraticCurveTo(sh[0], sh[1] + 7, sh[0] - 4.4, sh[1] + 1.6);
+      ctx.closePath(); ctx.stroke();
+      // --- Sacos de grano y matas al pie ---
+      // Piedras sueltas al pie, como en la linde de cualquier era.
+      for (const [u, v, r] of [[1.42, 1.56, 1.8], [1.66, 1.42, 1.3], [0.86, 1.66, 1.4],
+        [1.24, 1.72, 1.2]]) {
+        const p = iso(x, y, u, v);
+        ctx.fillStyle = stone;
+        ctx.beginPath(); ctx.ellipse(p[0], p[1] - r * 0.4, r, r * 0.74, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = stoneD;
+        ctx.beginPath(); ctx.ellipse(p[0], p[1], r, r * 0.44, 0, 0, Math.PI); ctx.fill();
+      }
+      for (const [u, v, sc] of [[0.66, 1.62, 0.9], [1.72, 1.42, 0.8], [0.42, 0.3, 0.75]]) {
+        const p = iso(x, y, u, v);
+        fern(ctx, p[0], p[1], sc, green);
       }
       break;
     }
