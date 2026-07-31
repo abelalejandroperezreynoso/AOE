@@ -48,7 +48,25 @@ export class Renderer {
     // sale píxel a píxel en vez de ampliada. Cada fotograma se sube o se baja
     // según lo cerca que esté la cámara (ver `render`).
     setSpriteQuality(dpr);
+    const prevW = this.w, prevH = this.h;
     this.w = w; this.h = h;
+    /*
+     * La cámara mira al centro del lienzo, así que al cambiar éste de tamaño el
+     * mundo se desplazaría media diferencia de golpe. Pero el lienzo no crece
+     * por sus cuatro lados: su esquina de arriba a la izquierda se queda donde
+     * está y lo que se mueve es el borde de abajo —al aparecer o retirarse la
+     * barra inferior, sobre todo—. Se corrige la cámara en esa media diferencia
+     * para que lo que ya se estaba viendo no se mueva ni un píxel: la franja que
+     * se gana aparece por abajo, que es de donde viene.
+     *
+     * Al girar el aparato no: ahí cambian los dos lados de golpe y lo que se
+     * quiere conservar es el centro, de lo que ya se encarga keepViewOnTurn().
+     */
+    const turned = !!prevW && ((prevW >= prevH) !== (w >= h));
+    if (prevW && prevH && !turned) {
+      this.cam.x += (w - prevW) / (2 * this.cam.zoom);
+      this.cam.y += (h - prevH) / (2 * this.cam.zoom);
+    }
     /*
      * Hasta dónde se puede alejar la cámara: lo justo para que quepa el mapa
      * entero con un margen. Sin minimapa, esa es la vista de conjunto —de dónde
