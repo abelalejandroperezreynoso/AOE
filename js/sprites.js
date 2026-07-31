@@ -1648,7 +1648,7 @@ function plinth(ctx, a, b, h, k, stone, stoneD) {
  */
 function timbering(ctx, a, b, h, k0, wood) {
   const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
-  const bays = Math.max(1, Math.round(len / 26));
+  const bays = Math.max(1, Math.round(len / 22));
   const mid = k0 + (1 - k0) * 0.52;
   faceBeam(ctx, a, b, h, 0, k0 + 0.02, 1, k0 + 0.02, 2.6, wood);
   faceBeam(ctx, a, b, h, 0, 0.97, 1, 0.97, 2.8, wood);
@@ -1713,10 +1713,10 @@ function slopeTexture(ctx, rA, rB, eA, eB, tone, mat) {
     // sombra abajo. Es lo que hace que el tejado se vea de madera y no de
     // barro, aunque de lejos el color sea parecido.
     const len = Math.hypot(eA[0] - rA[0], eA[1] - rA[1]);
-    const rows = clamp(Math.round(len / 4.6), 4, 12);
-    const cols = clamp(Math.round(width / 5.2), 4, 26);
+    const rows = clamp(Math.round(len / 3.6), 5, 16);
+    const cols = clamp(Math.round(width / 4.2), 5, 32);
     const at = (s, t) => lerp2(lerp2(rA, rB, s), lerp2(eA, eB, s), t);
-    const shades = [0.13, -0.1, 0.04, -0.15, 0.08, -0.03, -0.07];
+    const shades = [0.16, -0.13, 0.05, -0.2, 0.1, -0.04, -0.09];
     for (let j = 0; j < rows; j++) {
       const t0 = j / rows, t1 = (j + 1.06) / rows; // la hilada pisa a la de abajo
       for (let i = -1; i < cols; i++) {
@@ -1784,6 +1784,22 @@ function slopeTexture(ctx, rA, rB, eA, eB, tone, mat) {
 }
 
 /**
+ * Dientes de ripia asomando por el alero. Una tablilla nunca queda a ras de
+ * la de al lado, y ese borde mordido es lo que distingue un tejado de madera
+ * de uno de teja incluso de lejos.
+ */
+function shingleEave(ctx, eA, eB, tone) {
+  const n = Math.max(4, Math.round(Math.hypot(eB[0] - eA[0], eB[1] - eA[1]) / 4.4));
+  const drop = [2.6, 3.8, 1.9, 3.2, 2.3, 4, 2.8];
+  for (let i = 0; i < n; i++) {
+    const p = lerp2(eA, eB, i / n), q = lerp2(eA, eB, (i + 1) / n);
+    const d = drop[i % drop.length];
+    poly(ctx, [p, q, [q[0], q[1] + d], [p[0], p[1] + d]],
+      i % 2 ? shade(tone, -0.2) : shade(tone, -0.1));
+  }
+}
+
+/**
  * Tejado a dos aguas con material de verdad. La paja lleva alero grueso y
  * caballete de bálago; la teja, hiladas y caballete de cumbrera.
  *
@@ -1798,7 +1814,7 @@ function slopeTexture(ctx, rA, rB, eA, eB, tone, mat) {
 function roofOn(ctx, x, y, w, d, base, rh, c1, c2, c3, mat, o = {}) {
   const P = (u, v, hh = base) => { const p = iso(x, y, u, v); return [p[0], p[1] - hh]; };
   const thatch = mat === 'thatch';
-  const ov = thatch ? 0.13 : 0.1; // vuelo del alero
+  const ov = thatch ? 0.13 : mat === 'shingle' ? 0.16 : 0.1; // vuelo del alero
   const vAxis = o.axis === 'v';
   const r0 = vAxis ? P(w / 2, 0, base + rh) : P(0, d / 2, base + rh);
   const r1 = vAxis ? P(w / 2, d, base + rh) : P(w, d / 2, base + rh);
@@ -1842,6 +1858,7 @@ function roofOn(ctx, x, y, w, d, base, rh, c1, c2, c3, mat, o = {}) {
       ctx.beginPath(); ctx.moveTo(p[0], p[1] - 2); ctx.lineTo(p[0], p[1] + 2); ctx.stroke();
     }
   } else if (mat === 'shingle') {
+    shingleEave(ctx, fl, fr, c2);
     // Caballete de ripia: dos tablas a lomo de perro sobre la cumbrera.
     ctx.strokeStyle = shade(c2, 0.12); ctx.lineWidth = 3.4; ctx.lineCap = 'butt';
     ctx.beginPath(); ctx.moveTo(r0[0], r0[1]); ctx.lineTo(r1[0], r1[1]); ctx.stroke();
@@ -1877,7 +1894,8 @@ function shedRoof(ctx, x, y, w, d, hi, lo, dir, slope, edge, mat) {
   slopeTexture(ctx, rA, rB, eA, eB, slope, mat);
   // Canto del alero: la paja tiene un palmo de grueso y la teja, un dedo.
   const th = thatch ? 3.4 : 1.8;
-  poly(ctx, [eA, eB, [eB[0], eB[1] + th], [eA[0], eA[1] + th]], edge);
+  if (mat === 'shingle') shingleEave(ctx, eA, eB, slope);
+  else poly(ctx, [eA, eB, [eB[0], eB[1] + th], [eA[0], eA[1] + th]], edge);
   if (thatch) {
     ctx.strokeStyle = shade(edge, -0.3); ctx.lineWidth = 0.9; ctx.lineCap = 'butt';
     const n = Math.max(4, Math.round(Math.hypot(eB[0] - eA[0], eB[1] - eA[1]) / 5));
@@ -1970,8 +1988,12 @@ function outerStairs(ctx, x, y, u0, v0, n, wood, woodD, woodL) {
   ctx.stroke();
 }
 
-/** Entramado del hastial: tirante, pendolón y tornapuntas. */
-function gableTimbers(ctx, a, b, apex, wood, woodD) {
+/**
+ * Entramado del hastial. El centro urbano lo lleva 'lucido', con su colgadizo
+ * y el ventanuco del desván; la casa de aldea, sólo el tirante, el pendolón y
+ * dos tornapuntas, que es lo que se ve en cualquier casa.
+ */
+function gableTimbers(ctx, a, b, apex, wood, woodD, style = 'plain') {
   const mid = lerp2(a, b, 0.5);
   ctx.lineCap = 'butt';
   const beam = (p, q, w, c) => {
@@ -1980,13 +2002,19 @@ function gableTimbers(ctx, a, b, apex, wood, woodD) {
   };
   beam(a, b, 2.6, wood);                                    // tirante
   beam(mid, apex, 2.2, wood);                               // pendolón
-  const cA = lerp2(a, apex, 0.5), cB = lerp2(b, apex, 0.5);
-  beam(cA, cB, 2, wood);                                    // colgadizo
-  beam(lerp2(a, b, 0.22), lerp2(mid, apex, 0.55), 1.7, woodD);
-  beam(lerp2(a, b, 0.78), lerp2(mid, apex, 0.55), 1.7, woodD);
-  // Ventanuco del desván, justo bajo la cumbrera.
-  const w = lerp2(mid, apex, 0.42);
-  poly(ctx, [[w[0] - 3.4, w[1] - 1], [w[0], w[1] - 3.4], [w[0] + 3.4, w[1] - 1], [w[0], w[1] + 2.4]], '#2a2119');
+  if (style === 'rich') {
+    const cA = lerp2(a, apex, 0.5), cB = lerp2(b, apex, 0.5);
+    beam(cA, cB, 2, wood);                                  // colgadizo
+    beam(lerp2(a, b, 0.22), lerp2(mid, apex, 0.55), 1.7, woodD);
+    beam(lerp2(a, b, 0.78), lerp2(mid, apex, 0.55), 1.7, woodD);
+    // Ventanuco del desván, justo bajo la cumbrera.
+    const w = lerp2(mid, apex, 0.42);
+    poly(ctx, [[w[0] - 3.4, w[1] - 1], [w[0], w[1] - 3.4], [w[0] + 3.4, w[1] - 1], [w[0], w[1] + 2.4]], '#2a2119');
+  } else {
+    beam(lerp2(a, b, 0.16), lerp2(mid, apex, 0.72), 1.8, woodD);
+    beam(lerp2(a, b, 0.84), lerp2(mid, apex, 0.72), 1.8, woodD);
+    beam(lerp2(a, apex, 0.34), lerp2(b, apex, 0.34), 1.6, woodD);
+  }
 }
 
 /** Leña apilada: troncos cortos con la testa a la vista. */
@@ -2126,6 +2154,22 @@ function crate(ctx, cx, cy, s, wood, woodD) {
   ctx.stroke();
 }
 
+/** Mata de helechos: hojas puntiagudas, más viva que una mancha de hierba. */
+function fern(ctx, cx, cy, s, tone) {
+  ctx.lineCap = 'round';
+  for (const [dx, dy, w, k] of [[-4.2, -3.6, 1.5, -0.2], [-2, -6, 1.7, -0.1],
+    [0.4, -6.8, 1.8, 0], [2.6, -5.6, 1.7, 0.1], [4.4, -3, 1.5, 0.2]]) {
+    ctx.strokeStyle = k < 0 ? shade(tone, -0.14) : tone;
+    ctx.lineWidth = w * s;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.quadraticCurveTo(cx + dx * 0.4 * s, cy + dy * 0.75 * s, cx + dx * s, cy + dy * s);
+    ctx.stroke();
+  }
+  ctx.fillStyle = shade(tone, -0.24);
+  ctx.beginPath(); ctx.ellipse(cx, cy, 2.6 * s, 1.2 * s, 0, 0, Math.PI * 2); ctx.fill();
+}
+
 /** Mata de hierba o hiedra al pie de un muro. */
 function ivy(ctx, cx, cy, r, tone) {
   for (let i = 0; i < 4; i++) {
@@ -2212,69 +2256,83 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
 
   switch (type) {
     case 'house': {
-      // Casa de aldea en ele: la crujía larga con su chimenea de piedra, el
-      // ala corta cruzada por delante y, en el rincón que dejan las dos, el
-      // porche sobre la puerta. El tejado es de ripia, no de paja, y las
-      // ventanas van encendidas: es lo que la hace parecer habitada.
-      const h = 25, glow = L.glow || '#f2a53a';
-      const band = [0.3, 0.52];
+      // Casa de aldea en ele: la crujía larga, con su chimenea de sillares y
+      // el hastial grande de cara, y el ala corta cruzada, más baja y con los
+      // paños de yeso claro. En el rincón que dejan las dos, el porche sobre
+      // la puerta. Tejado de ripia y ventanas encendidas.
+      const h = 30, glow = L.glow || '#ffc356';
+      const band = [0.24, 0.46];
+      // El ala va de otro color, como en las casas de entramado de verdad:
+      // dos manos de yeso distintas sobre la misma madera.
+      const [w2L, w2, w2D] = ramp(L.wall2 || L.wall);
+      const M2 = { ...M, wall: w2, wallL: w2L, wallD: w2D };
       // Dos cajas que no se solapan, para que la de delante nunca pise a la
-      // de detrás: la crujía larga y el ala que asoma a la derecha.
-      const pA = iso(x, y, 0.14, 0.1);
-      const fa = timberBlock(ctx, pA[0], pA[1], 1, 1.5, h, M, { windows: false, band });
-      // Chimenea de sillares, pegada al hastial de espaldas.
+      // de detrás.
+      const pA = iso(x, y, 0.12, 0.06);
+      const fa = timberBlock(ctx, pA[0], pA[1], 1.06, 1.56, h, M, { windows: false, band });
+      // Chimenea de sillares, adosada al muro largo.
       const [chL, chM, chD] = ramp(L.chimney || '#5c5c58');
-      const ch = iso(x, y, 0.02, 0.62);
-      isoPrism(ctx, ch[0], ch[1], 0.26, 0.26, 42, chL, chD, chM);
-      stoneTexture(ctx, ch[0], ch[1], 0.26, 0.26, 42);
-      const cap = iso(x, y, -0.02, 0.58);
-      isoPrism(ctx, cap[0], cap[1] - 42, 0.34, 0.34, 2.6, chL, chD, chM);
-      const pB = iso(x, y, 1.14, 0.14);
-      const fb = timberBlock(ctx, pB[0], pB[1], 0.72, 1, h, M, { windows: false, band });
-      // Ventanas: dos en la fachada larga y una en cada cara del ala.
-      for (let i = 0; i < 2; i++) faceWindow(ctx, fa[0].a, fa[0].b, h, 0.3 + i * 0.4, 0.55, fa[0].wood, fa[0].band, glow);
-      faceWindow(ctx, fb[0].a, fb[0].b, h, 0.5, 0.55, fb[0].wood, fb[0].band, glow);
-      faceWindow(ctx, fb[1].a, fb[1].b, h, 0.5, 0.55, fb[1].wood, fb[1].band, glow);
+      const ch = iso(x, y, 0, 0.6);
+      isoPrism(ctx, ch[0], ch[1], 0.28, 0.28, 50, chL, chD, chM);
+      stoneTexture(ctx, ch[0], ch[1], 0.28, 0.28, 50);
+      const cap = iso(x, y, -0.03, 0.57);
+      isoPrism(ctx, cap[0], cap[1] - 50, 0.34, 0.34, 2.4, chL, chD, chM);
+      const pB = iso(x, y, 1.18, 0.2);
+      const fb = timberBlock(ctx, pB[0], pB[1], 0.72, 0.92, h, M2, { windows: false, band });
+      // Ventanas: dos grandes en la fachada larga y una en cada cara del ala.
+      // La contraventana va de madera, no del color del jugador: aquí el azul
+      // es cosa de los paños de abajo.
+      for (let i = 0; i < 2; i++) {
+        faceWindow(ctx, fa[0].a, fa[0].b, h, 0.3 + i * 0.4, 0.54, fa[0].wood, woodD, glow);
+      }
+      faceWindow(ctx, fb[0].a, fb[0].b, h, 0.68, 0.54, fb[0].wood, woodD, glow);
+      faceWindow(ctx, fb[1].a, fb[1].b, h, 0.5, 0.54, fb[1].wood, woodD, glow);
       // Puerta, en el trozo de fachada que deja libre el ala.
-      faceDoor(ctx, fa[1].a, fa[1].b, h, 0.16, 0.7, woodL, wood, L.door);
-      // --- Tejado en ele, con los dos hastiales de cara ---
-      const gA = roofOn(ctx, pA[0], pA[1], 1, 1.5, h, 14, roofD, roofM, wallL, mat,
+      faceDoor(ctx, fa[1].a, fa[1].b, h, 0.14, 0.72, woodL, wood, L.door);
+      // --- Tejado en ele ---
+      // La crujía larga manda: su cumbrera queda por encima de la del ala, y
+      // las dos se encuentran en una lima.
+      const gA = roofOn(ctx, pA[0], pA[1], 1.06, 1.56, h, 17, roofD, roofM, wallL, mat,
         { axis: 'v', gableBack: roofD });
-      const rB = iso(x, y, 0.5, 0.14);
-      const gB = roofOn(ctx, rB[0], rB[1], 1.35, 1, h, 14, roofD, roofL, wallL, mat,
+      const rB = iso(x, y, 0.82, 0.2);
+      const gB = roofOn(ctx, rB[0], rB[1], 1.08, 0.92, h, 12, roofD, roofL, w2L, mat,
         { gableBack: roofD });
       gableTimbers(ctx, gA.br, gA.fr, gA.r1, wood, woodD);
       gableTimbers(ctx, gB.br, gB.fr, gB.r1, wood, woodD);
       // --- Porche sobre la puerta ---
-      for (const v of [1.04, 1.62]) {
-        const p = iso(x, y, 1.36, v);
-        isoPrism(ctx, p[0], p[1], 0.11, 0.11, 14, woodL, woodD, wood);
+      for (const v of [1.2, 1.62]) {
+        const p = iso(x, y, 1.34, v);
+        isoPrism(ctx, p[0], p[1], 0.13, 0.13, 18.5, woodL, woodD, wood);
       }
-      const por = iso(x, y, 1.14, 1);
-      const pr = shedRoof(ctx, por[0], por[1], 0.3, 0.72, 17, 14, 'u+', roofM, roofD, mat);
+      const por = iso(x, y, 1.18, 1.16);
+      const pr = shedRoof(ctx, por[0], por[1], 0.22, 0.56, 21, 18.5, 'u+', roofM, roofD, mat);
       // Una línea de sombra bajo el alero del porche, o se confunde con el
       // faldón grande que le cae justo encima.
-      ctx.strokeStyle = 'rgba(28,20,10,.4)'; ctx.lineWidth = 1.4; ctx.lineCap = 'butt';
+      ctx.strokeStyle = 'rgba(24,18,10,.42)'; ctx.lineWidth = 1.4; ctx.lineCap = 'butt';
       ctx.beginPath();
-      ctx.moveTo(pr.eA[0], pr.eA[1] + 2); ctx.lineTo(pr.eB[0], pr.eB[1] + 2); ctx.stroke();
+      ctx.moveTo(pr.eA[0], pr.eA[1] + 3); ctx.lineTo(pr.eB[0], pr.eB[1] + 3); ctx.stroke();
       // --- La vida de la casa, alrededor ---
-      const yard = iso(x, y, 0.12, 1.9), keg = iso(x, y, 0.62, 1.98);
-      logPile(ctx, yard[0], yard[1], wood, woodL, woodD, 0.72);
-      barrel(ctx, keg[0], keg[1], 0.85, wood, woodD, stoneD);
-      const box = iso(x, y, 1.95, 0.72);
-      crate(ctx, box[0], box[1], 0.8, wood, woodD);
-      const pit = iso(x, y, 1.86, 1.72);
-      well(ctx, pit[0], pit[1], 6, M);
-      // Matas al pie de los muros y piedras sueltas por el suelo.
-      for (const [u, v, r] of [[0.08, 1.3, 4.6], [1.2, 1.72, 4], [1.98, 1.2, 4.4], [1.5, 0.05, 4]]) {
+      // La leña se apila contra el muro, no en medio del corral.
+      const yard = iso(x, y, 0.58, 1.82), keg = iso(x, y, 0.02, 1.96);
+      logPile(ctx, yard[0], yard[1], wood, woodL, woodD, 0.8);
+      barrel(ctx, keg[0], keg[1], 0.9, wood, woodD, stoneD);
+      const box = iso(x, y, 1.94, 0.78);
+      crate(ctx, box[0], box[1], 0.85, wood, woodD);
+      const pit = iso(x, y, 1.88, 1.7);
+      well(ctx, pit[0], pit[1], 6.5, M);
+      for (const [u, v, sc] of [[0.06, 1.24, 1], [1.16, 1.8, 0.85], [1.98, 1.28, 0.95],
+        [1.6, 0.06, 0.8], [0.9, 1.86, 0.7]]) {
         const p = iso(x, y, u, v);
-        ivy(ctx, p[0], p[1], r, green);
+        fern(ctx, p[0], p[1], sc, green);
       }
-      ctx.fillStyle = stoneD;
-      for (const [u, v, r] of [[1.5, 1.85, 1.6], [1.25, 1.95, 1.2], [0.95, 1.75, 1.1],
-        [1.7, 1.95, 1.3], [0.35, 1.6, 1.2]]) {
+      // Piedras sueltas por el suelo.
+      for (const [u, v, r] of [[1.5, 1.9, 1.7], [1.3, 1.98, 1.2], [1.02, 1.72, 1.1],
+        [1.72, 1.96, 1.4], [0.34, 1.56, 1.2], [1.66, 1.42, 1]]) {
         const p = iso(x, y, u, v);
-        ctx.beginPath(); ctx.ellipse(p[0], p[1], r, r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = stone;
+        ctx.beginPath(); ctx.ellipse(p[0], p[1] - r * 0.4, r, r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = stoneD;
+        ctx.beginPath(); ctx.ellipse(p[0], p[1], r, r * 0.42, 0, 0, Math.PI); ctx.fill();
       }
       break;
     }
@@ -2362,8 +2420,8 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       const cross = iso(x, y, hu - jut + (rw - cw) / 2, hu - jut - 0.07);
       const gB = roofOn(ctx, cross[0], cross[1], cw, rw + 0.14, eave, 26, roofD, roofL, wallL, 'tile',
         { axis: 'v', gableBack: roofD });
-      gableTimbers(ctx, gA.br, gA.fr, gA.r1, wood, woodD);
-      gableTimbers(ctx, gB.br, gB.fr, gB.r1, wood, woodD);
+      gableTimbers(ctx, gA.br, gA.fr, gA.r1, wood, woodD, 'rich');
+      gableTimbers(ctx, gB.br, gB.fr, gB.r1, wood, woodD, 'rich');
       bannerPole(ctx, gA.r1[0] - 1, gA.r1[1] + 2, 11, col);
       bannerPole(ctx, gB.r1[0] - 1, gB.r1[1] + 2, 11, col);
       // Banderolas colgadas de la viga del voladizo.

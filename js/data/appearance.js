@@ -29,8 +29,9 @@ const RAMPS = {
   '#8f8a80': ['#a9a49a', '#6f6a62'], // zócalo de piedra
   // Tejados
   '#b09a62': ['#c9b47c', '#8d7a4a'], // bálago (molino)
-  '#9c8a68': ['#b5a381', '#7d6d50'], // ripia de madera (casa)
-  '#707a88': ['#8a939f', '#57606c'], // yeso azulado de la casa
+  '#94856a': ['#ada07f', '#6f6350'], // ripia de madera (casa)
+  '#525d6b': ['#68737f', '#3c454f'], // yeso azulado de la casa
+  '#c6c0ad': ['#ddd8c8', '#a49e8c'], // yeso claro del ala
   '#a08a55': ['#bda66d', '#7f6d40'], // bálago viejo de los cobertizos
   '#a8452f': ['#c2543a', '#8a3423'], // teja roja
   '#96442f': ['#a85a3d', '#7d3a2a'], // centro urbano
@@ -104,8 +105,9 @@ export const LOOK = {
       wood: '#8a6234', stone: STONE, door: '#3b2a17', ivy: '#3f6b32',
     },
     house: {
-      wall: '#707a88', roof: '#9c8a68', wood: '#4a3826', stone: STONE,
-      chimney: '#5c5c58', door: '#8a5f2f', glow: '#f2a53a', ivy: '#3f6b32',
+      wall: '#525d6b', wall2: '#c6c0ad', roof: '#94856a', wood: '#332a22',
+      stone: '#9b968c', chimney: '#5c5c58', door: '#9a6a33', glow: '#ffc356',
+      ivy: '#4a8a3a',
     },
     mill: { wall: '#d8cba6', roof: '#b09a62', wood: '#6b4f2c', stone: STONE, accent: '#ebe4c8' },
     lumbercamp: { wall: '#8a6234', roof: '#a08a55', accent: '#8f6a3c' },
@@ -164,7 +166,8 @@ export const LOOK_FIELDS = {
     color('wheel', 'Ruedas'), scale,
   ],
   building: [
-    color('wall', 'Muros'), color('base', 'Basamento'), color('stone', 'Zócalo'),
+    color('wall', 'Muros'), color('wall2', 'Muros del ala'), color('base', 'Basamento'),
+    color('stone', 'Zócalo'),
     color('roof', 'Tejado'), color('thatch', 'Bálago'), color('wood', 'Madera'), color('door', 'Puerta'),
     color('chimney', 'Chimenea'), color('glow', 'Ventanas'), color('ivy', 'Hiedra'),
     color('soil', 'Tierra'), color('crop', 'Cultivo'), color('fence', 'Cerca'),
