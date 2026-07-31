@@ -378,20 +378,10 @@ export class Unit {
     const info = g.gatherInfo(target);
     this.wantRes = info.res;
     /*
-     * Si viene cargado con otro recurso, lo primero es dejarlo en el almacén:
-     * de ahí sale luego derecho al nuevo recurso. Se decide aquí y no al llegar
-     * porque, si no, el aldeano cruzaba el mapa hasta el recurso nuevo, volvía a
-     * descargar y tenía que hacer el viaje otra vez.
+     * Al cambiar de recurso el aldeano va directo al nuevo nodo: no da el rodeo
+     * por el almacén. Lo que llevaba encima se pierde al empezar a recolectar el
+     * otro recurso (más abajo), igual que en el juego original.
      */
-    if (this.carryRes && this.carryRes !== info.res && this.carry > 0.5) {
-      const drop = g.findDropoff(player, this.carryRes, this.x, this.y);
-      if (drop) {
-        this.task = { type: 'deliver', target: drop, back: target };
-        this.path = null; this.repathCd = 0;
-        return;
-      }
-      this.carry = 0;
-    }
     const isBuilding = target.kind === 'building';
     const near = this.inWorkRange(g, target, info);
     if (!near) {
