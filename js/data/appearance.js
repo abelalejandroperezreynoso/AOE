@@ -28,7 +28,8 @@ const RAMPS = {
   '#a8c24a': ['#c0d868', '#7a9a34'], // surcos del cultivo
   '#8f8a80': ['#a9a49a', '#6f6a62'], // zócalo de piedra
   // Tejados
-  '#b09a62': ['#c9b47c', '#8d7a4a'], // bálago (molino)
+  '#b09a62': ['#c9b47c', '#8d7a4a'], // bálago (casas de aldea)
+  '#cfc6b0': ['#e6dfcb', '#a99f8b'], // mampostería encalada del molino
   '#94856a': ['#ada07f', '#6f6350'], // ripia de madera (casa)
   '#525d6b': ['#68737f', '#3c454f'], // yeso azulado de la casa
   '#c6c0ad': ['#ddd8c8', '#a49e8c'], // yeso claro del ala
@@ -111,7 +112,10 @@ export const LOOK = {
       stone: '#9b968c', chimney: '#5c5c58', door: '#9a6a33', glow: '#ffc356',
       ivy: '#4a8a3a',
     },
-    mill: { wall: '#d8cba6', roof: '#b09a62', wood: '#6b4f2c', stone: STONE, accent: '#ebe4c8' },
+    mill: {
+      wall: '#cfc6b0', roof: '#a8452f', wood: '#6b4f2c', stone: '#9a9a94',
+      door: '#3b2a17', accent: '#ebe4c8', ivy: '#4a8a3a',
+    },
     lumbercamp: {
       wood: '#8a6234', accent: '#8f6a3c', wicker: '#b08a52', stone: STONE,
       soil: '#a8926a', ivy: '#4a8a3a',
