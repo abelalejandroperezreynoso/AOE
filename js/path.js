@@ -132,6 +132,18 @@ export function ringTiles(map, tx, ty, w, h, radius = 1) {
   return out;
 }
 
+/**
+ * Tiles transitables de dentro de un rectángulo. Sirve para llegar al interior
+ * de un edificio por el que se puede andar: a la granja se entra, no se rodea.
+ */
+export function areaTiles(map, tx, ty, w, h) {
+  const out = [];
+  for (let y = ty; y < ty + h; y++) {
+    for (let x = tx; x < tx + w; x++) if (map.isPassable(x, y)) out.push({ x, y });
+  }
+  return out;
+}
+
 /** Busca el tile libre más cercano a (x,y) en espiral. */
 export function nearestFree(map, x, y, maxR = 12) {
   if (map.isPassable(x, y)) return { x, y };

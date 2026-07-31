@@ -13,6 +13,12 @@ const MARKET_RATE = { sell: 0.8, buy: 1.4 };
 const QUEUE_ICONS = 6; // iconos que se dibujan de la cola; el resto los dice el contador
 // Cuánto se levanta la maqueta por encima del dedo al arrastrar un edificio.
 const DRAG_LIFT = 56;
+/*
+ * Cuánto hay que mantener el dedo quieto sobre el mapa para que el toque pase
+ * de seleccionar a dar la orden. Es el clic derecho del táctil, así que va
+ * corto: lo justo para separarlo de un toque, sin que se haga esperar.
+ */
+const HOLD_MS = 320;
 
 /**
  * Elementos que se pulsan o se arrastran: mientras el puntero esté encima no se
@@ -423,7 +429,8 @@ export class UI {
 
   /**
    * Control táctil: un toque selecciona lo propio o da la orden sobre lo
-   * seleccionado, arrastrar mueve la cámara y pellizcar acerca o aleja.
+   * seleccionado, mantener el dedo un momento da la orden sin cambiar la
+   * selección, arrastrar mueve la cámara y pellizcar acerca o aleja.
    *
    * Construir no entra aquí: con el dedo, la única forma es arrastrar el
    * edificio desde la barra de órdenes (ver barGesture*). El lienzo no coloca
@@ -436,15 +443,25 @@ export class UI {
     };
     const spread = (ts) => Math.hypot(ts[0].clientX - ts[1].clientX, ts[0].clientY - ts[1].clientY);
     let start = null, moved = false, pinch = 0, lastPan = null;
+    // Pulsación mantenida: el "clic derecho" del dedo (ver `touchHold`).
+    let holdTimer = null, held = false;
+    const cancelHold = () => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } };
 
     c.addEventListener('touchstart', (e) => {
       this.audio.ensure();
       this.touchMode = true;
       this.hideTooltip();
+      cancelHold();
       if (e.touches.length === 1) {
         start = pos(e.touches[0]);
         lastPan = start;
         moved = false;
+        held = false;
+        holdTimer = setTimeout(() => {
+          holdTimer = null;
+          if (moved || !start) return;
+          held = this.touchHold(start.x, start.y);
+        }, HOLD_MS);
       } else if (e.touches.length === 2) {
         pinch = spread(e.touches);
         moved = true;
@@ -454,14 +471,18 @@ export class UI {
 
     c.addEventListener('touchmove', (e) => {
       if (e.touches.length === 2 && pinch) {
+        cancelHold();
         const d = spread(e.touches);
         this.r.cam.zoom *= d / pinch;
         pinch = d;
         this.r.clampCam();
       } else if (e.touches.length === 1 && lastPan) {
         const p = pos(e.touches[0]);
-        if (Math.hypot(p.x - start.x, p.y - start.y) > 12) moved = true;
-        if (moved) {
+        if (Math.hypot(p.x - start.x, p.y - start.y) > 12) { moved = true; cancelHold(); }
+        // Tras dar la orden manteniendo pulsado, el mismo dedo ya no arrastra
+        // la cámara: se levanta y se vuelve a apoyar, y así no se va la vista
+        // sola justo después de mandar a alguien.
+        if (moved && !held) {
           this.r.cam.x -= (p.x - lastPan.x) / this.r.cam.zoom;
           this.r.cam.y -= (p.y - lastPan.y) / this.r.cam.zoom;
           this.r.clampCam();
@@ -473,6 +494,9 @@ export class UI {
 
     c.addEventListener('touchend', (e) => {
       if (e.touches.length === 0) pinch = 0;
+      cancelHold();
+      // La orden ya se dio al mantener el dedo: levantarlo no hace nada más.
+      if (held) { held = false; start = null; lastPan = null; e.preventDefault(); return; }
       if (!start || moved) { start = null; lastPan = null; return; }
       const { x, y } = start;
       start = null; lastPan = null;
@@ -490,14 +514,48 @@ export class UI {
       // Tocar algo propio lo selecciona, salvo que lo que haya seleccionado
       // pueda trabajar en ello: mandar aldeanos a terminar unos cimientos es
       // una orden, no un cambio de selección.
-      if (mine && this.canWorkOn(target)) this.rightClick(x, y, false);
-      else if (target && target.kind && target.owner === g.human.id) this.clickSelect(x, y, false, 0);
-      else if (mine) this.rightClick(x, y, false);
-      else this.clickSelect(x, y, false, 0);
+      if (mine && this.canWorkOn(target, false)) this.rightClick(x, y, false);
+      else if (target && target.kind && target.owner === g.human.id) {
+        // Se queda con el edificio, que es lo que se ha pedido; pero si había
+        // un aldeano cargado, se recuerda que la descarga está a un dedo
+        // mantenido de distancia.
+        if (this.canDeposit(target)) this.holdHint();
+        this.clickSelect(x, y, false, 0, true);
+      } else if (mine) this.rightClick(x, y, false);
+      else this.clickSelect(x, y, false, 0, true);
       e.preventDefault();
     }, { passive: false });
 
-    c.addEventListener('touchcancel', () => { start = null; lastPan = null; pinch = 0; });
+    c.addEventListener('touchcancel', () => {
+      cancelHold();
+      start = null; lastPan = null; pinch = 0; held = false;
+    });
+  }
+
+  /**
+   * Pulsación mantenida sobre el mapa: es el clic derecho del táctil. Da la
+   * orden a lo que se tenga seleccionado sin tocar la selección, así que un
+   * toque corto puede quedarse con lo suyo —seleccionar el edificio— y el
+   * dedo mantenido con lo otro —mandar al aldeano a descargar en él—.
+   *
+   * Devuelve si el gesto se ha consumido: sin nada propio seleccionado no hay
+   * orden que dar, así que se deja pasar y el toque acaba seleccionando.
+   */
+  touchHold(x, y) {
+    const g = this.game;
+    if (g.placing || this.pending) return false;
+    if (!g.selection.some((e) => e.owner === g.human.id)) return false;
+    this.rightClick(x, y, false);
+    // Un golpecito para avisar de que la orden salió sin levantar el dedo.
+    if (navigator.vibrate) { try { navigator.vibrate(12); } catch { /* da igual */ } }
+    return true;
+  }
+
+  /** Aviso, una sola vez por partida, de para qué sirve mantener pulsado. */
+  holdHint() {
+    if (this.holdHinted) return;
+    this.holdHinted = true;
+    this.notify('Mantén pulsado el edificio para ir a descargar');
   }
 
   /**
@@ -515,23 +573,28 @@ export class UI {
    * Las ovejas propias también cuentan, y aquí sí manda con el ratón: con
    * aldeanos seleccionados, pulsar una oveja es mandarlos a por su comida, no
    * cambiar la selección. Para pastorearla se pulsa sin aldeanos seleccionados.
+   *
+   * `deposit` desactiva el caso de ir a descargar. Con el dedo se apaga: el
+   * toque corto sobre el centro urbano o un campamento los selecciona y para
+   * mandar al aldeano a soltar la carga se mantiene pulsado (ver `touchHold`).
    */
-  canWorkOn(target) {
+  canWorkOn(target, deposit = true) {
     const g = this.game;
     const hasVillager = g.selection
       .some((e) => e.kind === 'unit' && e.type === 'villager' && e.owner === g.human.id);
     if (!hasVillager) return false;
     if (isMyAnimal(target, g)) return true;
-    if (this.canDeposit(target)) return true;
+    if (deposit && this.canDeposit(target)) return true;
     if (!target || target.kind !== 'building' || target.owner !== g.human.id) return false;
     return !target.built || target.type === 'farm';
   }
 
   /**
    * ¿Alguno de los aldeanos seleccionados tiene algo que soltar en ese edificio?
-   * Señalar el centro urbano (o el molino, el campamento...) con un aldeano
-   * cargado es mandarlo a descargar, no cambiar la selección: para eso están
-   * ahí. El edificio se sigue seleccionando en cuanto el aldeano va de vacío.
+   * Con el ratón, señalar el centro urbano (o el molino, el campamento...) con
+   * un aldeano cargado es mandarlo a descargar, no cambiar la selección: para
+   * eso están ahí, y el clic derecho sigue disponible para todo lo demás. El
+   * edificio se sigue seleccionando en cuanto el aldeano va de vacío.
    */
   canDeposit(target) {
     const g = this.game;
@@ -549,15 +612,18 @@ export class UI {
     this.refreshSelection();
   }
 
-  clickSelect(x, y, shift, elapsed) {
+  clickSelect(x, y, shift, elapsed, touch = false) {
     const g = this.game;
     const e = this.r.entityAtScreen(x, y);
     if (!e) { if (!shift) this.select([]); return; }
     // Oveja propia con aldeanos seleccionados: se les manda a por ella en vez
     // de soltarlos para seleccionarla.
     if (isMyAnimal(e, g) && this.canWorkOn(e)) { this.rightClick(x, y, shift); return; }
-    // Almacén propio con aldeanos cargados: se les manda a descargar.
-    if (this.canDeposit(e)) { this.rightClick(x, y, shift); return; }
+    // Almacén propio con aldeanos cargados: se les manda a descargar. Con el
+    // dedo no: ahí el toque corto selecciona y para descargar se mantiene
+    // pulsado, que si no no habría forma de abrir el centro urbano con un
+    // aldeano cargado a cuestas.
+    if (!touch && this.canDeposit(e)) { this.rightClick(x, y, shift); return; }
     // Un recurso del mapa sólo enseña su ficha... salvo que sea un animal de mi
     // rebaño, que se selecciona como cualquier otra cosa mía para poder moverlo.
     if (isNode(e) && !isMyAnimal(e, g)) {

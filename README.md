@@ -154,8 +154,10 @@ Detalles a tener en cuenta:
 | Ayuda | `F1` |
 
 En **móvil y tablet**: un toque selecciona lo tuyo, un toque en el suelo da la
-orden a lo que tengas seleccionado, arrastrar mueve la cámara y pellizcar acerca
-o aleja.
+orden a lo que tengas seleccionado, **mantener el dedo** un momento da la orden
+sin cambiar la selección —así se manda a un aldeano cargado a descargar en el
+centro urbano, el molino o un campamento, que con un toque corto se
+seleccionan—, arrastrar mueve la cámara y pellizcar acerca o aleja.
 
 ### Bucle de juego
 
@@ -164,6 +166,11 @@ o aleja.
    y granjas cuando se agote la caza. Las **ovejas se domestican**: pasan al bando
    de quien tenga unidades cerca —y cambian de dueño si se acerca otro—, así que
    conviene llevarlas a la base antes de sacrificarlas.
+   Las **granjas** funcionan como en el clásico: necesitan un molino, las cultiva
+   un solo aldeano puesto en el centro de la parcela, las unidades pasan por
+   encima de ellas y, cuando se agotan, su aldeano las vuelve a sembrar solo si
+   queda madera (si no, se queda en reposo y aparece en el contador de aldeanos
+   ociosos).
 2. **Población.** Cada casa da 5 de población; el centro urbano, 5; el castillo, 20.
 3. **Edades.** Desde el centro urbano se avanza a Feudal, Castillos e Imperial.
    Cada edad exige edificios de la anterior y desbloquea unidades, edificios y

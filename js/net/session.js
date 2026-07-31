@@ -323,11 +323,7 @@ export class NetSession {
         g.buildings.add(b);
         g.players[bs.owner].buildings.add(b);
         g.byId.set(b.id, b);
-        for (let y = bs.ty; y < bs.ty + b.size; y++) {
-          for (let x = bs.tx; x < bs.tx + b.size; x++) {
-            if (g.map.inBounds(x, y)) g.map.occupied[g.map.idx(x, y)] = b.id;
-          }
-        }
+        g.map.occupy(b, b.passable);
       }
       b.hp = bs.hp; b.maxHp = bs.maxHp;
       b.built = bs.built; b.progress = bs.progress;
