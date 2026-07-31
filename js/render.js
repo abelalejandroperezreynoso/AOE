@@ -19,6 +19,20 @@ const Z_PX = 18; // píxeles de altura por unidad de "z" en el mundo
  */
 const MAX_TILES = 1000;
 
+/*
+ * Banderas de destino: colores por clase de orden, los mismos del marcador que
+ * parpadea al darla, y cuántas se pintan como mucho. Con la selección al
+ * completo de una base salen destinos de sobra, y a partir de unas pocas
+ * banderas ya no se distingue nada.
+ */
+const FLAG_COLORS = {
+  move: { pole: '#cdeccd', cloth: '#5fb867' },
+  gather: { pole: '#ffeaa8', cloth: '#d9a92c' },
+  attack: { pole: '#ffc7bd', cloth: '#c8493a' },
+  rally: { pole: '#ffe9a8', cloth: '#e0b52c' },
+};
+const MAX_FLAGS = 12;
+
 export class Renderer {
   constructor(canvas, game) {
     this.canvas = canvas;
@@ -172,6 +186,7 @@ export class Renderer {
     this.drawDecals(ctx, b);
     this.drawSelectionMarkers(ctx);
     this.drawEntities(ctx, b);
+    this.drawFlags(ctx);
     this.drawParticles(ctx);
     this.drawPlacement(ctx);
     ctx.restore();
@@ -271,18 +286,49 @@ export class Renderer {
         ctx.closePath(); ctx.stroke();
       }
     }
-    // Punto de reunión del edificio seleccionado.
+  }
+
+  /**
+   * Banderas de lo seleccionado: a dónde va cada unidad y dónde tiene el punto
+   * de reunión un edificio. Van después de las entidades y no antes, porque son
+   * un aviso para el jugador y no algo que esté plantado en el mundo: una
+   * bandera detrás del centro urbano no la ve nadie.
+   *
+   * Cada destino lleva el color de su orden —verde ir a un sitio, ámbar un
+   * recurso, rojo ir a por alguien— y se agrupan por punto: una tropa entera
+   * yendo al mismo sitio planta una sola bandera, no cuarenta pegadas. Se corta
+   * a las primeras: con media base seleccionada el mapa sería un banderín.
+   */
+  drawFlags(ctx) {
+    const g = this.game;
     const sel = g.selection[0];
     if (sel && sel.kind === 'building' && sel.rally && sel.owner === g.human.id) {
-      const r = sel.rally;
-      const [mx, my] = this.worldToCanvas(r.x, r.y);
-      ctx.strokeStyle = '#ffe9a8'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx, my - 22); ctx.stroke();
-      ctx.fillStyle = '#e0b52c';
-      ctx.beginPath();
-      ctx.moveTo(mx, my - 22); ctx.lineTo(mx + 13, my - 18); ctx.lineTo(mx, my - 13);
-      ctx.closePath(); ctx.fill();
+      this.drawFlag(ctx, sel.rally.x, sel.rally.y, FLAG_COLORS.rally);
     }
+    const seen = new Set();
+    for (const e of g.selection) {
+      if (e.owner !== g.human.id) continue;
+      const d = g.destinationOf(e);
+      if (!d) continue;
+      const key = `${Math.round(d.x * 2)}:${Math.round(d.y * 2)}:${d.kind}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      this.drawFlag(ctx, d.x, d.y, FLAG_COLORS[d.kind] || FLAG_COLORS.move);
+      if (seen.size >= MAX_FLAGS) return;
+    }
+  }
+
+  /** Bandera clavada en un punto del mundo, con su cerco en el suelo. */
+  drawFlag(ctx, wx, wy, col) {
+    const [mx, my] = this.worldToCanvas(wx, wy);
+    ctx.strokeStyle = col.pole;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(mx, my, 7, 3.5, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx, my - 22); ctx.stroke();
+    ctx.fillStyle = col.cloth;
+    ctx.beginPath();
+    ctx.moveTo(mx, my - 22); ctx.lineTo(mx + 13, my - 18); ctx.lineTo(mx, my - 13);
+    ctx.closePath(); ctx.fill();
   }
 
   drawEntities(ctx, b) {
