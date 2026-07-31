@@ -32,6 +32,8 @@ const RAMPS = {
   '#94856a': ['#ada07f', '#6f6350'], // ripia de madera (casa)
   '#525d6b': ['#68737f', '#3c454f'], // yeso azulado de la casa
   '#c6c0ad': ['#ddd8c8', '#a49e8c'], // yeso claro del ala
+  '#b08a52': ['#c9a76d', '#8d6d3f'], // mimbre del cesto de la grúa
+  '#a8926a': ['#c2ae8b', '#8b7855'], // tierra pisada del tajo
   '#a08a55': ['#bda66d', '#7f6d40'], // bálago viejo de los cobertizos
   '#a8452f': ['#c2543a', '#8a3423'], // teja roja
   '#96442f': ['#a85a3d', '#7d3a2a'], // centro urbano
@@ -110,7 +112,10 @@ export const LOOK = {
       ivy: '#4a8a3a',
     },
     mill: { wall: '#d8cba6', roof: '#b09a62', wood: '#6b4f2c', stone: STONE, accent: '#ebe4c8' },
-    lumbercamp: { wall: '#8a6234', roof: '#a08a55', accent: '#8f6a3c' },
+    lumbercamp: {
+      wood: '#8a6234', accent: '#8f6a3c', wicker: '#b08a52', stone: STONE,
+      soil: '#a8926a', ivy: '#4a8a3a',
+    },
     miningcamp: { wall: '#8a6234', roof: '#a08a55', accent: '#8c8f95' },
     farm: { soil: '#8a6a3c', crop: '#a8c24a', fence: '#5b4426' },
     barracks: { wall: '#d8cba6', roof: '#7a3a2c', wood: '#8a6234', stone: STONE, door: '#4d3620', accent: '#d8d8d0' },
@@ -171,7 +176,8 @@ export const LOOK_FIELDS = {
     color('roof', 'Tejado'), color('thatch', 'Bálago'), color('wood', 'Madera'), color('door', 'Puerta'),
     color('chimney', 'Chimenea'), color('glow', 'Ventanas'), color('ivy', 'Hiedra'),
     color('soil', 'Tierra'), color('crop', 'Cultivo'), color('fence', 'Cerca'),
-    color('ground', 'Empedrado'), color('counter', 'Mostradores'), color('accent', 'Detalle'),
+    color('ground', 'Empedrado'), color('wicker', 'Mimbre'),
+    color('counter', 'Mostradores'), color('accent', 'Detalle'),
     color('stall1', 'Puesto 1'), color('stall2', 'Puesto 2'),
     color('stall3', 'Puesto 3'), color('stall4', 'Puesto 4'),
   ],
