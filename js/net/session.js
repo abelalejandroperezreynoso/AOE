@@ -1,85 +1,191 @@
-// Sesión de partida entre dos jugadores.
+// Sesión de partida en red, de dos a ocho jugadores.
 //
-// El anfitrión es quien simula: manda instantáneas del estado diez veces por
-// segundo y aplica las órdenes que recibe. El invitado no simula nada, sólo
-// pinta lo que le llega (interpolando entre instantáneas para que se vea
-// fluido a 60 fps) y manda sus órdenes.
+// El anfitrión es quien simula: mantiene una conexión con cada invitado, les
+// manda instantáneas del estado varias veces por segundo y aplica las órdenes
+// que recibe de cada uno. Los invitados no simulan nada, sólo pintan lo que les
+// llega (interpolando entre instantáneas para que se vea fluido a 60 fps) y
+// mandan sus órdenes al anfitrión.
 
 import { encodeSnapshot, decodeSnapshot, encodeOver, decodeOver } from './protocol.js';
 import { UNITS, BUILDINGS, TECHS } from '../config.js';
 import { Unit, Building } from '../entities.js';
 
 const SNAPSHOT_MS = 100;
+const SNAPSHOT_MAX_MS = 200;
+// Los invitados dan señales de vida cada poco. Normalmente basta con lo que
+// avisa WebRTC (cerrar la pestaña se nota en unos segundos), pero si la red se
+// corta de golpe puede tardar muchísimo, y esto lo cubre. El margen es amplio a
+// propósito: un móvil con el juego en segundo plano deja de dibujar, y no por
+// eso hay que echarlo de la partida.
+const PING_MS = 2000;
+const SILENCE_MS = 90000;
+
+/**
+ * Con mucha gente el anfitrión tiene que codificar y enviar una instantánea
+ * distinta por invitado, así que se espacian un poco para no ahogar su subida.
+ */
+export function snapshotInterval(guests) {
+  return Math.min(SNAPSHOT_MAX_MS, SNAPSHOT_MS + Math.max(0, guests - 2) * 20);
+}
 
 export class NetSession {
-  constructor(peer, role, game) {
-    this.peer = peer;
-    this.role = role;           // 'host' o 'guest'
+  /**
+   * `links` empareja cada conexión con el jugador que hay al otro lado: en el
+   * anfitrión hay una por invitado; en el invitado, sólo la del anfitrión.
+   */
+  constructor(game, role, links) {
     this.game = game;
-    this.acc = 0;
+    this.role = role;           // 'host' o 'guest'
     this.lost = false;
     this.onLost = null;
     game.net = this;
 
-    peer.addEventListener('message', (e) => this.receive(e.detail));
-    peer.addEventListener('lost', () => {
-      if (this.lost) return;
-      this.lost = true;
-      if (this.onLost) this.onLost();
+    this.interval = snapshotInterval(links.length);
+    this.links = links.map(({ playerId, peer }, i) => {
+      const link = {
+        playerId, peer, lost: false,
+        // Cada invitado recibe la suya en un momento distinto del ciclo, para
+        // repartir el trabajo del anfitrión en vez de amontonarlo.
+        acc: (i / Math.max(1, links.length)) * this.interval,
+        removed: [], depleted: [], silence: 0,
+      };
+      peer.addEventListener('message', (e) => this.receive(e.detail, link));
+      peer.addEventListener('lost', () => this.handleLost(link));
+      return link;
     });
+    game.netSnapMs = this.interval / 1000;
+    this.lastSnapAt = 0;
+    // Va por su cuenta y no con el bucle de dibujo, para que siga habiendo
+    // señales de vida aunque el navegador deje de pintar en segundo plano.
+    if (!this.isHost) this.pingTimer = setInterval(() => this.ping(), PING_MS);
+    // Lo que llegó mientras se generaba el mundo se entrega ahora.
+    for (const link of this.links) link.peer.release();
   }
 
   get isHost() { return this.role === 'host'; }
 
+  /** Conexión con el anfitrión (sólo existe en el invitado). */
+  get hostLink() { return this.links[0]; }
+
+  linkOf(playerId) { return this.links.find((l) => l.playerId === playerId) || null; }
+
   sendCommand(cmd) {
     if (this.isHost) return; // el anfitrión aplica sus órdenes directamente
-    this.peer.send(JSON.stringify(cmd));
+    this.hostLink?.peer.send(JSON.stringify(cmd));
   }
 
   /** Llamado desde el bucle principal, después de simular. */
   tick(dt) {
-    if (!this.isHost || !this.peer.ready) return;
-    this.acc += dt * 1000;
-    if (this.acc < SNAPSHOT_MS) return;
-    this.acc = 0;
+    if (!this.isHost) return;
+    const step = dt * 1000;
     const g = this.game;
-    const buf = encodeSnapshot(g, this.remotePlayer, g.netRemoved, g.netDepleted);
-    g.netRemoved = [];
-    g.netDepleted = [];
-    this.peer.send(buf);
+
+    // Bajas y recursos agotados de este ciclo: cada invitado lleva su propia
+    // lista porque no todos reciben la instantánea en el mismo momento.
+    if (g.netRemoved.length || g.netDepleted.length) {
+      for (const link of this.links) {
+        if (link.lost) continue;
+        for (const id of g.netRemoved) link.removed.push(id);
+        for (const idx of g.netDepleted) link.depleted.push(idx);
+      }
+      g.netRemoved = [];
+      g.netDepleted = [];
+    }
+
+    for (const link of this.links) {
+      if (link.lost) continue;
+      // Quien lleva mucho rato sin decir nada es que ya no está.
+      link.silence += step;
+      if (link.silence > SILENCE_MS) { this.handleLost(link); continue; }
+      if (!link.peer.ready) continue;
+      link.acc += step;
+      if (link.acc < this.interval) continue;
+      link.acc = 0;
+      const viewer = g.players[link.playerId];
+      link.peer.send(encodeSnapshot(g, viewer, link.removed, link.depleted));
+      link.removed = [];
+      link.depleted = [];
+    }
   }
 
-  get remotePlayer() {
+  /** Señal de vida del invitado al anfitrión. */
+  ping() {
+    const link = this.hostLink;
+    if (!link || link.lost || !link.peer.ready) return;
+    link.peer.send(JSON.stringify({ c: 'ping' }));
+  }
+
+  /** El anfitrión comunica a un jugador cómo acabó su partida. */
+  announceResult(player, won) {
+    if (!this.isHost) return;
+    const link = this.linkOf(player.id);
+    if (link && !link.lost) link.peer.send(encodeOver(won));
+  }
+
+  handleLost(link) {
+    if (link.lost) return;
+    link.lost = true;
+    link.removed = [];
+    link.depleted = [];
+
+    // El invitado se queda sin partida: sin el anfitrión no hay simulación.
+    if (!this.isHost) {
+      clearInterval(this.pingTimer);
+      if (this.lost) return;
+      this.lost = true;
+      if (this.onLost) this.onLost();
+      return;
+    }
+
+    // El anfitrión sigue: quien se cae queda eliminado y los demás continúan.
     const g = this.game;
-    return this.isHost ? g.players[1] : g.players[0];
+    const p = g.players[link.playerId];
+    if (!p || p.defeated) return;
+    p.defeated = true;
+    p.resultSent = true;    // ya no hay canal por el que avisarle
+    if (g.ui) g.ui.notify(`${p.name} ha perdido la conexión.`, 'info');
+    g.checkVictory();
   }
 
-  /** El anfitrión comunica el final; `won` es desde la óptica del invitado. */
-  announceOver(won) {
-    if (this.isHost) this.peer.send(encodeOver(won));
-  }
-
-  receive(data) {
+  receive(data, link) {
+    link.silence = 0;
     if (typeof data === 'string') {
-      if (this.isHost) this.applyCommand(JSON.parse(data));
+      if (!this.isHost) return;   // el arranque lo gestiona la sala
+      let cmd = null;
+      try { cmd = JSON.parse(data); } catch { return; }
+      if (cmd && cmd.t !== 'start') this.applyCommand(cmd, this.game.players[link.playerId]);
       return;
     }
     const buf = data instanceof ArrayBuffer ? data : null;
-    if (!buf) return;
+    if (!buf || buf.byteLength < 1) return;
     const kind = new DataView(buf).getUint8(0);
-    if (kind === 1) this.applySnapshot(decodeSnapshot(buf));
-    else if (kind === 2) {
+    if (kind === 1) {
+      this.measureRate();
+      this.applySnapshot(decodeSnapshot(buf));
+    } else if (kind === 2) {
       const over = decodeOver(buf);
       if (over && !this.game.over) this.game.endGame(over.won);
     }
   }
 
-  // --- Anfitrión: aplicar lo que pide el invitado --------------------------
+  /**
+   * Ritmo real al que llegan las instantáneas: con él se interpola el
+   * movimiento, así que se suaviza para que un retraso suelto no dé tirones.
+   */
+  measureRate() {
+    const now = performance.now();
+    if (this.lastSnapAt) {
+      const gap = Math.min(500, Math.max(50, now - this.lastSnapAt)) / 1000;
+      this.game.netSnapMs = this.game.netSnapMs * 0.8 + gap * 0.2;
+    }
+    this.lastSnapAt = now;
+  }
 
-  applyCommand(cmd) {
+  // --- Anfitrión: aplicar lo que pide un invitado --------------------------
+
+  applyCommand(cmd, player) {
     const g = this.game;
-    const player = g.players[1];
-    if (!cmd || !player || player.defeated || g.over) return;
+    if (!cmd || !player || player.defeated || player === g.human) return;
     const mine = (ids) => (ids || [])
       .map((id) => g.byId.get(id))
       .filter((e) => e && !e.dead && e.owner === player.id);
@@ -158,6 +264,7 @@ export class NetSession {
       }
       case 'resign':
         player.defeated = true;
+        if (g.ui) g.ui.notify(`${player.name} se ha rendido.`, 'good');
         g.checkVictory();
         break;
       default: break;
