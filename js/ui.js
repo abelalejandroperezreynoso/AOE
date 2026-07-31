@@ -110,6 +110,7 @@ export class UI {
     this.el.notif = id('notifications');
     this.el.production = id('production');
     this.el.tooltip = id('tooltip');
+    this.el.dragGhost = id('drag-ghost');
     this.el.bottombar = id('bottombar');
     this.el.pauseMenu = id('pause-menu');
     this.el.endScreen = id('end-screen');
@@ -419,15 +420,15 @@ export class UI {
     document.addEventListener('mouseleave', () => { if (this.mouse) this.mouse.out = true; });
     document.addEventListener('mouseenter', () => { if (this.mouse) this.mouse.out = false; });
     /*
-     * Cierre del arrastre de construcción pase lo que pase: si el botón
-     * desaparece a media faena —la botonera se rehace al cambiar la selección—
-     * o el navegador no concede la captura del puntero, el «pointerup» no llega
-     * al botón y el edificio se quedaría pegado al dedo.
+     * Cierre del gesto de la barra pase lo que pase: si el botón desaparece a
+     * media faena —la botonera se rehace al cambiar la selección— o el
+     * navegador no concede la captura del puntero, el «pointerup» no llega al
+     * botón y el edificio se quedaría pegado al dedo.
      */
     window.addEventListener('pointerup', (e) => {
-      if (this.dragPlace && this.dragPlace.id === e.pointerId) this.dragPlaceEnd(e);
+      if (this.barGesture && this.barGesture.id === e.pointerId) this.barGestureEnd(e);
     });
-    window.addEventListener('pointercancel', () => this.dragPlaceCancel());
+    window.addEventListener('pointercancel', () => this.barGestureCancel());
 
     // Al girar el móvil o cambiar el tamaño, la ficha quedaría descolocada.
     window.addEventListener('resize', () => this.hideTooltip());
@@ -711,50 +712,83 @@ export class UI {
   }
 
   /*
-   * Construir con el dedo: el edificio se arrastra desde su botón hasta el sitio
-   * del mapa y se suelta ahí. Antes había que tocar el botón y después el mapa,
-   * y ese segundo toque se confundía con cualquier otro: se colocaban edificios
-   * sin querer y no quedaba claro que el juego estuviera esperando un sitio.
+   * Gesto del dedo sobre la barra de órdenes. La barra no decide nada por su
+   * cuenta —el navegador tiene el desplazamiento desactivado ahí—, así que cada
+   * arrastre elige un solo camino y no se mezclan nunca:
    *
-   * La maqueta se dibuja un poco por encima del dedo (DRAG_LIFT), que si no
-   * queda tapada justo por la mano; y como el botón está en la barra de abajo,
-   * así asoma en cuanto el dedo entra en el lienzo.
+   *  · De lado: se recorre la tira de botones y nada más. El mapa no se entera.
+   *  · Hacia arriba desde un edificio: se lo saca de la barra y se lo lleva al
+   *    mapa, como quien coge una ficha. Se suelta donde vaya a construirse.
+   *  · Sin moverse: es un toque normal y se ejecuta la orden del botón.
+   *
+   * El edificio viaja en el dedo desde el primer momento: primero como el icono
+   * del botón (la maqueta del mapa aún no puede dibujarse sobre la barra) y, al
+   * entrar en el lienzo, ese icono se apaga y toma el relevo la maqueta de
+   * verdad, con su huella y su aviso de si el sitio vale. Ambos se dibujan en el
+   * mismo punto —DRAG_LIFT por encima del dedo, para que no lo tape la mano—,
+   * de modo que el relevo pasa desapercibido.
    *
    * Con ratón no cambia nada: se pulsa el botón y luego el mapa, con Mayús para
    * encadenar varios.
    */
-  dragPlaceStart(el, type, e) {
+  barGestureStart(el, b, run, e) {
     // La captura mantiene los eventos en el botón aunque el dedo se vaya al
     // lienzo; si el navegador no la da, la red de seguridad de bindInput cierra
-    // el arrastre igualmente.
+    // el gesto igualmente.
     try { el.setPointerCapture(e.pointerId); } catch { /* no pasa nada */ }
-    this.dragPlace = { el, type, id: e.pointerId, x0: e.clientX, y0: e.clientY, armed: false };
+    this.barGesture = {
+      el, b, run, id: e.pointerId, x0: e.clientX, y0: e.clientY, lastX: e.clientX, mode: null,
+    };
   }
 
-  dragPlaceMove(e) {
-    const d = this.dragPlace;
+  barGestureMove(e) {
+    const d = this.barGesture;
     if (!d || d.id !== e.pointerId) return;
-    if (!d.armed) {
+    if (!d.mode) {
       const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
-      if (Math.hypot(dx, dy) < 14) return;
-      // De lado se está recorriendo la tira de órdenes, no sacando el edificio.
-      if (Math.abs(dx) > Math.abs(dy)) { this.dragPlaceCancel(); return; }
-      d.armed = true;
+      if (Math.hypot(dx, dy) < 12) return;
       this.hideTooltip();
-      this.startPlacing(d.type);
-      this.audio.play('click');
+      if (Math.abs(dx) > Math.abs(dy)) d.mode = 'scroll';
+      else if (d.b.place && !d.b.disabled) this.dragPlaceArm(d);
+      else d.mode = 'idle'; // hacia arriba desde un botón que no es un edificio
     }
-    this.dragPlaceGhost(e);
+    if (d.mode === 'scroll') {
+      this.el.commands.scrollLeft -= e.clientX - d.lastX;
+      d.lastX = e.clientX;
+    } else if (d.mode === 'place') {
+      this.dragPlaceGhost(e);
+    }
   }
 
-  /** Lleva la maqueta al punto del lienzo que toca; fuera de él, la esconde. */
+  /** Saca el edificio de la barra: el botón se vacía y el icono pasa al dedo. */
+  dragPlaceArm(d) {
+    d.mode = 'place';
+    d.el.classList.add('dragging');
+    const ghost = this.el.dragGhost;
+    ghost.innerHTML = d.b.icon ? `<img src="${d.b.icon}" alt="">` : '';
+    ghost.classList.remove('hidden', 'over-map');
+    this.startPlacing(d.b.place);
+    this.audio.play('click');
+  }
+
+  /**
+   * Lleva el edificio al punto que toca el dedo. Sobre el lienzo manda la
+   * maqueta del juego; fuera —la barra, los bordes— sigue el icono a secas y no
+   * hay dónde construir.
+   */
   dragPlaceGhost(e) {
     const pl = this.game.placing;
     if (!pl) return null;
     const r = this.el.canvas.getBoundingClientRect();
-    const x = clamp(e.clientX - r.left, 0, r.width);
-    const y = e.clientY - r.top - DRAG_LIFT;
-    if (y < 0 || y > r.height) { pl.tx = undefined; return null; }
+    const gx = e.clientX, gy = e.clientY - DRAG_LIFT;
+    const ghost = this.el.dragGhost;
+    ghost.style.left = `${gx}px`;
+    ghost.style.top = `${gy}px`;
+    const x = clamp(gx - r.left, 0, r.width);
+    const y = gy - r.top;
+    const onMap = y >= 0 && y <= r.height && gx >= r.left && gx <= r.right;
+    ghost.classList.toggle('over-map', onMap);
+    if (!onMap) { pl.tx = undefined; return null; }
     const [u, v] = this.r.screenToWorld(x, y);
     const size = BUILDINGS[pl.type].size;
     pl.tx = Math.floor(u - size / 2 + 0.5);
@@ -762,28 +796,40 @@ export class UI {
     return { x, y };
   }
 
-  dragPlaceEnd(e) {
-    const d = this.dragPlace;
+  barGestureEnd(e) {
+    const d = this.barGesture;
     if (!d || d.id !== e.pointerId) return;
-    this.dragPlace = null;
-    try { d.el.releasePointerCapture(e.pointerId); } catch { /* ya estaba suelto */ }
-    if (!d.armed) {
-      // Un toque suelto no coloca nada: se explica el gesto y se deja todo como estaba.
-      this.notify('Arrastra el edificio hasta el mapa');
+    this.barGestureClear();
+    if (d.mode === 'place') {
+      const at = this.dragPlaceGhost(e);
+      // Soltar fuera del lienzo —sobre la propia barra, casi siempre— es desistir.
+      if (at) this.tryPlace(at.x, at.y, false);
+      this.cancelPlacing();
       return;
     }
-    const at = this.dragPlaceGhost(e);
-    // Soltar sobre la barra —o con la maqueta escondida— es desistir.
-    if (at) this.tryPlace(at.x, at.y, false);
-    this.cancelPlacing();
+    if (d.mode) return; // se recorrió la tira o se tiró de un botón sin edificio
+    // Sin movimiento es un toque normal.
+    if (d.b.place && !d.b.disabled) { this.notify('Arrastra el edificio hasta el mapa'); return; }
+    d.el._tapAt = performance.now();
+    d.run();
   }
 
-  dragPlaceCancel() {
-    const d = this.dragPlace;
+  barGestureCancel() {
+    const d = this.barGesture;
     if (!d) return;
-    this.dragPlace = null;
+    this.barGestureClear();
+    if (d.mode === 'place') this.cancelPlacing();
+  }
+
+  /** Deshace las señales del arrastre: el botón vuelve y el icono se guarda. */
+  barGestureClear() {
+    const d = this.barGesture;
+    if (!d) return;
+    this.barGesture = null;
     try { d.el.releasePointerCapture(d.id); } catch { /* ya estaba suelto */ }
-    if (d.armed) this.cancelPlacing();
+    d.el.classList.remove('dragging');
+    this.el.dragGhost.classList.add('hidden');
+    this.el.dragGhost.innerHTML = '';
   }
 
   tryPlace(x, y, keepGoing) {
@@ -1126,35 +1172,27 @@ export class UI {
         if (e.pointerType === 'mouse') this.showTooltip(b, el);
       });
       el.addEventListener('pointerleave', () => this.hideTooltip());
+      /*
+       * Todo el gesto táctil del botón lo lleva barGesture*: la orden se
+       * ejecuta al levantar el dedo, sin esperar al «click» que sintetiza el
+       * navegador —en iOS ese click llega tarde o no llega cuando se repiten
+       * los toques, y encolar varias unidades seguidas fallaba—, y el arrastre
+       * decide entre recorrer la tira y sacar el edificio al mapa.
+       */
       el.addEventListener('pointerdown', (e) => {
         if (e.pointerType === 'mouse') return;
-        el._tapFrom = { x: e.clientX, y: e.clientY };
         this.showTooltip(b, el, true);
-        if (b.place && !b.disabled) this.dragPlaceStart(el, b.place, e);
+        this.barGestureStart(el, b, run, e);
       });
       el.addEventListener('pointermove', (e) => {
         if (e.pointerType === 'mouse') return;
-        this.dragPlaceMove(e);
+        this.barGestureMove(e);
       });
-      el.addEventListener('pointercancel', () => {
-        el._tapFrom = null; this.hideTooltip(); this.dragPlaceCancel();
-      });
-      /*
-       * La orden se ejecuta al levantar el dedo, sin esperar al «click» que
-       * sintetiza el navegador: en iOS ese click llega tarde o no llega cuando
-       * se repiten los toques, y encolar varias unidades seguidas fallaba.
-       * Si el dedo se ha desplazado es que se estaba deslizando la tira, no
-       * pulsando.
-       */
+      el.addEventListener('pointercancel', () => { this.hideTooltip(); this.barGestureCancel(); });
       el.addEventListener('pointerup', (e) => {
         if (e.pointerType === 'mouse') return;
         this.hideTooltip();
-        const from = el._tapFrom;
-        el._tapFrom = null;
-        if (this.dragPlace && this.dragPlace.id === e.pointerId) { this.dragPlaceEnd(e); return; }
-        if (!from || Math.hypot(e.clientX - from.x, e.clientY - from.y) > 12) return;
-        el._tapAt = performance.now();
-        run();
+        this.barGestureEnd(e);
       });
       el.onclick = () => {
         // Descarta el click sintetizado que sigue a un toque ya atendido.
