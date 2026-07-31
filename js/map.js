@@ -6,6 +6,22 @@ import { drawTerrainTile, makeCanvas } from './sprites.js';
 
 const HW = TILE_W / 2, HH = TILE_H / 2;
 
+// Casillas que se dejan como mínimo entre dos bases vecinas. Alrededor de cada
+// centro urbano se despeja un radio de 7 y se siembran recursos hasta 13, así
+// que por debajo de esta distancia las bases se pisarían entre sí.
+const START_SPACING = 20;
+
+/**
+ * Mapa mínimo para que quepan `playerCount` bases sin amontonarse. Las
+ * posiciones iniciales se reparten por una circunferencia de radio 0,33 × lado,
+ * de modo que la distancia entre vecinas es 2 · r · sen(π / n).
+ */
+export function minMapSizeFor(playerCount) {
+  const n = Math.max(2, playerCount);
+  const size = START_SPACING / (0.66 * Math.sin(Math.PI / n));
+  return Math.ceil(size / 8) * 8;   // múltiplo de 8, como los tamaños del menú
+}
+
 export class GameMap {
   constructor(size, seed, playerCount) {
     this.size = size;

@@ -4,8 +4,8 @@ Juego de **estrategia medieval en tiempo real** para navegador, inspirado en los
 clásicos del género. Recolecta recursos, haz crecer tu aldea, avanza por cuatro
 edades y conquista a tus rivales.
 
-Se juega en solitario contra la máquina o **contra otra persona**, cada quien
-desde su dispositivo.
+Se juega en solitario contra la máquina o **con otras personas**, hasta ocho
+jugadores, cada quien desde su dispositivo.
 
 El juego es HTML, CSS y JavaScript modular puro, sin compilación. Todo el arte
 (unidades, edificios, terreno, iconos) y todo el sonido se **generan por código**
@@ -23,7 +23,7 @@ npm start          # equivale a: node tools/dev-server.mjs
 
 Hace falta un servidor (no vale abrir el archivo con `file://`) porque el juego
 usa módulos ES. `tools/dev-server.mjs` no tiene dependencias y sirve además la
-sala del multijugador, de modo que se puede probar una partida entre dos
+sala del multijugador, de modo que se puede probar una partida entre varios
 dispositivos de la misma red local. Para jugar sólo en solitario vale cualquier
 servidor estático, por ejemplo `python3 -m http.server 8000`.
 
@@ -42,34 +42,54 @@ El repositorio está listo para desplegarse tal cual:
 
 ## Multijugador
 
-Uno contra uno, cada quien desde su dispositivo:
+De dos a ocho jugadores, cada quien desde su dispositivo:
 
-1. En el menú principal, **Jugar con otra persona**.
+1. En el menú principal, **Jugar con otras personas**.
 2. Escribe tu nombre y entra en la sala. Verás a quienes estén conectados.
-3. Pulsa **Invitar** en la persona con la que quieras jugar.
-4. Cuando acepte, la partida arranca en los dos dispositivos (unos 3 segundos).
+3. Pulsa **Invitar** en cada persona que quieras meter en tu partida. Según van
+   aceptando aparecen en «Tu partida», con el color que les tocará.
+4. Cuando estén listas, pulsa **Empezar partida**. Arranca en todos los
+   dispositivos a la vez, en cuestión de segundos.
 
-Quien envía la invitación hace de anfitrión: su dispositivo lleva la simulación
-y el otro le manda sus órdenes. **La partida viaja directa de un navegador al
-otro por WebRTC**, sin pasar por ningún servidor, con un consumo de unos 8 kB/s
-incluso con ejércitos grandes.
+Quien invita hace de anfitrión: su dispositivo lleva la simulación de todos y
+los demás le mandan sus órdenes. **La partida viaja directa de un navegador a
+otro por WebRTC**, sin pasar por ningún servidor.
 
-El servidor sólo interviene para que los dos jugadores se encuentren, y deja de
+El anfitrión mantiene una conexión con cada invitado y les manda una instantánea
+distinta a cada uno, así que es su subida la que marca el límite: con dos o tres
+jugadores van diez instantáneas por segundo, y a partir de ahí se espacian hasta
+cinco por segundo con la partida llena (el movimiento se sigue interpolando, así
+que se ve igual de fluido). Conviene que haga de anfitrión quien tenga mejor
+conexión.
+
+El servidor sólo interviene para que los jugadores se encuentren, y deja de
 usarse en cuanto la partida empieza. En Netlify eso lo resuelve una función
 (`netlify/functions/lobby.mjs`) que guarda la presencia y las invitaciones en
 Netlify Blobs; no hace falta ningún servicio externo ni cuenta de terceros.
 
+Qué pasa cuando alguien se cae:
+
+- Si se cae **un invitado**, queda eliminado y los demás siguen jugando.
+- Si se cae **el anfitrión**, la partida sí termina para todos: es quien la
+  simula.
+- Si al anfitrión lo eliminan dentro de la partida, su equipo **sigue llevando
+  la simulación** de los demás; puede quedarse mirando hasta que acabe. Si
+  cierra la página, corta la partida al resto, y se le avisa de ello.
+- Quien reserve sitio y no llegue a conectarse a tiempo se queda fuera: la
+  partida empieza sin él y sin su base.
+
 Limitaciones conocidas:
 
-- Hace falta que **ambos navegadores puedan establecer una conexión directa**.
+- Hace falta que **los navegadores puedan establecer una conexión directa**.
   Funciona en la misma red local y en la mayoría de conexiones domésticas
   gracias a los servidores STUN públicos, pero algunas redes muy restrictivas
   (ciertas corporativas o móviles) lo impiden; para cubrir esos casos haría
   falta un servidor TURN, que no es gratuito.
-- Si se corta la conexión, la partida termina y se avisa: no hay reconexión.
+- No hay reconexión: quien pierde la conexión no puede volver a la partida.
 - El anfitrión manda el estado completo, así que un invitado que abriese las
   herramientas del navegador podría ver el mapa entero. En pantalla la niebla
   de guerra funciona con normalidad para cada jugador.
+- No hay equipos ni alianzas: todos contra todos.
 
 ## Catálogo del juego
 
@@ -109,8 +129,8 @@ Detalles a tener en cuenta:
 
 - Los cambios se guardan **en ese navegador** y se aplican a las **partidas
   nuevas**, no a una que ya esté en marcha.
-- En **multijugador manda quien invita**: sus valores se usan en los dos lados,
-  de modo que ambos jugadores ven y juegan con las mismas cifras.
+- En **multijugador manda quien invita**: sus valores se usan en todos los
+  dispositivos, de modo que todos ven y juegan con las mismas cifras.
 - Los valores se validan y se recortan a un rango razonable, así que no es
   posible dejar el juego en un estado inservible desde el catálogo.
 
@@ -158,8 +178,9 @@ o aleja.
 - **4 edades**, 17 tipos de unidad y 15 edificios distintos.
 - **11 tecnologías** (armas, armaduras, arquería, economía) y 7 mejoras de línea
   que transforman las unidades ya creadas.
-- **Mapas aleatorios** con semilla reproducible, en tres tamaños y con hasta
-  3 rivales.
+- **Mapas aleatorios** con semilla reproducible, en cuatro tamaños y con hasta
+  7 rivales (ocho jugadores, uno por color). Si el mapa elegido se queda corto
+  para tanta base, se agranda solo.
 - **IA rival** que reparte a sus aldeanos por proporciones de recursos, ahorra
   para subir de edad, se expande, investiga, defiende su base y ataca por oleadas
   crecientes. Tres niveles de dificultad.
@@ -191,7 +212,7 @@ js/lobby-ui.js      Pantalla de la sala de espera
 js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
 js/net/protocol.js  Codificación binaria del estado y de las órdenes
 js/net/session.js   Partida en red: anfitrión que simula, invitado que pinta
-netlify/functions/  Sala de espera (sólo para que dos jugadores se encuentren)
+netlify/functions/  Sala de espera (sólo para que los jugadores se encuentren)
 tools/dev-server.mjs  Servidor local: juego + sala, sin dependencias
 ```
 
@@ -207,10 +228,12 @@ Para depurar, el objeto de la partida está disponible en la consola como
   fotograma, y se guardan en caché.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
-- En multijugador el anfitrión manda diez instantáneas por segundo en binario y
-  el invitado interpola entre ellas para pintar a 60 fps. Tras una batalla de
-  80 unidades, el estado de ambos coincide exactamente y las posiciones difieren
-  menos de una décima de casilla.
+- En multijugador el anfitrión manda hasta diez instantáneas por segundo en
+  binario y los invitados interpolan entre ellas para pintar a 60 fps. Tras una
+  batalla de 80 unidades, el estado de ambos coincide exactamente y las
+  posiciones difieren menos de una décima de casilla.
+- Con la partida llena, el anfitrión reparte los envíos a lo largo del ciclo en
+  vez de mandárselos a los siete a la vez, para no dar un tirón cada 200 ms.
 
 ## Aviso legal
 

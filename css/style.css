@@ -128,6 +128,7 @@ html, body {
   font-family: inherit;
 }
 .options select:focus, .options input:focus { outline: 2px solid var(--gold); }
+.options .hint { font-size: 11.5px; color: #8e7c5c; line-height: 1.4; }
 
 button {
   font-family: inherit;
@@ -185,6 +186,14 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .menu-actions button { flex: 1 1 calc(50% - 4px); margin: 0; padding: 9px 10px; font-size: 14px; }
 .menu-actions .wide { flex-basis: 100%; }
 #pause-menu .stats { margin: 4px 0 16px; }
+
+/* Aviso del anfitrión eliminado: si se va, corta la partida de los demás. */
+.end-warn {
+  margin: 0 0 12px; padding: 9px 12px;
+  border: 1px solid #a2884a; border-left-width: 4px; border-radius: 6px;
+  background: rgba(90, 70, 24, .3);
+  color: #f0dcae; font-size: 13px; text-align: left; line-height: 1.5;
+}
 
 .stats { width: 100%; margin: 10px 0 18px; border-collapse: collapse; font-size: 14px; }
 .stats td { padding: 5px 8px; border-bottom: 1px solid rgba(255,255,255,.08); }
@@ -367,9 +376,51 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 }
 .lobby-player button { padding: 6px 14px; font-size: 13px; }
 
+/* Sala a dos columnas: quién está conectado y quién va en tu partida. */
+.lobby-cols {
+  display: grid; gap: 14px; text-align: left;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.lobby-col h3 {
+  font-size: 13px; letter-spacing: .5px; text-transform: uppercase;
+  color: #b6a179; margin: 0 0 7px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+}
+.lobby-col h3 small { font-size: 12px; color: #8e7c5c; text-transform: none; letter-spacing: 0; }
+.lobby-col .lobby-list { margin-bottom: 10px; }
+.lobby-col button.primary { width: 100%; font-size: 15px; padding: 9px 14px; }
+.lobby-col button.secondary { width: 100%; }
+
+.lobby-tag { font-size: 12px; color: var(--gold-l); white-space: nowrap; }
+.lobby-tag.muted { color: #8e7c5c; }
+
+.party-slot {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.party-slot:last-child { border-bottom: none; }
+.party-slot .lobby-name {
+  flex: 1; font-size: 14.5px; color: var(--parch);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Un punto con el color que tendrá cada jugador en la partida. */
+.party-color {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, .5); flex: none;
+}
+.party-color.c0 { background: #3f7fd8; }
+.party-color.c1 { background: #d2453c; }
+.party-color.c2 { background: #43a047; }
+.party-color.c3 { background: #d9b330; }
+.party-color.c4 { background: #9455cf; }
+.party-color.c5 { background: #e07a2a; }
+.party-color.c6 { background: #2aa79b; }
+.party-color.c7 { background: #8b939e; }
+
 .lobby-hint {
   font-size: 12px; color: #8e7c5c; line-height: 1.5;
-  text-align: left; margin: 0 0 14px;
+  text-align: left; margin: 12px 0 14px;
 }
 .lobby-error {
   margin-top: 14px; padding: 9px 12px;

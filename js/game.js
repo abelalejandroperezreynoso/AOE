@@ -2,9 +2,9 @@
 
 import {
   UNITS, BUILDINGS, TECHS, UPGRADES, AGES, RESOURCES, PLAYER_COLORS,
-  GATHER_RATE, DIFFICULTIES,
+  GATHER_RATE, DIFFICULTIES, MAX_PLAYERS,
 } from './config.js';
-import { GameMap } from './map.js';
+import { GameMap, minMapSizeFor } from './map.js';
 import { Player, Unit, Building, Projectile } from './entities.js';
 import { clamp, dist, Rng } from './utils.js';
 import { nearestFree, ringTiles } from './path.js';
@@ -71,8 +71,13 @@ export class Game {
     this.seed = opts.seed >>> 0;
     this.rng = new Rng(this.seed);
     this.difficulty = DIFFICULTIES[opts.difficulty] || DIFFICULTIES.normal;
-    this.playerCount = 1 + opts.opponents;
-    this.map = new GameMap(opts.mapSize, this.seed, this.playerCount);
+    // En red viene el número exacto de jugadores; contra la máquina, los rivales.
+    this.playerCount = clamp(opts.playerCount ?? (1 + (opts.opponents ?? 1)), 2, MAX_PLAYERS);
+    // Con muchas bases hace falta sitio: si el mapa elegido se queda corto se
+    // agranda, y como los dos lados calculan lo mismo el mundo sigue siendo
+    // idéntico para todos.
+    this.mapSize = Math.max(opts.mapSize, minMapSizeFor(this.playerCount));
+    this.map = new GameMap(this.mapSize, this.seed, this.playerCount);
     this.players = [];
     this.units = new Set();
     this.buildings = new Set();
@@ -99,6 +104,7 @@ export class Game {
     this.netRemoved = [];
     this.netDepleted = [];
     this.netHasState = false;
+    this.netSnapMs = 0.1;   // separación real entre instantáneas, en segundos
 
     const names = opts.playerNames || [];
     const localIdx = opts.localPlayer ?? 0;
@@ -113,10 +119,17 @@ export class Game {
     this.herds = this.map.nodes.filter((n) => n.herd);
     this.herdCd = 0;
     this.setupStart();
+    this.dropAbsent(opts.absent);
   }
 
   /** El invitado no simula: sólo pinta lo que le manda el anfitrión. */
   get isGuest() { return this.net !== null && this.net.role === 'guest'; }
+
+  /** ¿Lleva la máquina a ese jugador? En red no hay ninguno: todos son personas. */
+  isAi(playerId) {
+    const p = this.players[playerId];
+    return !!p && !p.isHuman && this.net === null;
+  }
 
   netSend(cmd) { if (this.net) this.net.sendCommand(cmd); }
 
@@ -137,6 +150,26 @@ export class Game {
       if (sc && !p.isHuman) sc.task = null;
     });
     this.updateFog(true);
+  }
+
+  /**
+   * Jugadores que reservaron sitio pero no llegaron a conectarse. Se les retira
+   * del mapa antes de empezar; se marcan derrotados primero para que su
+   * desaparición no se anuncie como una derrota en mitad de la partida.
+   */
+  dropAbsent(absent) {
+    for (const id of absent || []) {
+      const p = this.players[id];
+      if (!p || p === this.human) continue;
+      p.defeated = true;
+      p.resultSent = true;   // no hay a quién avisar
+      for (const b of [...p.buildings]) this.killBuilding(b, null);
+      for (const u of [...p.units]) this.killUnit(u, null);
+    }
+    // Nada de esto llegó a existir para los demás: no hay que retransmitirlo.
+    this.netRemoved = [];
+    this.fx.decals.length = 0;
+    this.fx.parts.length = 0;
   }
 
   // --- Fábrica de entidades -------------------------------------------------
@@ -254,13 +287,36 @@ export class Game {
     this.checkVictory();
   }
 
+  /**
+   * Gana quien se queda solo en pie. Con más de dos jugadores el resto de la
+   * partida continúa aunque uno caiga, así que a cada jugador se le avisa de su
+   * propio resultado en cuanto se decide y sólo una vez.
+   */
   checkVictory() {
-    if (this.over || this.isGuest) return;
+    if (this.isGuest) return;
     const alive = this.players.filter((p) => !p.defeated);
+    const winner = alive.length === 1 ? alive[0] : null;
+
+    if (this.net) {
+      for (const p of this.players) {
+        if (p === this.human || p.resultSent) continue;
+        if (p.defeated) { p.resultSent = true; this.net.announceResult(p, false); }
+        else if (p === winner) { p.resultSent = true; this.net.announceResult(p, true); }
+      }
+    }
+
+    if (this.over) return;
     if (this.human.defeated) this.endGame(false);
-    else if (alive.length === 1 && alive[0] === this.human) this.endGame(true);
-    // En multijugador hay que avisar al otro del resultado, que es el contrario.
-    if (this.over && this.net) this.net.announceOver(!this.over.won);
+    else if (winner === this.human) this.endGame(true);
+  }
+
+  /**
+   * El anfitrión sigue simulando aunque le hayan eliminado: es quien lleva la
+   * partida de todos y pararla dejaría a los demás sin juego.
+   */
+  get keepsSimulating() {
+    if (!this.net || this.isGuest) return false;
+    return this.players.filter((p) => !p.defeated).length > 1;
   }
 
   endGame(won, reason = null) {
@@ -948,7 +1004,8 @@ export class Game {
   // --- Bucle ----------------------------------------------------------------
 
   update(dt) {
-    if (this.paused || this.over) return;
+    if (this.paused) return;
+    if (this.over && !this.keepsSimulating) return;
     if (this.isGuest) { this.updateAsGuest(dt); return; }
     dt *= this.speed;
     this.time += dt;
@@ -980,7 +1037,9 @@ export class Game {
    */
   updateAsGuest(dt) {
     this.rebuildGrid();
-    const step = dt / 0.1; // duración esperada entre instantáneas
+    // El anfitrión espacia las instantáneas según cuánta gente haya; la sesión
+    // mide cada cuánto llegan de verdad y aquí se interpola con esa medida.
+    const step = dt / (this.netSnapMs || 0.1);
     for (const u of this.units) {
       if (!u.lerpTo) continue;
       u.lerpT = Math.min(1, (u.lerpT || 0) + step);
