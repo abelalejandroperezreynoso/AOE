@@ -724,7 +724,31 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   background: linear-gradient(180deg, #4d3b26, #2a1f14);
   border: 1px solid #6b5334;
   overflow: hidden;
+  /* El dedo sobre un botón lo gestiona el juego entero: de lado recorre la tira
+     y hacia arriba saca el edificio al mapa. Si lo desplazara también el
+     navegador, los dos gestos se pisarían. */
+  touch-action: none;
 }
+/* Mientras el edificio va en el dedo, su hueco queda vacío en la barra. */
+.cmd.dragging { opacity: .3; }
+
+/*
+ * El edificio que se lleva en el dedo: el mismo icono del botón, en el aire,
+ * hasta que entra en el mapa y toma el relevo la maqueta del juego.
+ */
+#drag-ghost {
+  position: fixed; z-index: 40;
+  width: 62px; height: 62px;
+  margin: -31px 0 0 -31px; /* centrado en el punto que se le indica */
+  pointer-events: none;
+  opacity: .95;
+  transform: scale(1.1);
+  filter: drop-shadow(0 8px 10px rgba(0,0,0,.6));
+  transition: opacity .1s linear;
+}
+#drag-ghost img { width: 100%; height: 100%; }
+/* Sobre el lienzo manda la maqueta, así que el icono se aparta sin dar tirones. */
+#drag-ghost.over-map { opacity: 0; }
 .cmd img { width: 52px; height: 52px; pointer-events: none; }
 .cmd .glyph { font-size: 26px; line-height: 1; }
 .cmd .key {
@@ -921,9 +945,7 @@ button.cmd, button.qitem, button.prod { margin: 0; }
     overflow-x: auto; overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
   }
-  /* La tira se recorre de lado; el tirón hacia arriba es para sacar el edificio
-     al mapa, así que ese eje lo gestiona el juego y no el navegador. */
-  .cmd { width: 58px; height: 58px; touch-action: pan-x; }
+  .cmd { width: 58px; height: 58px; }
   .cmd img { width: 48px; height: 48px; }
   .mm-hint { display: none; }
   .hint { font-size: 11px; }
