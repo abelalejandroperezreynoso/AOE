@@ -624,6 +624,41 @@ export class Game {
     }
   }
 
+  /**
+   * ¿A dónde va esto? Devuelve el punto al que se dirige una unidad —o un
+   * animal del rebaño al que se está pastoreando— y de qué clase es la orden,
+   * o null si no va a ninguna parte. La interfaz lo usa para plantar la
+   * bandera de destino de lo que se tenga seleccionado.
+   *
+   * Las clases son las tres del marcador de órdenes: ir a un sitio, ir a por
+   * un recurso o ir a por alguien.
+   */
+  destinationOf(e) {
+    if (!e || e.dead) return null;
+    // Los animales del rebaño no tienen tareas: su orden es el punto al que van.
+    if (e.kind !== 'unit') {
+      const h = e.task;
+      return h ? { x: h.ax ?? h.x, y: h.ay ?? h.y, kind: 'move' } : null;
+    }
+    const t = e.task;
+    if (!t) return null;
+    const at = (o, kind) => {
+      if (!o || o.dead || o.alive === false) return null;
+      if (o.kind === 'building') return { x: o.cx, y: o.cy, kind };
+      if (o.kind === 'unit') return { x: o.x, y: o.y, kind };
+      return { x: o.fx, y: o.fy, kind };
+    };
+    switch (t.type) {
+      case 'move': return { x: t.ax ?? t.x, y: t.ay ?? t.y, kind: 'move' };
+      case 'attackmove': return { x: t.ax ?? t.x, y: t.ay ?? t.y, kind: 'attack' };
+      case 'gather': return at(t.target, 'gather');
+      case 'deliver': return at(t.target, 'move');
+      case 'build': return at(t.target, 'move');
+      case 'attack': return at(t.target, 'attack');
+      default: return null;
+    }
+  }
+
   /** Saca del cuadro de selección algo que acaba de desaparecer o cambiar de dueño. */
   dropFromSelection(e) {
     const i = this.selection.indexOf(e);
@@ -708,7 +743,9 @@ export class Game {
     const spots = this.formationSpots(x, y, list.length);
     list.forEach((a, i) => {
       const s = spots[i] || { x, y };
-      a.task = { x: s.x, y: s.y };
+      // `ax,ay` es el punto que se señaló, el mismo para todo el grupo: es
+      // donde va la bandera de destino, en vez de una por hueco de formación.
+      a.task = { x: s.x, y: s.y, ax: x, ay: y };
     });
   }
 
@@ -824,7 +861,9 @@ export class Game {
     list.forEach((u, i) => {
       const s = spots[i] || { x, y };
       u.stopTask();
-      u.task = { type: attackMove ? 'attackmove' : 'move', x: s.x, y: s.y };
+      // `ax,ay`: el punto señalado, común a todo el grupo, para que la bandera
+      // de destino salga donde se dio la orden y no una por cada hueco.
+      u.task = { type: attackMove ? 'attackmove' : 'move', x: s.x, y: s.y, ax: x, ay: y };
       u.carryTarget = null;
     });
   }

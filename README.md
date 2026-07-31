@@ -151,6 +151,7 @@ Detalles a tener en cuenta:
 | Pausa y menú | `P` o `Esc` |
 | Construir en cadena | Mantén Mayús al colocar un edificio |
 | Pastorear ovejas | Selecciona las tuyas y clic derecho donde quieras llevarlas |
+| Ver a dónde va | Selecciónalo: una bandera marca su destino (verde ir, ámbar recurso, roja objetivo) |
 | Ayuda | `F1` |
 
 En **móvil y tablet** el dedo reparte el trabajo en dos gestos que no se pisan:
