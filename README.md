@@ -153,11 +153,13 @@ Detalles a tener en cuenta:
 | Pastorear ovejas | Selecciona las tuyas y clic derecho donde quieras llevarlas |
 | Ayuda | `F1` |
 
-En **móvil y tablet**: un toque selecciona lo tuyo, un toque en el suelo da la
-orden a lo que tengas seleccionado, **mantener el dedo** un momento da la orden
-sin cambiar la selección —así se manda a un aldeano cargado a descargar en el
-centro urbano, el molino o un campamento, que con un toque corto se
-seleccionan—, arrastrar mueve la cámara y pellizcar acerca o aleja.
+En **móvil y tablet**: un toque selecciona lo tuyo y, con unidades seleccionadas,
+un toque en el suelo les da la orden; **mantener el dedo** un momento da la orden
+sin cambiar la selección. Eso es lo que manda a un aldeano cargado a descargar en
+el centro urbano, el molino o un campamento, y lo que planta el punto de reunión
+de un cuartel: con un toque corto esos edificios se seleccionan o se sueltan, que
+es lo que se quiere al recorrer la base. Arrastrar mueve la cámara y pellizcar
+acerca o aleja.
 
 ### Bucle de juego
 
