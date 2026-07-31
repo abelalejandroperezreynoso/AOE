@@ -9,12 +9,21 @@ export const RES_NAME = { food: 'Comida', wood: 'Madera', gold: 'Oro', stone: 'P
 
 export const POP_MAX = 200;
 
+// Un color por jugador: hay ocho porque ese es el máximo que admite una
+// partida, tanto contra la máquina como en red.
 export const PLAYER_COLORS = [
   { name: 'Azul', main: '#3f7fd8', dark: '#22488a', light: '#8fc0ff' },
   { name: 'Rojo', main: '#d2453c', dark: '#7d221d', light: '#ff9a92' },
   { name: 'Verde', main: '#43a047', dark: '#215a24', light: '#9be79e' },
   { name: 'Amarillo', main: '#d9b330', dark: '#846a12', light: '#ffe58a' },
+  { name: 'Morado', main: '#9455cf', dark: '#552c7d', light: '#d3a9f5' },
+  { name: 'Naranja', main: '#e07a2a', dark: '#8a4310', light: '#ffc182' },
+  { name: 'Turquesa', main: '#2aa79b', dark: '#12615a', light: '#8ee7dd' },
+  { name: 'Gris', main: '#8b939e', dark: '#4c525a', light: '#d6dbe2' },
 ];
+
+/** Jugadores que caben en una partida, uno por color. */
+export const MAX_PLAYERS = PLAYER_COLORS.length;
 
 export const AGES = [
   { name: 'Edad Oscura', short: 'Oscura', cost: {}, time: 0, reqBuildings: 0 },

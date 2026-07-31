@@ -24,6 +24,10 @@
           <option value="1" selected>1 rival</option>
           <option value="2">2 rivales</option>
           <option value="3">3 rivales</option>
+          <option value="4">4 rivales</option>
+          <option value="5">5 rivales</option>
+          <option value="6">6 rivales</option>
+          <option value="7">7 rivales</option>
         </select>
       </label>
       <label>
@@ -40,7 +44,9 @@
           <option value="48">Pequeño</option>
           <option value="64" selected>Mediano</option>
           <option value="80">Grande</option>
+          <option value="96">Enorme</option>
         </select>
+        <small class="hint">Con muchos rivales el mapa se agranda solo para que quepan todas las bases.</small>
       </label>
       <label>
         <span>Semilla del mapa</span>
@@ -113,8 +119,8 @@
 <!-- ---------- Sala de espera (multijugador) ---------- -->
 <div id="lobby" class="overlay hidden">
   <div class="menu-card">
-    <h2>Jugar con otra persona</h2>
-    <p class="subtitle">Uno contra uno, cada quien desde su dispositivo.</p>
+    <h2>Jugar con otras personas</h2>
+    <p class="subtitle">De dos a ocho jugadores, cada quien desde su dispositivo.</p>
 
     <div id="lobby-join">
       <div class="options">
@@ -128,7 +134,9 @@
             <option value="48">Pequeño</option>
             <option value="64" selected>Mediano</option>
             <option value="80">Grande</option>
+            <option value="96">Enorme</option>
           </select>
+          <small class="hint">Lo elige el anfitrión, y se agranda solo si hay muchos jugadores.</small>
         </label>
       </div>
       <button id="btn-lobby-enter" class="primary">Entrar en la sala</button>
@@ -139,10 +147,25 @@
         <span>Conectado como <b id="lobby-me"></b></span>
         <span id="lobby-status" class="lobby-status">Buscando jugadores...</span>
       </div>
-      <ul id="lobby-players" class="lobby-list"></ul>
+
+      <div class="lobby-cols">
+        <div class="lobby-col">
+          <h3>En la sala <small id="lobby-count"></small></h3>
+          <ul id="lobby-players" class="lobby-list"></ul>
+        </div>
+        <div id="lobby-party-box" class="lobby-col hidden">
+          <h3>Tu partida <small id="lobby-party-count"></small></h3>
+          <ul id="lobby-party" class="lobby-list"></ul>
+          <button id="btn-lobby-start" class="primary hidden">Empezar partida</button>
+          <button id="btn-lobby-cancel" class="secondary">Cancelar partida</button>
+        </div>
+      </div>
+
       <p class="lobby-hint">
-        Quien envía la invitación hace de anfitrión: su dispositivo lleva la
-        partida. Comparte esta página con la otra persona para que aparezca aquí.
+        Quien invita hace de anfitrión: su dispositivo lleva la partida de todos,
+        así que conviene que sea el de mejor conexión. Puede invitar a varias
+        personas y empezar cuando estén listas. Comparte esta página para que
+        aparezcan aquí.
       </p>
       <button id="btn-lobby-leave" class="secondary">Salir de la sala</button>
     </div>
@@ -278,6 +301,7 @@
       <h2 id="end-title">Victoria</h2>
       <div id="end-body"></div>
       <button id="btn-restart2" class="primary">Jugar otra vez</button>
+      <button id="btn-end-watch" class="secondary hidden">Seguir viendo la partida</button>
     </div>
   </div>
 </div>
