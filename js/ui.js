@@ -508,34 +508,17 @@ export class UI {
         return;
       }
       if (this.pending === 'attackmove') { this.issueAttackMove(x, y); return; }
-      const g = this.game;
-      const target = this.r.entityAtScreen(x, y);
-      const mine = g.selection.length && g.selection[0].owner === g.human.id;
       /*
-       * El toque sólo da órdenes a lo que se mueve. Con un edificio
-       * seleccionado manda la selección: un toque en el suelo la suelta y un
-       * toque en otra cosa se la queda, que es lo que se espera al andar
-       * mirando la base. Su única orden —el punto de reunión— se da
-       * manteniendo el dedo, igual que la descarga (ver `touchHold`).
+       * Con el dedo, el toque es sólo para la selección: coger algo, cambiar de
+       * unidad o soltar lo que hubiera. Todas las órdenes —moverse, recolectar,
+       * atacar, descargar, el punto de reunión— se dan manteniendo pulsado (ver
+       * `touchHold`), así que un toque no manda a nadie a ninguna parte por
+       * mucho que se falle el dedo.
        */
-      const canOrder = mine && g.selection.some((e) => e.kind === 'unit' || isMyAnimal(e, g));
-      // Tocar algo propio lo selecciona, salvo que lo que haya seleccionado
-      // pueda trabajar en ello: mandar aldeanos a terminar unos cimientos es
-      // una orden, no un cambio de selección.
-      if (canOrder && this.canWorkOn(target, false)) this.rightClick(x, y, false);
-      else if (target && target.kind && target.owner === g.human.id) {
-        // Se queda con el edificio, que es lo que se ha pedido; pero si había
-        // un aldeano cargado, se recuerda que la descarga está a un dedo
-        // mantenido de distancia.
-        if (this.canDeposit(target)) {
-          this.holdHint('deposit', 'Mantén pulsado el edificio para ir a descargar');
-        }
-        this.clickSelect(x, y, false, 0, true);
-      } else if (canOrder) this.rightClick(x, y, false);
-      else {
-        if (mine) this.rallyHint();
-        this.clickSelect(x, y, false, 0, true);
+      if (this.game.selection.some((s) => s.owner === this.game.human.id)) {
+        this.orderHint(this.r.entityAtScreen(x, y));
       }
+      this.clickSelect(x, y, false, 0, true);
       e.preventDefault();
     }, { passive: false });
 
@@ -546,11 +529,12 @@ export class UI {
   }
 
   /**
-   * Pulsación mantenida sobre el mapa: es el clic derecho del táctil. Da la
-   * orden a lo que se tenga seleccionado sin tocar la selección, así que el
-   * toque corto se queda con la selección —coger un edificio, soltarlo,
-   * cambiar de unidad— y el dedo mantenido con las órdenes: mandar al aldeano
-   * cargado a descargar o plantar el punto de reunión de un cuartel.
+   * Pulsación mantenida sobre el mapa: es el clic derecho del táctil, y con el
+   * dedo el único que da órdenes. Reparte el trabajo con el toque en dos
+   * mitades que no se pisan: el toque manda la selección —coger algo, cambiar
+   * de unidad, soltarlo todo— y el dedo mantenido manda las órdenes —moverse,
+   * recolectar, atacar, descargar, el punto de reunión—, sin tocar nunca lo
+   * que hubiera seleccionado.
    *
    * Devuelve si el gesto se ha consumido: sin nada propio seleccionado no hay
    * orden que dar, así que se deja pasar y el toque acaba seleccionando.
@@ -585,32 +569,33 @@ export class UI {
   }
 
   /**
-   * ¿Los aldeanos seleccionados tienen trabajo que hacer en ese objetivo?
-   * Con el dedo no hay clic derecho, así que un toque tiene que decidir entre
-   * seleccionar y dar la orden. Sobre unos cimientos propios o una granja
-   * propia lo que se quiere es mandar a los aldeanos; el edificio terminado se
-   * sigue seleccionando como siempre.
-   *
-   * No entra el reparar: seleccionar un edificio dañado —para ver cómo va o
-   * para sacar unidades de él— es demasiado corriente como para robarle el
-   * toque. Para trabajar sobre unos cimientos que ya no quieres, basta con
-   * deseleccionar tocando el suelo y volver a tocarlos.
-   *
-   * Las ovejas propias también cuentan, y aquí sí manda con el ratón: con
-   * aldeanos seleccionados, pulsar una oveja es mandarlos a por su comida, no
-   * cambiar la selección. Para pastorearla se pulsa sin aldeanos seleccionados.
-   *
-   * `deposit` desactiva el caso de ir a descargar. Con el dedo se apaga: el
-   * toque corto sobre el centro urbano o un campamento los selecciona y para
-   * mandar al aldeano a soltar la carga se mantiene pulsado (ver `touchHold`).
+   * La primera vez que un toque cambia la selección teniendo algo propio, se
+   * dice dónde han ido a parar las órdenes. El aviso se afina según lo que se
+   * suelta, que es lo que el jugador tenía en la cabeza al tocar.
    */
-  canWorkOn(target, deposit = true) {
+  orderHint(target) {
+    if (this.canDeposit(target)) {
+      this.holdHint('deposit', 'Mantén pulsado el edificio para ir a descargar');
+      return;
+    }
+    if (this.game.selection[0].kind === 'building') { this.rallyHint(); return; }
+    this.holdHint('order', 'Mantén pulsado para dar la orden');
+  }
+
+  /**
+   * ¿Los aldeanos seleccionados tienen trabajo que hacer en ese objetivo? Es
+   * cosa del ratón: con aldeanos seleccionados, pulsar una oveja propia es
+   * mandarlos a por su comida y no cambiar la selección (para pastorearla se
+   * pulsa sin aldeanos seleccionados). Con el dedo no se usa: allí el toque
+   * siempre selecciona y las órdenes van por la pulsación mantenida.
+   */
+  canWorkOn(target) {
     const g = this.game;
     const hasVillager = g.selection
       .some((e) => e.kind === 'unit' && e.type === 'villager' && e.owner === g.human.id);
     if (!hasVillager) return false;
     if (isMyAnimal(target, g)) return true;
-    if (deposit && this.canDeposit(target)) return true;
+    if (this.canDeposit(target)) return true;
     if (!target || target.kind !== 'building' || target.owner !== g.human.id) return false;
     return !target.built || target.type === 'farm';
   }
@@ -642,13 +627,15 @@ export class UI {
     const g = this.game;
     const e = this.r.entityAtScreen(x, y);
     if (!e) { if (!shift) this.select([]); return; }
-    // Oveja propia con aldeanos seleccionados: se les manda a por ella en vez
-    // de soltarlos para seleccionarla.
-    if (isMyAnimal(e, g) && this.canWorkOn(e)) { this.rightClick(x, y, shift); return; }
-    // Almacén propio con aldeanos cargados: se les manda a descargar. Con el
-    // dedo no: ahí el toque corto selecciona y para descargar se mantiene
-    // pulsado, que si no no habría forma de abrir el centro urbano con un
-    // aldeano cargado a cuestas.
+    /*
+     * Dos atajos del ratón, que tiene el clic derecho para todo lo demás: con
+     * aldeanos seleccionados, pulsar una oveja propia los manda a por ella y
+     * pulsar un almacén los manda a descargar lo que lleven. Con el dedo no
+     * hay atajos que valgan: el toque es sólo selección y las órdenes se dan
+     * manteniendo pulsado, así que un toque nunca suelta lo seleccionado para
+     * mandarlo a otra parte.
+     */
+    if (!touch && isMyAnimal(e, g) && this.canWorkOn(e)) { this.rightClick(x, y, shift); return; }
     if (!touch && this.canDeposit(e)) { this.rightClick(x, y, shift); return; }
     // Un recurso del mapa sólo enseña su ficha... salvo que sea un animal de mi
     // rebaño, que se selecciona como cualquier otra cosa mía para poder moverlo.
