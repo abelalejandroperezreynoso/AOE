@@ -98,8 +98,8 @@ export const LOOK = {
 
   building: {
     towncenter: {
-      wall: '#d8cba6', base: '#ab9668', roof: '#96442f', wood: '#8a6234',
-      stone: STONE, door: '#3b2a17',
+      wall: '#d8cba6', base: '#ab9668', roof: '#96442f', thatch: '#bd9d52',
+      wood: '#8a6234', stone: STONE, door: '#3b2a17', ivy: '#3f6b32',
     },
     house: { wall: '#d8cba6', roof: '#b09a62', wood: '#8a6234', stone: STONE, door: '#4d3620', ivy: '#3f6b32' },
     mill: { wall: '#d8cba6', roof: '#b09a62', wood: '#6b4f2c', stone: STONE, accent: '#ebe4c8' },
@@ -160,7 +160,7 @@ export const LOOK_FIELDS = {
   ],
   building: [
     color('wall', 'Muros'), color('base', 'Basamento'), color('stone', 'Zócalo'),
-    color('roof', 'Tejado'), color('wood', 'Madera'), color('door', 'Puerta'),
+    color('roof', 'Tejado'), color('thatch', 'Bálago'), color('wood', 'Madera'), color('door', 'Puerta'),
     color('chimney', 'Chimenea'), color('ivy', 'Hiedra'),
     color('soil', 'Tierra'), color('crop', 'Cultivo'), color('fence', 'Cerca'),
     color('ground', 'Empedrado'), color('counter', 'Mostradores'), color('accent', 'Detalle'),
