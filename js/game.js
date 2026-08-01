@@ -410,6 +410,40 @@ export class Game {
     return list.slice(0, count).map((e) => e.u);
   }
 
+  /** Edificio enemigo más cercano a (x,y) dentro del radio, o null. */
+  findEnemyBuildingNear(owner, x, y, r) {
+    const probe = { x, y, radius: 0 };
+    let best = null, bestD = Infinity;
+    for (const b of this.buildings) {
+      if (b.owner === owner || b.dead) continue;
+      // La muralla se ataca sólo si no hay nada mejor: derribarla cuesta y no
+      // da nada a cambio.
+      const d = this.edgeDist(probe, b) + (BUILDINGS[b.type].wall ? 6 : 0);
+      if (d < r && d < bestD) { bestD = d; best = b; }
+    }
+    return best;
+  }
+
+  /**
+   * A quién ataca por su cuenta una unidad que va en ataque en movimiento o
+   * dentro de un grupo de asalto: primero unidades —militares antes que
+   * civiles— y, si no queda ninguna a la vista, edificios.
+   *
+   * Sin la segunda parte el ejército llegaba a la base enemiga y se quedaba
+   * plantado junto a los edificios sin atacarlos. Los edificios se buscan en un
+   * radio más corto que las unidades para no detener la marcha por una casa que
+   * quede de refilón; el asedio hace justo lo contrario, que para eso está.
+   */
+  findAttackTarget(u, radius) {
+    const siege = UNITS[u.type].class === 'siege';
+    if (siege) {
+      return this.findEnemyBuildingNear(u.owner, u.x, u.y, radius)
+        || this.findEnemyNear(u.owner, u.x, u.y, radius, true);
+    }
+    return this.findEnemyNear(u.owner, u.x, u.y, radius, true)
+      || this.findEnemyBuildingNear(u.owner, u.x, u.y, radius * 0.55);
+  }
+
   // --- Granjas --------------------------------------------------------------
 
   /*
@@ -962,12 +996,32 @@ export class Game {
   /** Compraventa en el mercado. dir es 'sell' o 'buy'. */
   commandMarket(res, dir) {
     const p = this.human;
+    if (this.isGuest) {
+      const price = Math.round(100 * (dir === 'sell' ? 0.8 : 1.4));
+      if (dir === 'sell' && p.res[res] < 100) return;
+      if (dir === 'buy' && p.res.gold < price) return;
+      this.netSend({ c: 'market', r: res, d: dir });
+      return;
+    }
+    this.tradeAt(p, res, dir);
+  }
+
+  /**
+   * Una operación de mercado: se venden 100 unidades del recurso por oro o se
+   * compran 100 pagando oro. La usan el jugador y la máquina por igual.
+   * Devuelve false si no se pudo hacer.
+   */
+  tradeAt(player, res, dir) {
+    if (res === 'gold') return false;
     const price = Math.round(100 * (dir === 'sell' ? 0.8 : 1.4));
-    if (dir === 'sell' && p.res[res] < 100) return;
-    if (dir === 'buy' && p.res.gold < price) return;
-    if (this.isGuest) { this.netSend({ c: 'market', r: res, d: dir }); return; }
-    if (dir === 'sell') { p.res[res] -= 100; p.res.gold += price; }
-    else { p.res.gold -= price; p.res[res] += 100; }
+    if (dir === 'sell') {
+      if (player.res[res] < 100) return false;
+      player.res[res] -= 100; player.res.gold += price;
+    } else {
+      if (player.res.gold < price) return false;
+      player.res.gold -= price; player.res[res] += 100;
+    }
+    return true;
   }
 
   /** Rendirse. */
