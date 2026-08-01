@@ -12,6 +12,12 @@ import { findPath, ringTiles, areaTiles, nearestFree } from './path.js';
 const WORK_REACH = 0.45;
 const WORK_KEEP = 0.8;
 
+// Hasta dónde persigue una unidad que se lanzó sola a por un enemigo que pasaba
+// cerca. Como en el juego original, no cruza el mapa detrás de él: al pasarse de
+// esta distancia de su puesto abandona y vuelve. Sólo afecta a las órdenes que
+// se dio ella misma (llevan `guard`), nunca a las que da el jugador.
+const PURSUE_LIMIT = 9;
+
 // --- Jugador ----------------------------------------------------------------
 
 export class Player {
@@ -138,6 +144,8 @@ export class Unit {
     this.carry = 0;
     this.carryRes = null;
     this.lastNode = null;
+    // Hasta cuándo está a resguardo por la campana (ver `ringBell` en ai.js).
+    this.panicUntil = 0;
     this.scanCd = Math.random();
     this.selected = false;
     this.dead = false;
@@ -312,6 +320,12 @@ export class Unit {
     }
   }
 
+  /**
+   * Unidad parada: si ve pasar a un enemigo, va a por él y luego vuelve a su
+   * puesto. Sólo unidades, no edificios: igual que en el juego original, una
+   * tropa en posición agresiva no se pone a picar un cuartel por su cuenta;
+   * para eso está la orden de ataque en movimiento.
+   */
   idleScan(g, dt) {
     if (!this.isMilitary) return;
     this.scanCd -= dt;
@@ -334,14 +348,19 @@ export class Unit {
     if (this.stuck > 20) { this.stuck = 0; this.path = null; this.repathCd = 0; }
   }
 
+  /**
+   * Ataque en movimiento: se avanza hacia el punto señalado atacando lo que se
+   * encuentre por el camino —unidades y también edificios, como en el juego
+   * original—, y al terminar cada pelea se retoma la marcha.
+   */
   doAttackMove(g, dt, speed) {
     this.scanCd -= dt;
     if (this.scanCd <= 0) {
       this.scanCd = 0.5;
-      const e = g.findEnemyNear(this.owner, this.x, this.y, UNITS[this.type].los + 1, true);
+      const e = g.findAttackTarget(this, UNITS[this.type].los + 1);
       if (e) {
-        const dest = { x: this.task.x, y: this.task.y };
-        this.task = { type: 'attack', target: e, resume: dest };
+        const t = this.task;
+        this.task = { type: 'attack', target: e, resume: { x: t.x, y: t.y, ax: t.ax, ay: t.ay } };
         return;
       }
     }
@@ -551,12 +570,19 @@ export class Unit {
 
   doAttack(g, dt, speed, player) {
     const t = this.task.target;
+    const guard = this.task.guard;
     if (!t || t.dead) {
       const r = this.task.resume;
-      const guard = this.task.guard;
       this.task = null;
-      if (r) this.task = { type: 'attackmove', x: r.x, y: r.y };
+      if (r) this.task = { type: 'attackmove', x: r.x, y: r.y, ax: r.ax ?? r.x, ay: r.ay ?? r.y };
       else if (guard && dist(this.x, this.y, guard.x, guard.y) > 4) this.task = { type: 'move', x: guard.x, y: guard.y };
+      return;
+    }
+    // Se persigue, pero no hasta el fin del mundo: quien salió de su puesto por
+    // iniciativa propia vuelve a él en cuanto se aleja demasiado.
+    if (guard && dist(this.x, this.y, guard.x, guard.y) > PURSUE_LIMIT) {
+      this.stopTask();
+      this.task = { type: 'move', x: guard.x, y: guard.y };
       return;
     }
     const def = UNITS[this.type];
