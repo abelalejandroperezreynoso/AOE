@@ -666,7 +666,11 @@ const BODY = {
  * milicia se distinguen de un vistazo aunque salgan del mismo dibujo.
  */
 const GEAR = {
-  villager: { armor: 0, helm: null, cape: 0 },
+  // El aldeano no lleva equipo: va con el torso desnudo, las calzas del color
+  // del jugador, el cinto ancho de cuero trenzado, las muñequeras y la barba.
+  villager: {
+    armor: 0, helm: null, cape: 0, bare: true, pants: 'player', bracers: true, beard: true,
+  },
   militia: { armor: 1, helm: 'cap', shield: 'round', cape: 0.5 },
   manatarms: { armor: 2, helm: 'nasal', shield: 'round', cape: 0.75 },
   longswordsman: { armor: 3, helm: 'great', shield: 'heater', cape: 0.95 },
@@ -698,6 +702,7 @@ function palette(type, colorIdx) {
   if (hit) return hit;
   const col = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length];
   const L = look('unit', type);
+  const G = GEAR[type] || NO_GEAR;
   const [metalL, metal, metalD] = ramp(L.metal || '#b9bcc4');
   const [helmL, helm, helmD] = ramp(L.helmet || L.metal || '#a7a9b0');
   const [woodL, wood, woodD] = ramp(L.wood || '#7a5c33');
@@ -718,6 +723,11 @@ function palette(type, colorIdx) {
     leather, leatherL, leatherD,
     cloth, clothD: shade(cloth, -0.2),
     hair: L.hair || '#6b4a2c',
+    // A quien viste calzas del color del jugador se las pinta con él: es lo
+    // que hace al aldeano reconocible de un bando o de otro desde lejos.
+    ...(G.pants === 'player'
+      ? { legs: col.main, legsL: shade(col.main, 0.16), legsD: col.dark }
+      : { legsD: shade(legs, -0.2) }),
     plume: L.plume || '#e0dcd2',
     mail: mix(metalD, '#3c3f46', 0.5), mailL: mix(metal, '#5a5e66', 0.4),
   };
@@ -794,6 +804,18 @@ function ridingLegs(ctx, P, G) {
 /** Faldón de la túnica, con ribete y las escarcelas de hierro por encima. */
 function skirt(ctx, P, G, walk) {
   const y0 = BODY.waist, y1 = BODY.hip + 3.6;
+  if (G.bare) {
+    // Sin túnica no hay faldón: lo que se ve es la cadera de las calzas, que
+    // arrancan del cinto y bajan sin costura hasta los muslos.
+    poly(ctx, [[-4.6, y0 - 0.6], [4.6, y0 - 0.6], [5, y1 - 1.6], [-5, y1 - 1.6]], P.legsL);
+    poly(ctx, [[0.9, y0 - 0.6], [4.6, y0 - 0.6], [5, y1 - 1.6], [1.3, y1 - 1.6]], P.legs);
+    poly(ctx, [[2.9, y0 - 0.6], [4.6, y0 - 0.6], [5, y1 - 1.6], [3.3, y1 - 1.6]], P.legsD);
+    // Entrepierna, para que las dos perneras no parezcan una falda.
+    ctx.strokeStyle = P.legsD; ctx.lineWidth = 0.8; ctx.lineCap = 'butt';
+    ctx.beginPath();
+    ctx.moveTo(0.2, y1 - 4.4); ctx.lineTo(0.2, y1 - 1.4); ctx.stroke();
+    return;
+  }
   const sway = walk * 0.9;
   poly(ctx, [[-4.8, y0], [4.8, y0], [5.8 + sway, y1], [-5.8 + sway, y1]], P.tunic);
   // Mitad en sombra y ribete del bajo.
@@ -816,8 +838,83 @@ function skirt(ctx, P, G, walk) {
   }
 }
 
+/**
+ * Torso desnudo del aldeano: hombros anchos, cintura estrecha y el bulto de
+ * los pectorales y del vientre marcado a base de luces y sombras. Encima, el
+ * cinto ancho de cuero trenzado con su hebilla.
+ */
+function bareTorso(ctx, P) {
+  const sh = BODY.shoulder, ch = BODY.chest, wa = BODY.waist + 0.6, R = 6.8;
+  const body = [
+    [-R, sh + 0.8], [R, sh + 0.8], [R - 0.8, ch + 0.6],
+    [4.3, wa + 2.2], [-4.3, wa + 2.2], [-R + 0.8, ch + 0.6],
+  ];
+  poly(ctx, body, P.skin);
+  // Costado en sombra: el bulto del cuerpo sale de aquí, no de las rayas.
+  poly(ctx, [[2.6, sh + 0.9], [R, sh + 0.8], [R - 0.8, ch + 0.6], [4.3, wa + 2.2], [3, wa + 2.2]],
+    P.skinD);
+  // Trapecios, que el cuello no nazca de unos hombros planos.
+  poly(ctx, [[-3.6, sh - 0.6], [3.6, sh - 0.6], [4.6, sh + 1.4], [-4.6, sh + 1.4]], P.skin);
+  poly(ctx, [[1.2, sh - 0.4], [3.6, sh - 0.6], [4.6, sh + 1.4], [1.8, sh + 1.4]], P.skinD);
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(body[0][0], body[0][1]);
+  for (const q of body.slice(1)) ctx.lineTo(q[0], q[1]);
+  ctx.closePath(); ctx.clip();
+  // Pectorales: cada uno con su lomo a la luz y su sombra por debajo, que es
+  // lo que hace que el pecho se lea como pecho a este tamaño.
+  for (const [cx, tone] of [[-2.6, P.skinL], [2.6, P.skin]]) {
+    ctx.fillStyle = tone;
+    ctx.beginPath();
+    ctx.ellipse(cx, ch - 0.4, 2.9, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.strokeStyle = P.skinD; ctx.lineWidth = 0.8; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-5.1, ch - 0.8); ctx.quadraticCurveTo(-2.6, ch + 2.2, -0.2, ch + 1);
+  ctx.moveTo(5.3, ch - 1); ctx.quadraticCurveTo(2.8, ch + 2, 0.4, ch + 1);
+  ctx.stroke();
+  // Surco del esternón, del hueco del cuello al ombligo.
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(0.1, sh + 2); ctx.lineTo(0.4, ch + 4.4);
+  ctx.stroke();
+  // Vientre: dos tramos de recto.
+  for (const y of [ch + 2.6, ch + 4]) {
+    ctx.beginPath();
+    ctx.moveTo(-2.4, y); ctx.lineTo(2.6, y - 0.2); ctx.stroke();
+  }
+  ctx.restore();
+  // --- Cinto ancho de cuero trenzado, con la hebilla de hierro ---
+  const by = wa - 0.7;
+  const belt = shade(P.leather, 0.2), beltD = shade(P.leather, -0.22);
+  poly(ctx, [[-5.2, by], [5.2, by], [4.8, by + 3.6], [-4.8, by + 3.6]], belt);
+  poly(ctx, [[1.4, by], [5.2, by], [4.8, by + 3.6], [1.2, by + 3.6]], beltD);
+  ctx.fillStyle = shade(P.leatherL, 0.16);
+  ctx.fillRect(-5.2, by, 10.4, 0.8);
+  ctx.fillStyle = shade(beltD, -0.2);
+  ctx.fillRect(-5.1, by + 3.1, 10, 0.8);
+  // Trenzado: unas puntadas en diagonal bastan para que no sea una cinta lisa.
+  ctx.strokeStyle = beltD; ctx.lineWidth = 0.6; ctx.lineCap = 'butt';
+  for (let i = -4.4; i <= 4.4; i += 1.5) {
+    ctx.beginPath();
+    ctx.moveTo(i, by + 1); ctx.lineTo(i + 1, by + 3); ctx.stroke();
+  }
+  // Hebilla: un óvalo de hierro con su clavillo, que es lo que se le ve de lejos.
+  ctx.fillStyle = P.metal;
+  ctx.beginPath(); ctx.ellipse(-0.4, by + 1.9, 1.9, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = P.metalD;
+  ctx.beginPath(); ctx.ellipse(-0.4, by + 1.9, 1.9, 2.2, 0, 0.6, Math.PI - 0.2); ctx.fill();
+  ctx.fillStyle = beltD;
+  ctx.beginPath(); ctx.ellipse(-0.4, by + 1.9, 1.1, 1.4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = P.gleam;
+  ctx.fillRect(-1.9, by + 0.8, 0.8, 1.4);
+  ctx.fillStyle = P.metalD;
+  ctx.fillRect(-1, by + 1.4, 2.6, 0.8);
+}
+
 /** Torso: túnica, protección según el escalón, cinturón y hombreras. */
 function torso(ctx, P, G) {
+  if (G.bare) { bareTorso(ctx, P); return; }
   const sh = BODY.shoulder, ch = BODY.chest, wa = BODY.waist + 0.6, R = 6.3;
   // Silueta: hombros anchos que se estrechan en la cintura.
   poly(ctx, [
@@ -972,19 +1069,53 @@ function head(ctx, P, G, back) {
     ctx.beginPath(); ctx.ellipse(2.4, hy + 1.6, R * 0.42, R * 0.5, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = P.skinL;
     ctx.beginPath(); ctx.ellipse(-1.4, hy - 1.2, R * 0.4, R * 0.46, 0, 0, Math.PI * 2); ctx.fill();
+    if (G.beard) {
+      // Barba cerrada: envuelve la mandíbula y baja en punta bajo el mentón.
+      ctx.fillStyle = shade(P.hair, -0.06);
+      ctx.beginPath();
+      ctx.moveTo(-R * 0.88, hy + 0.4);
+      ctx.quadraticCurveTo(-R * 0.74, hy + R + 0.6, 0.8, hy + R + 1.2);
+      ctx.quadraticCurveTo(R * 0.86, hy + R * 0.66, R * 0.86, hy - 0.2);
+      ctx.quadraticCurveTo(R * 0.42, hy + 1.8, 0.2, hy + 1.6);
+      ctx.quadraticCurveTo(-R * 0.44, hy + 1.6, -R * 0.88, hy + 0.4);
+      ctx.closePath(); ctx.fill();
+      // Mechones y bigote.
+      ctx.strokeStyle = shade(P.hair, -0.24); ctx.lineWidth = 0.6; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-1.4, hy + 2.6); ctx.quadraticCurveTo(-0.2, hy + 4.4, 0.6, hy + R + 0.4);
+      ctx.moveTo(2.8, hy + 2.4); ctx.quadraticCurveTo(2.8, hy + 4.2, 1.8, hy + R * 0.96);
+      ctx.stroke();
+      ctx.fillStyle = shade(P.hair, 0.12);
+      ctx.fillRect(0.6, hy + 1.1, 2.8, 0.9);
+    }
     if (!style) {
-      // Sin yelmo se le ve el pelo: flequillo, nuca y patilla.
+      // Sin yelmo se le ve el pelo: melena, nuca y patilla.
       ctx.fillStyle = P.hair;
       ctx.beginPath(); ctx.ellipse(0.2, hy - 1.8, R * 0.94, R * 0.72, 0, Math.PI, Math.PI * 2); ctx.fill();
       ctx.fillRect(-R * 0.92, hy - 2.4, 1.8, 4.2);
+      if (G.beard) {
+        // Al aldeano le cae una guedeja espesa por encima de la oreja.
+        ctx.beginPath();
+        ctx.ellipse(0.2, hy - 2.6, R * 1.0, R * 0.8, 0, Math.PI * 1.04, Math.PI * 2.04);
+        ctx.fill();
+        ctx.fillRect(-R * 0.98, hy - 3, 2.1, 3.2);
+        // Ondas del pelo, como el mechón revuelto del original.
+        ctx.strokeStyle = shade(P.hair, -0.22); ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(-R * 0.8, hy - 3.6); ctx.quadraticCurveTo(-1.4, hy - 5.6, 2.4, hy - 4.4);
+        ctx.moveTo(-R * 0.72, hy - 1.8); ctx.quadraticCurveTo(-2.4, hy - 3.4, 0.6, hy - 2.8);
+        ctx.stroke();
+      }
       ctx.fillStyle = shade(P.hair, 0.14);
       ctx.fillRect(-R * 0.5, hy - 3.9, 2.6, 1);
     }
     if (!back) {
       ctx.fillStyle = 'rgba(0,0,0,.5)';
       ctx.fillRect(2.2, hy - 1.2, 1.1, 1.2);   // ojo
-      ctx.fillStyle = 'rgba(0,0,0,.18)';
-      ctx.fillRect(1.8, hy + 1.6, 1.8, 0.6);   // boca
+      if (!G.beard) {
+        ctx.fillStyle = 'rgba(0,0,0,.18)';
+        ctx.fillRect(1.8, hy + 1.6, 1.8, 0.6); // boca
+      }
     }
   }
 
@@ -1067,10 +1198,11 @@ function arm(ctx, P, G, hx, hy, o = {}) {
   const ey = (sy + hy) / 2 + (dx / len) * bend;
   const far = !!o.far; // el brazo del fondo va un punto más oscuro
   // Manga: hierro, malla, la propia túnica o la camisa de lino de debajo.
-  const sleeve = G.armor >= 3 ? (far ? P.metalD : P.metal)
-    : G.armor === 2 ? (far ? P.mail : P.mailL)
-      : G.armor === 1 ? (far ? P.tunicD : P.tunic)
-        : (far ? P.clothD : P.cloth);
+  const sleeve = G.bare ? (far ? P.skinD : P.skin)
+    : G.armor >= 3 ? (far ? P.metalD : P.metal)
+      : G.armor === 2 ? (far ? P.mail : P.mailL)
+        : G.armor === 1 ? (far ? P.tunicD : P.tunic)
+          : (far ? P.clothD : P.cloth);
   const fore = G.armor >= 2 ? (far ? P.metalD : P.metal) : (far ? P.skinD : P.skin);
   limb(ctx, sx, sy, ex, ey, 3.9, sleeve);
   limb(ctx, ex, ey, hx, hy, 3.2, fore);
@@ -1078,6 +1210,26 @@ function arm(ctx, P, G, hx, hy, o = {}) {
     // Codal y guardabrazo.
     dot(ctx, ex, ey, 1.8, far ? P.metalD : P.metal);
     limb(ctx, ex, ey, hx * 0.5 + ex * 0.5, hy * 0.5 + ey * 0.5, 3.3, far ? P.metalD : P.metal);
+  } else if (G.bracers) {
+    // Muñequera de cuero trenzado, del codo a la muñeca.
+    const t0 = 0.34, t1 = 0.94;
+    const ax = ex + (hx - ex) * t0, ay = ey + (hy - ey) * t0;
+    const bx = ex + (hx - ex) * t1, by = ey + (hy - ey) * t1;
+    limb(ctx, ax, ay, bx, by, 3.3, far ? P.leatherD : P.leather);
+    limb(ctx, ax, ay, ax + (bx - ax) * 0.4, ay + (by - ay) * 0.4, 3.3,
+      far ? P.leather : P.leatherL);
+    // Las correas cruzadas del brazalete.
+    ctx.strokeStyle = far ? shade(P.leatherD, -0.2) : P.leatherD;
+    ctx.lineWidth = 0.6; ctx.lineCap = 'butt';
+    const nx = -(by - ay), ny = bx - ax;
+    const nl = Math.hypot(nx, ny) || 1;
+    for (const k of [0.28, 0.56, 0.84]) {
+      const px = ax + (bx - ax) * k, py = ay + (by - ay) * k;
+      ctx.beginPath();
+      ctx.moveTo(px - (nx / nl) * 1.5, py - (ny / nl) * 1.5);
+      ctx.lineTo(px + (nx / nl) * 1.5, py + (ny / nl) * 1.5);
+      ctx.stroke();
+    }
   }
   // Mano: guantelete de hierro, guante de cuero o la mano desnuda.
   dot(ctx, hx, hy, 1.8, G.armor >= 2 ? (far ? P.metalD : P.metal)
@@ -1372,7 +1524,7 @@ function drawSoldier(ctx, type, P, f, back, mounted) {
   skirt(ctx, P, G, walk);
   // Brazo del fondo, por detrás del torso.
   const offHand = { x: -6.4, y: armY - bob + 3.6 };
-  if (!G.shield) arm(ctx, P, G, offHand.x - 1, offHand.y + 1.4, { far: true, bend: -2.4 });
+  if (!G.shield && !G.bare) arm(ctx, P, G, offHand.x - 1, offHand.y + 1.4, { far: true, bend: -2.4 });
   torso(ctx, P, G);
   if (type === 'archer' || type === 'crossbowman' || type === 'arbalester' || type === 'skirmisher') {
     quiver(ctx, P);
@@ -1396,9 +1548,12 @@ function drawWeapons(ctx, type, P, G, f, atk, swing, armY) {
 
   switch (type) {
     case 'villager': {
-      arm(ctx, P, G, -6.4, armY + 6, { far: true, bend: -2.2 });
-      const hx = 7.2, hy = armY + 5 - (atk ? swing * 6 : 0);
-      arm(ctx, P, G, hx, hy, { bend: 2.4 });
+      // Los brazos cuelgan a los lados, con el hombro en el canto del torso:
+      // así el antebrazo no cruza la barriga ni tapa el cinto.
+      const sy = BODY.shoulder + 2.6;
+      arm(ctx, P, G, -7.4, armY + 11.6, { far: true, sx: -5, sy, bend: 0.8 });
+      const hx = 7.6, hy = armY + 9.6 - (atk ? swing * 8 : 0);
+      arm(ctx, P, G, hx, hy, { sx: atk ? 2.6 : 5, sy, bend: atk ? 2.4 : -1 });
       ctx.save();
       ctx.translate(hx, hy);
       ctx.rotate(atk ? -0.7 + swing * 1.4 : 0.55);
