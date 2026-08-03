@@ -82,7 +82,7 @@ export const LOOK = {
   unit: {
     villager: {
       skin: SKIN, legs: LEGS, cloth: CLOTH, leather: LEATHER,
-      metal: '#b9bcc4', wood: '#6b4d2c', scale: 1,
+      metal: '#b9bcc4', wood: '#6b4d2c', hair: '#7a4f2a', scale: 1,
     },
     militia: soldier({ metal: '#c9ccd4', wood: '#8c6b3a' }),
     manatarms: soldier({ metal: '#c9ccd4', wood: '#8c6b3a' }),
@@ -174,7 +174,8 @@ export const LOOK_FIELDS = {
   unit: [
     color('skin', 'Piel'), color('legs', 'Calzas'), color('helmet', 'Yelmo'),
     color('metal', 'Metal'), color('wood', 'Madera'), color('cloth', 'Jubón'),
-    color('leather', 'Cuero'), color('plume', 'Penacho'), color('horse', 'Montura'),
+    color('leather', 'Cuero'), color('hair', 'Pelo'), color('plume', 'Penacho'),
+    color('horse', 'Montura'),
     color('wheel', 'Ruedas'), scale,
   ],
   building: [
