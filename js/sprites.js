@@ -735,14 +735,123 @@ function palette(type, colorIdx) {
   return p;
 }
 
+// --- Volumen ----------------------------------------------------------------
+//
+// Lo que separa un muñeco de manchas planas de un sprite renderizado no es el
+// detalle, es que cada pieza tenga su degradado y su sombra de contacto. La luz
+// entra por arriba y por la izquierda: todo cilindro lleva el canto claro a ese
+// lado, el tono base en el lomo y la sombra al dorso, y donde una pieza se mete
+// debajo de otra hay una mancha oscura que las separa.
+
+const LIGHT = [-0.7, -0.72];
+/*
+ * Canto de la silueta. Un sprite sacado de un render lleva la orilla oscura
+ * -es el sombreado que se cierra al borde-, y sin ella las piezas se recortan
+ * contra la hierba como pegatinas. No es una tinta: es un tono muy bajo que
+ * sólo se nota en el contorno.
+ */
+const EDGE = 'rgba(38,22,12,.34)';
+
+/*
+ * Los degradados se piden en coordenadas del propio muñeco, que son las mismas
+ * en cada cuadro y para cada copia, así que se guardan: crearlos era lo único
+ * caro de pintar con volumen. Un objeto de degradado no está atado al lienzo
+ * que lo creó, de modo que vale igual para la caché de sprites y para el
+ * pintado directo.
+ */
+const gradCache = new Map();
+const q = (v) => Math.round(v * 4) / 4;
+
+function cachedGrad(key, make) {
+  let g = gradCache.get(key);
+  if (g) return g;
+  g = make();
+  if (gradCache.size > 4000) gradCache.clear();
+  gradCache.set(key, g);
+  return g;
+}
+
+/** Degradado que cruza un eje, para cilindros: brazos, piernas, astiles. */
+function crossGrad(ctx, cx, cy, nx, ny, r, color, lo = -0.3, hi = 0.2) {
+  const x0 = q(cx + nx * r), y0 = q(cy + ny * r), x1 = q(cx - nx * r), y1 = q(cy - ny * r);
+  return cachedGrad(`c${x0},${y0},${x1},${y1},${color},${lo},${hi}`, () => {
+    const g = ctx.createLinearGradient(x0, y0, x1, y1);
+    g.addColorStop(0, shade(color, lo - 0.16));
+    g.addColorStop(0.13, shade(color, hi));
+    g.addColorStop(0.38, shade(color, hi * 0.4));
+    g.addColorStop(0.66, color);
+    g.addColorStop(1, shade(color, lo - 0.14));
+    return g;
+  });
+}
+
+/** Degradado de bulto para una superficie ancha: pecho, muros de tela, faldones. */
+function faceGrad(ctx, x0, x1, y, color, lo = -0.26, hi = 0.16) {
+  return cachedGrad(`f${q(x0)},${q(x1)},${q(y)},${color},${lo},${hi}`, () => {
+    const g = ctx.createLinearGradient(q(x0), q(y), q(x1), q(y));
+    g.addColorStop(0, shade(color, hi));
+    g.addColorStop(0.42, color);
+    g.addColorStop(1, shade(color, lo));
+    return g;
+  });
+}
+
+/** Esfera: cabeza, frutos, pomos. El foco cae hacia la luz. */
+function sphere(ctx, cx, cy, rx, ry, color) {
+  const r = Math.max(rx, ry);
+  ctx.fillStyle = cachedGrad(`s${q(cx)},${q(cy)},${q(rx)},${q(ry)},${color}`, () => {
+    const g = ctx.createRadialGradient(
+      q(cx + LIGHT[0] * rx * 0.46), q(cy + LIGHT[1] * ry * 0.46), r * 0.1, q(cx), q(cy), r * 1.14,
+    );
+    g.addColorStop(0, shade(color, 0.24));
+    g.addColorStop(0.44, shade(color, 0.07));
+    g.addColorStop(0.76, color);
+    g.addColorStop(1, shade(color, -0.32));
+    return g;
+  });
+  ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  // Sólo las piezas grandes llevan canto: en un hombro o en una mano se leería
+  // como un aro pintado.
+  if (rx > 3) {
+    ctx.strokeStyle = EDGE; ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.ellipse(cx, cy, rx - 0.3, ry - 0.3, 0, 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
+/** Sombra de contacto: hunde una pieza bajo otra sin dibujar una raya. */
+function occlude(ctx, cx, cy, rx, ry, a = 0.3) {
+  const r = Math.max(rx, ry);
+  const g = cachedGrad(`o${q(cx)},${q(cy)},${q(r)},${a}`, () => {
+    const gg = ctx.createRadialGradient(q(cx), q(cy), 0, q(cx), q(cy), r);
+    gg.addColorStop(0, `rgba(30,18,10,${a})`);
+    gg.addColorStop(0.55, `rgba(30,18,10,${a * 0.5})`);
+    gg.addColorStop(1, 'rgba(30,18,10,0)');
+    return gg;
+  });
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.ellipse(cx, cy, r, r, 0, 0, Math.PI * 2); ctx.fill();
+}
+
+/** Miembro cilíndrico, con el degradado cruzado a su eje. */
 function limb(ctx, x1, y1, x2, y2, w, color) {
-  ctx.strokeStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+  if (typeof color === 'string' && color[0] === '#') {
+    const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+    let nx = -dy / len, ny = dx / len;
+    if (nx * LIGHT[0] + ny * LIGHT[1] < 0) { nx = -nx; ny = -ny; }
+    ctx.strokeStyle = crossGrad(ctx, (x1 + x2) / 2, (y1 + y2) / 2, nx, ny, w / 2, color);
+  } else {
+    ctx.strokeStyle = color;
+  }
+  ctx.lineWidth = w; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
 }
 
 function dot(ctx, x, y, r, color) {
-  ctx.fillStyle = color;
-  ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  if (typeof color === 'string' && color[0] === '#' && r >= 1.4) sphere(ctx, x, y, r, r, color);
+  else {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
 }
 
 // --- Piezas del soldado -----------------------------------------------------
@@ -776,7 +885,11 @@ function leg(ctx, P, G, phase, front, bob) {
   poly(ctx, [
     [footX - 2.6, ankY - 1.2], [footX + 2.4, ankY - 1.2],
     [footX + 4.8, sole - 1.6], [footX + 4.8, sole - 0.9], [footX - 2.8, sole - 0.9],
-  ], lea);
+  ], faceGrad(ctx, footX - 2.8, footX + 4.8, sole, lea, -0.3, 0.18), EDGE);
+  // Empeine: una luz corta que redondea el pie.
+  ctx.strokeStyle = `${shade(lea, 0.26)}cc`; ctx.lineWidth = 0.7; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(footX - 1.6, ankY - 0.4); ctx.lineTo(footX + 2.6, sole - 2.2); ctx.stroke();
   poly(ctx, [
     [footX - 2.9, sole - 1.1], [footX + 4.9, sole - 1.1],
     [footX + 4.9, sole], [footX - 2.9, sole],
@@ -807,13 +920,17 @@ function skirt(ctx, P, G, walk) {
   if (G.bare) {
     // Sin túnica no hay faldón: lo que se ve es la cadera de las calzas, que
     // arrancan del cinto y bajan sin costura hasta los muslos.
-    poly(ctx, [[-4.6, y0 - 0.6], [4.6, y0 - 0.6], [5, y1 - 1.6], [-5, y1 - 1.6]], P.legsL);
-    poly(ctx, [[0.9, y0 - 0.6], [4.6, y0 - 0.6], [5, y1 - 1.6], [1.3, y1 - 1.6]], P.legs);
-    poly(ctx, [[2.9, y0 - 0.6], [4.6, y0 - 0.6], [5, y1 - 1.6], [3.3, y1 - 1.6]], P.legsD);
+    poly(ctx, [[-4.6, y0 - 0.6], [4.6, y0 - 0.6], [5, y1 - 1.6], [-5, y1 - 1.6]],
+      faceGrad(ctx, -4.8, 5, y0, P.legs, -0.3, 0.18), EDGE);
     // Entrepierna, para que las dos perneras no parezcan una falda.
-    ctx.strokeStyle = P.legsD; ctx.lineWidth = 0.8; ctx.lineCap = 'butt';
+    occlude(ctx, 0.2, y1 - 1.6, 1.6, 3, 0.34);
+    ctx.strokeStyle = `${P.legsD}dd`; ctx.lineWidth = 0.8; ctx.lineCap = 'butt';
     ctx.beginPath();
-    ctx.moveTo(0.2, y1 - 4.4); ctx.lineTo(0.2, y1 - 1.4); ctx.stroke();
+    ctx.moveTo(0.2, y1 - 4.6); ctx.lineTo(0.2, y1 - 1.4); ctx.stroke();
+    // Arruga del cinto y luz del muslo de delante.
+    ctx.strokeStyle = `${shade(P.legsL, 0.2)}bb`; ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(-3.6, y0 + 1.4); ctx.lineTo(-3.9, y1 - 2); ctx.stroke();
     return;
   }
   const sway = walk * 0.9;
@@ -849,49 +966,62 @@ function bareTorso(ctx, P) {
     [-R, sh + 0.8], [R, sh + 0.8], [R - 0.8, ch + 0.6],
     [4.3, wa + 2.2], [-4.3, wa + 2.2], [-R + 0.8, ch + 0.6],
   ];
-  poly(ctx, body, P.skin);
-  // Costado en sombra: el bulto del cuerpo sale de aquí, no de las rayas.
-  poly(ctx, [[2.6, sh + 0.9], [R, sh + 0.8], [R - 0.8, ch + 0.6], [4.3, wa + 2.2], [3, wa + 2.2]],
-    P.skinD);
+  // El bulto del cuerpo sale del degradado, no de las rayas.
+  poly(ctx, body, faceGrad(ctx, -R, R, ch, P.skin, -0.3, 0.14), EDGE);
   // Trapecios, que el cuello no nazca de unos hombros planos.
-  poly(ctx, [[-3.6, sh - 0.6], [3.6, sh - 0.6], [4.6, sh + 1.4], [-4.6, sh + 1.4]], P.skin);
-  poly(ctx, [[1.2, sh - 0.4], [3.6, sh - 0.6], [4.6, sh + 1.4], [1.8, sh + 1.4]], P.skinD);
+  poly(ctx, [[-3.6, sh - 0.6], [3.6, sh - 0.6], [4.6, sh + 1.4], [-4.6, sh + 1.4]],
+    faceGrad(ctx, -4.6, 4.6, sh, P.skin, -0.24, 0.2));
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(body[0][0], body[0][1]);
   for (const q of body.slice(1)) ctx.lineTo(q[0], q[1]);
   ctx.closePath(); ctx.clip();
+  // Hueco del cuello y sombra de los hombros: el torso se hunde hacia dentro.
+  occlude(ctx, 0.2, sh + 1.4, 3.4, 2.2, 0.34);
+  occlude(ctx, R - 0.6, sh + 2.6, 2.4, 3.2, 0.3);
   // Pectorales: cada uno con su lomo a la luz y su sombra por debajo, que es
   // lo que hace que el pecho se lea como pecho a este tamaño.
-  for (const [cx, tone] of [[-2.6, P.skinL], [2.6, P.skin]]) {
-    ctx.fillStyle = tone;
-    ctx.beginPath();
-    ctx.ellipse(cx, ch - 0.4, 2.9, 2.2, 0, 0, Math.PI * 2); ctx.fill();
+  for (const [cx, k] of [[-2.7, 0.16], [2.7, -0.02]]) {
+    const g = ctx.createRadialGradient(cx - 1, ch - 1.6, 0.3, cx, ch - 0.4, 3.6);
+    g.addColorStop(0, shade(P.skin, 0.22 + k));
+    g.addColorStop(0.55, shade(P.skin, 0.06 + k));
+    g.addColorStop(1, shade(P.skin, -0.12 + k));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(cx, ch - 0.4, 3, 2.3, 0, 0, Math.PI * 2); ctx.fill();
   }
-  ctx.strokeStyle = P.skinD; ctx.lineWidth = 0.8; ctx.lineCap = 'round';
+  // Surco de debajo de cada pectoral, en sombra suave y no en línea dura.
+  occlude(ctx, 0, ch + 1.7, 5.8, 1.2, 0.34);
+  ctx.strokeStyle = shade(P.skinD, -0.06); ctx.lineWidth = 0.7; ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(-5.1, ch - 0.8); ctx.quadraticCurveTo(-2.6, ch + 2.2, -0.2, ch + 1);
-  ctx.moveTo(5.3, ch - 1); ctx.quadraticCurveTo(2.8, ch + 2, 0.4, ch + 1);
+  ctx.moveTo(-5.1, ch - 0.8); ctx.quadraticCurveTo(-2.6, ch + 2.1, -0.3, ch + 0.9);
+  ctx.moveTo(5.3, ch - 1); ctx.quadraticCurveTo(2.8, ch + 1.9, 0.5, ch + 0.9);
   ctx.stroke();
   // Surco del esternón, del hueco del cuello al ombligo.
-  ctx.lineWidth = 0.7;
+  ctx.lineWidth = 0.6;
   ctx.beginPath();
-  ctx.moveTo(0.1, sh + 2); ctx.lineTo(0.4, ch + 4.4);
+  ctx.moveTo(0.1, sh + 2.2); ctx.lineTo(0.4, ch + 4.4);
   ctx.stroke();
-  // Vientre: dos tramos de recto.
-  for (const y of [ch + 2.6, ch + 4]) {
-    ctx.beginPath();
-    ctx.moveTo(-2.4, y); ctx.lineTo(2.6, y - 0.2); ctx.stroke();
+  // Vientre: dos tramos de recto, con su luz encima de cada surco.
+  for (const [y, w2] of [[ch + 2.6, 1.9], [ch + 4.1, 1.6]]) {
+    ctx.strokeStyle = `${shade(P.skinD, -0.04)}cc`; ctx.lineWidth = 0.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-w2, y); ctx.lineTo(w2 + 0.4, y - 0.2); ctx.stroke();
   }
+  // Canto de luz en el costado que mira a la lumbre.
+  ctx.strokeStyle = `${shade(P.skinL, 0.18)}dd`; ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(-R + 0.5, sh + 1.6); ctx.lineTo(-4.1, wa + 1.6); ctx.stroke();
   ctx.restore();
   // --- Cinto ancho de cuero trenzado, con la hebilla de hierro ---
   const by = wa - 0.7;
   const belt = shade(P.leather, 0.2), beltD = shade(P.leather, -0.22);
-  poly(ctx, [[-5.2, by], [5.2, by], [4.8, by + 3.6], [-4.8, by + 3.6]], belt);
-  poly(ctx, [[1.4, by], [5.2, by], [4.8, by + 3.6], [1.2, by + 3.6]], beltD);
+  // El cinto ciñe: lleva su propio degradado de cilindro y hace sombra sobre
+  // el vientre y sobre las calzas.
+  occlude(ctx, 0, by - 0.4, 5.6, 1.4, 0.34);
+  poly(ctx, [[-5.2, by], [5.2, by], [4.8, by + 3.6], [-4.8, by + 3.6]],
+    faceGrad(ctx, -5.2, 5.2, by, belt, -0.34, 0.12), EDGE);
   ctx.fillStyle = shade(P.leatherL, 0.16);
-  ctx.fillRect(-5.2, by, 10.4, 0.8);
-  ctx.fillStyle = shade(beltD, -0.2);
+  ctx.fillRect(-5.2, by, 10.4, 0.7);
+  ctx.fillStyle = shade(beltD, -0.24);
   ctx.fillRect(-5.1, by + 3.1, 10, 0.8);
   // Trenzado: unas puntadas en diagonal bastan para que no sea una cinta lisa.
   ctx.strokeStyle = beltD; ctx.lineWidth = 0.6; ctx.lineCap = 'butt';
@@ -900,16 +1030,15 @@ function bareTorso(ctx, P) {
     ctx.moveTo(i, by + 1); ctx.lineTo(i + 1, by + 3); ctx.stroke();
   }
   // Hebilla: un óvalo de hierro con su clavillo, que es lo que se le ve de lejos.
-  ctx.fillStyle = P.metal;
-  ctx.beginPath(); ctx.ellipse(-0.4, by + 1.9, 1.9, 2.2, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = P.metalD;
-  ctx.beginPath(); ctx.ellipse(-0.4, by + 1.9, 1.9, 2.2, 0, 0.6, Math.PI - 0.2); ctx.fill();
+  const buck = mix(P.metalD, '#8a8478', 0.5);
+  ctx.fillStyle = crossGrad(ctx, -0.4, by + 1.8, -0.6, -0.8, 1.6, buck, -0.36, 0.26);
+  ctx.beginPath(); ctx.ellipse(-0.4, by + 1.8, 1.6, 1.8, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = beltD;
-  ctx.beginPath(); ctx.ellipse(-0.4, by + 1.9, 1.1, 1.4, 0, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = P.gleam;
-  ctx.fillRect(-1.9, by + 0.8, 0.8, 1.4);
-  ctx.fillStyle = P.metalD;
-  ctx.fillRect(-1, by + 1.4, 2.6, 0.8);
+  ctx.beginPath(); ctx.ellipse(-0.4, by + 1.8, 0.9, 1.1, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = `${shade(buck, -0.2)}cc`;
+  ctx.fillRect(-0.9, by + 1.4, 2.3, 0.65);
+  ctx.fillStyle = `${shade(buck, 0.34)}bb`;
+  ctx.beginPath(); ctx.ellipse(-1.4, by + 1.2, 0.4, 0.5, -0.4, 0, Math.PI * 2); ctx.fill();
 }
 
 /** Torso: túnica, protección según el escalón, cinturón y hombreras. */
@@ -1033,7 +1162,7 @@ function cape(ctx, P, G, walk, back) {
 function head(ctx, P, G, back) {
   const hy = BODY.head, R = BODY.headR;
   const style = G.helm;
-  limb(ctx, 0, BODY.neck + 1.8, 0.4, BODY.neck - 1.4, 4, P.skinD);
+  limb(ctx, 0.1, BODY.neck + 2.2, 0.5, BODY.neck - 1.6, G.bare ? 5 : 4, P.skinD);
   if (G.armor >= 2 && style !== 'great' && style !== 'crest') {
     // Cofia de malla: enmarca la cara y baja hasta los hombros.
     ctx.fillStyle = P.mail;
@@ -1062,16 +1191,31 @@ function head(ctx, P, G, back) {
     for (let i = 0; i < 3; i++) dot(ctx, 2.4 + i * 1.4, hy + 2.2, 0.5, P.helmD);
     dot(ctx, -2.6, hy - R + 0.6, 1.5, P.gleam); // brillo
   } else {
-    // Cara: óvalo, mandíbula en sombra y pómulo a la luz.
-    ctx.fillStyle = P.skin;
-    ctx.beginPath(); ctx.ellipse(0.4, hy, R * 0.88, R, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = P.skinD;
-    ctx.beginPath(); ctx.ellipse(2.4, hy + 1.6, R * 0.42, R * 0.5, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = P.skinL;
-    ctx.beginPath(); ctx.ellipse(-1.4, hy - 1.2, R * 0.4, R * 0.46, 0, 0, Math.PI * 2); ctx.fill();
+    // Cara: la bola de la cabeza con su degradado, y encima los rasgos.
+    sphere(ctx, 0.4, hy, R * 0.88, R, P.skin);
+    if (G.beard) {
+      // Perfil de tres cuartos: frente, ceja marcada, nariz con su caballete y
+      // su sombra, y el pómulo cogiendo la luz.
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(0.4, hy, R * 0.88, R, 0, 0, Math.PI * 2);
+      ctx.clip();
+      occlude(ctx, 1.2, hy - 1.4, 3.4, 1.3, 0.36);            // cuenca del ojo
+      ctx.fillStyle = `${shade(P.skinL, 0.16)}cc`;
+      ctx.beginPath();                                        // frente
+      ctx.ellipse(-1, hy - 2.8, R * 0.46, R * 0.3, -0.24, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath();                                        // pómulo
+      ctx.ellipse(-1.9, hy + 0.6, R * 0.28, R * 0.24, 0, 0, Math.PI * 2); ctx.fill();
+      // Nariz: sólo el lomo iluminado y su sombra al lado, sin contorno.
+      ctx.fillStyle = `${shade(P.skinL, 0.24)}d0`;
+      ctx.beginPath();
+      ctx.ellipse(1.5, hy - 0.2, 0.55, 1.25, -0.16, 0, Math.PI * 2); ctx.fill();
+      occlude(ctx, 2.5, hy + 0.4, 1.1, 1, 0.3);
+      ctx.restore();
+    }
     if (G.beard) {
       // Barba cerrada: envuelve la mandíbula y baja en punta bajo el mentón.
-      ctx.fillStyle = shade(P.hair, -0.06);
+      ctx.fillStyle = faceGrad(ctx, -R, R, hy + 2, shade(P.hair, -0.06), -0.34, 0.2);
       ctx.beginPath();
       ctx.moveTo(-R * 0.88, hy + 0.4);
       ctx.quadraticCurveTo(-R * 0.74, hy + R + 0.6, 0.8, hy + R + 1.2);
@@ -1085,14 +1229,34 @@ function head(ctx, P, G, back) {
       ctx.moveTo(-1.4, hy + 2.6); ctx.quadraticCurveTo(-0.2, hy + 4.4, 0.6, hy + R + 0.4);
       ctx.moveTo(2.8, hy + 2.4); ctx.quadraticCurveTo(2.8, hy + 4.2, 1.8, hy + R * 0.96);
       ctx.stroke();
-      ctx.fillStyle = shade(P.hair, 0.12);
-      ctx.fillRect(0.6, hy + 1.1, 2.8, 0.9);
+      // Bigote: dos mechas que caen del labio, no una tira pegada.
+      ctx.fillStyle = shade(P.hair, 0.1);
+      ctx.beginPath();
+      ctx.moveTo(0.2, hy + 0.9);
+      ctx.quadraticCurveTo(2.4, hy + 0.5, 3.6, hy + 1.3);
+      ctx.quadraticCurveTo(2.2, hy + 2.2, 0.2, hy + 1.9);
+      ctx.closePath(); ctx.fill();
+      // Volumen de la barba: la punta recoge luz y el cuello queda en sombra.
+      ctx.fillStyle = `${shade(P.hair, 0.2)}90`;
+      ctx.beginPath();
+      ctx.ellipse(-1.4, hy + 3, 1.9, 2.2, -0.2, 0, Math.PI * 2); ctx.fill();
+      occlude(ctx, 0.8, hy + R + 0.6, 3.2, 1.6, 0.3);
     }
     if (!style) {
       // Sin yelmo se le ve el pelo: melena, nuca y patilla.
-      ctx.fillStyle = P.hair;
+      const hg = ctx.createRadialGradient(-1.8, hy - 4.2, 0.6, 0.2, hy - 2.4, R * 1.5);
+      hg.addColorStop(0, shade(P.hair, 0.26));
+      hg.addColorStop(0.5, shade(P.hair, 0.05));
+      hg.addColorStop(1, shade(P.hair, -0.28));
+      ctx.fillStyle = hg;
       ctx.beginPath(); ctx.ellipse(0.2, hy - 1.8, R * 0.94, R * 0.72, 0, Math.PI, Math.PI * 2); ctx.fill();
       ctx.fillRect(-R * 0.92, hy - 2.4, 1.8, 4.2);
+      // Mechones: unos lóbulos sobre el flequillo para que no sea un casquete.
+      for (const [mx, my2, mr, mk] of [[-2.8, hy - 3.6, 1.9, 0.16], [-0.4, hy - 4.4, 2.1, 0.24],
+        [2.2, hy - 3.8, 1.9, 0.06], [3.8, hy - 2.4, 1.5, -0.06]]) {
+        ctx.fillStyle = shade(P.hair, mk);
+        ctx.beginPath(); ctx.ellipse(mx, my2, mr, mr * 0.82, 0.2, 0, Math.PI * 2); ctx.fill();
+      }
       if (G.beard) {
         // Al aldeano le cae una guedeja espesa por encima de la oreja.
         ctx.beginPath();
@@ -1100,18 +1264,21 @@ function head(ctx, P, G, back) {
         ctx.fill();
         ctx.fillRect(-R * 0.98, hy - 3, 2.1, 3.2);
         // Ondas del pelo, como el mechón revuelto del original.
-        ctx.strokeStyle = shade(P.hair, -0.22); ctx.lineWidth = 0.7;
+        ctx.strokeStyle = `${shade(P.hair, -0.26)}bb`; ctx.lineWidth = 0.6; ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(-R * 0.8, hy - 3.6); ctx.quadraticCurveTo(-1.4, hy - 5.6, 2.4, hy - 4.4);
-        ctx.moveTo(-R * 0.72, hy - 1.8); ctx.quadraticCurveTo(-2.4, hy - 3.4, 0.6, hy - 2.8);
+        ctx.moveTo(-R * 0.86, hy - 2.8); ctx.quadraticCurveTo(-1.6, hy - 5.4, 2.6, hy - 4.6);
+        ctx.moveTo(-R * 0.7, hy - 1.2); ctx.quadraticCurveTo(-2.6, hy - 3, 0.8, hy - 2.4);
+        ctx.moveTo(1.4, hy - 5); ctx.quadraticCurveTo(3.4, hy - 4.4, 4.2, hy - 2.6);
         ctx.stroke();
       }
-      ctx.fillStyle = shade(P.hair, 0.14);
-      ctx.fillRect(-R * 0.5, hy - 3.9, 2.6, 1);
+      // Sombra del pelo sobre la frente, que es lo que asienta la melena.
+      occlude(ctx, 0.4, hy - 2.2, R * 0.9, 1.2, 0.34);
     }
     if (!back) {
-      ctx.fillStyle = 'rgba(0,0,0,.5)';
-      ctx.fillRect(2.2, hy - 1.2, 1.1, 1.2);   // ojo
+      ctx.fillStyle = 'rgba(28,18,10,.66)';
+      ctx.beginPath(); ctx.ellipse(2.6, hy - 0.9, 0.72, 0.52, -0.12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(30,20,12,.34)';                   // ceja
+      ctx.beginPath(); ctx.ellipse(2.4, hy - 2, 1.25, 0.42, -0.2, 0, Math.PI * 2); ctx.fill();
       if (!G.beard) {
         ctx.fillStyle = 'rgba(0,0,0,.18)';
         ctx.fillRect(1.8, hy + 1.6, 1.8, 0.6); // boca
@@ -1230,6 +1397,10 @@ function arm(ctx, P, G, hx, hy, o = {}) {
       ctx.lineTo(px + (nx / nl) * 1.5, py + (ny / nl) * 1.5);
       ctx.stroke();
     }
+  }
+  if (G.bare) {
+    // Deltoides: el casquete del hombro cose el brazo al torso.
+    sphere(ctx, sx + (far ? 0.6 : -0.6), sy + 0.3, 1.9, 2, far ? P.skinD : P.skin);
   }
   // Mano: guantelete de hierro, guante de cuero o la mano desnuda.
   dot(ctx, hx, hy, 1.8, G.armor >= 2 ? (far ? P.metalD : P.metal)
@@ -1418,23 +1589,39 @@ function quiver(ctx, P) {
 
 /** Hacha del aldeano: mango de madera y hoja de hierro remachada. */
 function axe(ctx, P) {
-  ctx.fillStyle = P.wood; ctx.fillRect(-0.9, -11, 1.8, 14);
-  ctx.fillStyle = P.woodD; ctx.fillRect(0.3, -11, 0.7, 14);
-  // Hoja: filo curvo hacia fuera y ojo remachado al mango.
-  ctx.fillStyle = P.metal;
+  // Astil: un palo redondo, con su veta y el puño de cuero.
+  ctx.fillStyle = crossGrad(ctx, 0, -4, -1, 0, 0.9, P.wood, -0.34, 0.24);
+  ctx.fillRect(-0.9, -11, 1.8, 14);
+  ctx.strokeStyle = `${P.woodD}aa`; ctx.lineWidth = 0.4;
+  ctx.beginPath(); ctx.moveTo(0.1, -10.4); ctx.lineTo(0.3, 2); ctx.stroke();
+  ctx.fillStyle = P.leatherD; ctx.fillRect(-1, 0.4, 2, 2.4);
+  // Hoja: cuerpo de hierro, bisel del filo y el ojo por donde entra el astil.
+  const bg = ctx.createLinearGradient(-1, -12.6, 3.4, -8);
+  bg.addColorStop(0, shade(P.metal, -0.22));
+  bg.addColorStop(0.5, P.metal);
+  bg.addColorStop(1, shade(P.metalL, 0.2));
+  ctx.fillStyle = bg;
   ctx.beginPath();
-  ctx.moveTo(-0.6, -12.6);
-  ctx.quadraticCurveTo(2.4, -12.2, 3.4, -10.2);
-  ctx.quadraticCurveTo(2.4, -8.2, -0.6, -8);
+  ctx.moveTo(-0.6, -12.7);
+  ctx.quadraticCurveTo(2.6, -12.3, 3.6, -10.2);
+  ctx.quadraticCurveTo(2.6, -8.1, -0.6, -7.9);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = P.metalL;
+  ctx.fillStyle = P.gleam;
   ctx.beginPath();
-  ctx.moveTo(1.4, -12.1);
-  ctx.quadraticCurveTo(3, -11.6, 3.4, -10.2);
-  ctx.quadraticCurveTo(3, -8.8, 1.4, -8.3);
+  ctx.moveTo(2, -11.8);
+  ctx.quadraticCurveTo(3.2, -11.2, 3.6, -10.2);
+  ctx.quadraticCurveTo(3.2, -9.2, 2, -8.6);
+  ctx.quadraticCurveTo(2.9, -10.2, 2, -11.8);
   ctx.closePath(); ctx.fill();
-  ctx.fillStyle = P.metalD; ctx.fillRect(-1.5, -12.4, 1.4, 4.6);
-  dot(ctx, -0.8, -10.2, 0.5, P.metalL);
+  ctx.strokeStyle = shade(P.metalD, -0.2); ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(-0.4, -12.4); ctx.quadraticCurveTo(2.2, -12, 3.4, -10.2);
+  ctx.stroke();
+  // Ojo y cuñas.
+  ctx.fillStyle = crossGrad(ctx, -0.8, -10.2, -1, 0, 1.4, P.metalD, -0.3, 0.4);
+  ctx.fillRect(-1.6, -12.5, 1.6, 4.8);
+  dot(ctx, -0.8, -11.4, 0.45, P.gleam);
+  dot(ctx, -0.8, -8.8, 0.45, P.metalL);
 }
 
 // --- Montura ----------------------------------------------------------------
@@ -3908,6 +4095,7 @@ export function iconFor(kind, type, colorIdx = 0) {
  * volver a dibujarlos.
  */
 export function clearSpriteCaches() {
+  gradCache.clear();
   tileCache.clear();
   tileSheets.clear();
   resCache.clear();
