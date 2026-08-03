@@ -309,6 +309,7 @@ export class NetSession {
       u.lerpT = 0;
       u.hp = us.hp; u.maxHp = us.maxHp;
       u.dir = us.dir; u.back = us.back; u.moving = us.moving; u.working = us.working;
+      u.face = us.face;
       u.attackAnim = us.attackAnim;
       u.carry = us.carry; u.carryRes = us.carryRes;
       if (u.moving) u.anim += 0.9;

@@ -12,6 +12,13 @@ El juego es HTML, CSS y JavaScript modular puro, sin compilación. Todo el arte
 en tiempo de ejecución, así que pesa unos pocos cientos de kilobytes y no
 descarga ningún recurso externo.
 
+El arte sigue la técnica de los clásicos del género: las unidades, los
+edificios y los recursos son **modelos 3D de polígonos bajos pre-renderizados a
+sprites isométricos 2D**. Los modelos se construyen por código, un rasterizador
+propio los hornea con luz, sombra arrojada y contorno al cargar (y bajo
+demanda), y la partida sólo copia mapas de bits: el aspecto de render de
+estudio del original, sin un solo fichero de imagen.
+
 ## Jugar
 
 Sirve la carpeta con cualquier servidor estático:
@@ -216,7 +223,12 @@ js/entities.js      Jugadores, unidades, edificios y proyectiles
 js/map.js           Generación del mapa y de los recursos
 js/path.js          Búsqueda de caminos A* sobre la rejilla
 js/render.js        Renderizador isométrico y niebla de guerra
-js/sprites.js       Arte procedural: todo se dibuja con Canvas
+js/sprites.js       Sprites: terreno a mano y horneado/caché de los renders 3D
+js/gfx3d/engine.js  Rasterizador 3D por software: proyección dimétrica, z-buffer,
+                    luz, sombras y horneado a sprite
+js/gfx3d/units.js   Modelos 3D de las unidades, con posturas y 8 orientaciones
+js/gfx3d/buildings.js Modelos 3D de los edificios y sus etapas de obra
+js/gfx3d/nodes.js   Modelos 3D de árboles, minas, bayas y animales
 js/ai.js            IA de los rivales
 js/ui.js            HUD, panel de órdenes, ratón, teclado y táctil
 js/audio.js         Efectos de sonido sintetizados con WebAudio
@@ -239,8 +251,13 @@ Para depurar, el objeto de la partida está disponible en la consola como
 - El terreno se dibuja una sola vez en un lienzo fuera de pantalla y se compone
   con transformaciones; la niebla se calcula a un quinto de resolución y sólo se
   rehace cuando cambian la cámara o la visibilidad.
-- Los sprites se generan una vez por combinación de tipo, color, orientación y
-  fotograma, y se guardan en caché.
+- Los sprites se hornean una vez por combinación de tipo, color, orientación y
+  fotograma, y se guardan en caché. Las unidades miran en ocho direcciones pero
+  sólo se hornean cinco: las otras tres salen volteando el mapa de bits, igual
+  que hacía el original con sus SLP.
+- El horneado rasteriza a 2× con sobremuestreo, endurece el borde y oscurece el
+  perfil: interior suave, silueta a un bit. Al acercar la cámara se ven los
+  píxeles del sprite, como al ampliar el clásico.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
 - En multijugador el anfitrión manda hasta diez instantáneas por segundo en

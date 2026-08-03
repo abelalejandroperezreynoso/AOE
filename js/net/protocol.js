@@ -82,7 +82,8 @@ export function encodeSnapshot(game, viewer, removed, depleted) {
     w.i16(Math.round(u.y * POS));
     w.u16(Math.max(0, Math.round(u.hp)));
     w.u16(Math.round(u.maxHp));
-    w.u8((u.dir < 0 ? 1 : 0) | (u.back ? 2 : 0) | (u.moving ? 4 : 0) | (u.working ? 8 : 0));
+    w.u8((u.dir < 0 ? 1 : 0) | (u.back ? 2 : 0) | (u.moving ? 4 : 0) | (u.working ? 8 : 0)
+      | ((u.face & 7) << 4));
     w.u8(Math.max(0, Math.min(255, Math.round(u.attackAnim * 255))));
     w.u8(u.carryRes ? (resIdx.get(u.carryRes) + 1) : 0);
     w.u8(Math.max(0, Math.min(255, Math.round(u.carry))));
@@ -185,6 +186,7 @@ export function decodeSnapshot(buf) {
     snap.units.push({
       id, type: type2, owner, x, y, hp, maxHp,
       dir: (flags & 1) ? -1 : 1, back: !!(flags & 2), moving: !!(flags & 4), working: !!(flags & 8),
+      face: (flags >> 4) & 7,
       attackAnim: anim, carryRes: carryRes ? RES_LIST[carryRes - 1] : null, carry,
     });
   }

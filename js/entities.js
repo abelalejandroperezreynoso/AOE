@@ -133,6 +133,7 @@ export class Unit {
     this.x = x; this.y = y;
     this.vx = 0; this.vy = 0;
     this.dir = 1; this.back = false;
+    this.face = 1; // orientación en octantes: 0 = +u del mundo, sentido horario
     this.anim = Math.random() * 4;
     this.attackAnim = 0;
     this.attackCd = 0;
@@ -218,6 +219,7 @@ export class Unit {
       const sdx = dx - dy;      // dirección en pantalla
       if (Math.abs(sdx) > 1e-4) this.dir = sdx > 0 ? 1 : -1;
       this.back = dx + dy < -1e-4;
+      this.face = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
       this.anim += Math.hypot(dx, dy) * 7;
       this.moving = true;
     }
@@ -234,9 +236,13 @@ export class Unit {
   }
 
   faceTo(tx, ty) {
-    const sdx = (tx - this.x) - (ty - this.y);
+    const dx = tx - this.x, dy = ty - this.y;
+    const sdx = dx - dy;
     if (Math.abs(sdx) > 1e-3) this.dir = sdx > 0 ? 1 : -1;
-    this.back = (tx - this.x) + (ty - this.y) < 0;
+    this.back = dx + dy < 0;
+    if (Math.abs(dx) > 1e-3 || Math.abs(dy) > 1e-3) {
+      this.face = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
+    }
   }
 
   // --- Ciclo principal ------------------------------------------------------

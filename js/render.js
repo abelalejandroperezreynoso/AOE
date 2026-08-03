@@ -369,12 +369,21 @@ export class Renderer {
 
     list.sort((a, c) => a.d - c.d);
 
+    /*
+     * Los sprites están horneados a 2×: mientras la cámara no pase de ahí se
+     * copian con filtro (reducir con filtro se ve bien), y más cerca se copian
+     * a píxel visto, que es como se veía el clásico al ampliarlo.
+     */
+    const crisp = this.dpr * this.cam.zoom > 2.05;
+    if (crisp) ctx.imageSmoothingEnabled = false;
+
     for (const item of list) {
       if (item.t === 'node') this.drawNode(ctx, item.e);
       else if (item.t === 'building') this.drawBuilding(ctx, item.e);
       else if (item.t === 'unit') this.drawUnit(ctx, item.e);
       else this.drawProjectile(ctx, item.e);
     }
+    ctx.imageSmoothingEnabled = true;
   }
 
   drawNode(ctx, n) {
@@ -485,8 +494,11 @@ export class Renderer {
       : (u.moving ? (Math.floor(u.anim) % 4) : 0);
     const colorIdx = g.players[u.owner].colorIdx;
     const [mx, my] = this.worldToCanvas(u.x, u.y);
-    if (this.sharp) paintUnit(ctx, mx, my, u.type, colorIdx, u.dir, frame, u.back);
-    else drawSprite(ctx, unitSprite(u.type, colorIdx, u.dir, frame, u.back), mx, my);
+    // Orientación en octantes; si viene de una instantánea vieja sin ella, se
+    // reconstruye del par dir/atrás.
+    const face = u.face !== undefined ? u.face : (u.dir > 0 ? (u.back ? 6 : 0) : (u.back ? 4 : 2));
+    if (this.sharp) paintUnit(ctx, mx, my, u.type, colorIdx, face, frame);
+    else drawSprite(ctx, unitSprite(u.type, colorIdx, face, frame), mx, my);
 
     if (u.carry > 0.5 && u.carryRes) {
       const col = { food: '#d24a3a', wood: '#8a6234', gold: '#e0b52c', stone: '#b6b6b0' }[u.carryRes];
