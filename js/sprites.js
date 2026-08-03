@@ -2202,6 +2202,229 @@ function logPile(ctx, cx, cy, wood, woodL, woodD, sc = 1) {
   }
 }
 
+// --- Piezas de cantería -----------------------------------------------------
+
+/**
+ * Un faldón de lona: la cumbrera va tirante y el alero cuelga con panza, que
+ * es lo que distingue una tela echada sobre unas varas de un tejado rígido.
+ */
+function tarpSlope(ctx, rA, rB, eA, eB, tone, sag, rsag = 2.4) {
+  const mid = (p, q, dx, dy) => [(p[0] + q[0]) / 2 + dx, (p[1] + q[1]) / 2 + dy];
+  const cR = mid(rA, rB, 0, rsag);
+  ctx.beginPath();
+  ctx.moveTo(rA[0], rA[1]);
+  ctx.quadraticCurveTo(cR[0], cR[1], rB[0], rB[1]);
+  const cB = mid(rB, eB, sag * 0.5, sag * 0.5);
+  ctx.quadraticCurveTo(cB[0], cB[1], eB[0], eB[1]);
+  const cE = mid(eA, eB, 0, sag * 2.2);
+  ctx.quadraticCurveTo(cE[0], cE[1], eA[0], eA[1]);
+  const cA = mid(eA, rA, -sag * 0.5, sag * 0.5);
+  ctx.quadraticCurveTo(cA[0], cA[1], rA[0], rA[1]);
+  ctx.closePath();
+  ctx.fillStyle = tone; ctx.fill();
+  // Arpillera: las costuras caen de la cumbrera al alero y las arrugas cruzan.
+  ctx.save();
+  ctx.clip();
+  ctx.lineCap = 'butt';
+  for (let i = 1; i < 9; i++) {
+    const t = i / 9;
+    const rc = [(rA[0] + rB[0]) / 2, (rA[1] + rB[1]) / 2 + sag];
+    const r = lerp2(lerp2(rA, rc, t), lerp2(rc, rB, t), t), e = lerp2(eA, eB, t);
+    ctx.strokeStyle = i % 3 === 0 ? shade(tone, -0.16) : shade(tone, -0.07);
+    ctx.lineWidth = i % 3 === 0 ? 1 : 0.7;
+    ctx.beginPath();
+    ctx.moveTo(r[0], r[1]);
+    ctx.quadraticCurveTo((r[0] + e[0]) / 2, (r[1] + e[1]) / 2 + sag * 1.6, e[0], e[1]);
+    ctx.stroke();
+  }
+  for (const [k, w, a] of [[0.34, 1.2, -0.1], [0.62, 1.4, 0.12], [0.84, 1.1, -0.08]]) {
+    const p = lerp2(lerp2(rA, eA, k), lerp2(rB, eB, k), 0);
+    const q = lerp2(lerp2(rA, eA, k), lerp2(rB, eB, k), 1);
+    ctx.strokeStyle = a < 0 ? shade(tone, 0.16) : shade(tone, -0.12);
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(p[0], p[1]);
+    ctx.quadraticCurveTo((p[0] + q[0]) / 2, (p[1] + q[1]) / 2 + sag * (1.2 + a), q[0], q[1]);
+    ctx.stroke();
+  }
+  ctx.restore();
+  // Dobladillo del alero, con su sombra debajo.
+  ctx.strokeStyle = shade(tone, -0.3); ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(eA[0], eA[1]);
+  ctx.quadraticCurveTo((eA[0] + eB[0]) / 2, (eA[1] + eB[1]) / 2 + sag * 2.2, eB[0], eB[1]);
+  ctx.stroke();
+}
+
+/**
+ * Toldo a dos aguas sobre el cobertizo: la cumbrera corre por el eje u y los
+ * dos faldones caen hacia el patio y hacia el fondo.
+ */
+function tarpRoof(ctx, x, y, w, d, base, rh, cL, cM, cD) {
+  const P = (u, v, h) => { const p = iso(x, y, u, v); return [p[0], p[1] - h]; };
+  const ov = 0.15, hi = base + rh;
+  const rA = P(-0.06, d / 2, hi), rB = P(w + 0.06, d / 2, hi);
+  // Faldón trasero primero: lo pisa el delantero por la cumbrera.
+  tarpSlope(ctx, rA, rB, P(-ov, -ov, base), P(w + ov, -ov, base), cD, 2.2);
+  tarpSlope(ctx, rA, rB, P(-ov, d + ov, base), P(w + ov, d + ov, base), cL, 3.4);
+  // Cumbrera: la tela dobla sobre la viga y hace lomo.
+  const cR = [(rA[0] + rB[0]) / 2, (rA[1] + rB[1]) / 2 + 2.4];
+  ctx.strokeStyle = shade(cM, 0.2); ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(rA[0], rA[1]); ctx.quadraticCurveTo(cR[0], cR[1], rB[0], rB[1]); ctx.stroke();
+  ctx.strokeStyle = shade(cD, -0.18); ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(rA[0], rA[1] + 1.6);
+  ctx.quadraticCurveTo(cR[0], cR[1] + 1.6, rB[0], rB[1] + 1.6); ctx.stroke();
+  return { rA, rB, eA: P(-ov, d + ov, base), eB: P(w + ov, d + ov, base) };
+}
+
+/** Montón de mineral: cascotes angulosos, no cantos rodados. */
+function oreHeap(ctx, cx, cy, sc, oL, oM, oD) {
+  for (const [dx, dy, r] of [
+    [-9, 1.8, 3.4], [-4.5, 2.6, 3], [0.5, 2.8, 3.4], [5.5, 2.2, 3], [9.4, 1.2, 2.6],
+    [-6.5, -1.2, 3.2], [-1.5, -0.6, 3.6], [3.5, -1, 3.2], [7.6, -1.6, 2.8],
+    [-3.5, -4.2, 3], [1.5, -4.6, 3.2], [5.6, -3.8, 2.6], [-0.5, -7.4, 2.8],
+  ]) {
+    const px = cx + dx * sc, py = cy + dy * sc, rr = r * sc;
+    poly(ctx, [[px - rr, py], [px - rr * 0.55, py - rr * 0.85], [px + rr * 0.5, py - rr * 0.9],
+      [px + rr, py - rr * 0.15], [px + rr * 0.45, py + rr * 0.5], [px - rr * 0.6, py + rr * 0.45]],
+    oM, shade(oD, -0.14));
+    poly(ctx, [[px - rr * 0.55, py - rr * 0.85], [px + rr * 0.5, py - rr * 0.9],
+      [px + rr * 0.15, py - rr * 0.25], [px - rr * 0.7, py - rr * 0.15]], oL);
+  }
+}
+
+/** Sillar escuadrado, con la testa cincelada. */
+function ashlar(ctx, x, y, w, d, h, sL, sM, sD) {
+  const f = isoPrism(ctx, x, y, w, d, h, sL, sD, sM);
+  const up = f.up;
+  // Aristas vivas: es piedra labrada, no un canto del río.
+  ctx.strokeStyle = shade(sD, -0.22); ctx.lineWidth = 0.7; ctx.lineCap = 'butt';
+  ctx.beginPath();
+  ctx.moveTo(f.p01[0], f.p01[1]); ctx.lineTo(f.p11[0], f.p11[1]); ctx.lineTo(f.p10[0], f.p10[1]);
+  ctx.stroke();
+  ctx.strokeStyle = shade(sL, 0.16); ctx.lineWidth = 0.8;
+  const a = up(f.p01), b = up(f.p11), c = up(f.p10);
+  ctx.beginPath();
+  ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.stroke();
+  // Golpes de puntero en la cara al sol.
+  ctx.strokeStyle = shade(sM, -0.12); ctx.lineWidth = 0.6;
+  for (const k of [0.3, 0.62]) {
+    const p = faceAt(f.p11, f.p10, h, k, 0.3), q = faceAt(f.p11, f.p10, h, k, 0.62);
+    ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke();
+  }
+  return f;
+}
+
+/** Herramienta tumbada: pico, maza o cincel. */
+function miningTool(ctx, cx, cy, ang, len, kind, wood, woodD, mL, mM, mD) {
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(ang);
+  const hx = len / 2;
+  ctx.fillStyle = wood;
+  ctx.fillRect(-hx, -1.1, len, 2.2);
+  ctx.fillStyle = woodD;
+  ctx.fillRect(-hx, 0.4, len, 0.9);
+  ctx.fillStyle = shade(wood, 0.2);
+  ctx.fillRect(-hx, -1.1, len, 0.6);
+  if (kind === 'pick') {
+    // Cabeza de dos puntas que salen del ojo y se afilan hacia fuera.
+    poly(ctx, [[hx - 0.6, -2.6], [hx - 6.4, -3.6], [hx - 6.6, -2.4], [hx - 0.6, -0.9]], mM);
+    poly(ctx, [[hx + 0.6, -2.6], [hx + 6.4, -3.2], [hx + 6.6, -2], [hx + 0.6, -0.9]], mL);
+    ctx.fillStyle = mD;
+    ctx.fillRect(hx - 1.4, -3.2, 2.8, 4);
+    ctx.fillStyle = mL;
+    ctx.fillRect(hx - 1.4, -3.2, 2.8, 1);
+  } else if (kind === 'mallet') {
+    // Maza de cantero: cabeza gorda de madera zunchada.
+    ctx.fillStyle = shade(wood, -0.12);
+    ctx.fillRect(hx - 3.4, -4, 8, 8);
+    ctx.fillStyle = shade(wood, 0.14);
+    ctx.fillRect(hx - 3.4, -4, 8, 2);
+    ctx.fillStyle = mD;
+    ctx.fillRect(hx - 3.4, -4, 1.4, 8);
+    ctx.fillRect(hx + 3.2, -4, 1.4, 8);
+  } else {
+    // Martillo de hierro.
+    ctx.fillStyle = mM;
+    ctx.fillRect(hx - 2.6, -3.2, 7.6, 6.2);
+    ctx.fillStyle = mL;
+    ctx.fillRect(hx - 2.6, -3.2, 7.6, 1.8);
+    ctx.fillStyle = mD;
+    ctx.fillRect(hx + 3.2, -3.2, 1.8, 6.2);
+  }
+  ctx.restore();
+}
+
+/** Yunque sobre su tocón: la pieza que preside el cobertizo. */
+function anvilOnStump(ctx, cx, cy, sc, wood, woodL, woodD, mL, mM, mD) {
+  // Tocón: un rollizo de pie con la testa a la vista.
+  const r = 7 * sc, h = 9 * sc;
+  ctx.fillStyle = wood;
+  ctx.fillRect(cx - r, cy - h, r * 2, h);
+  ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.42, 0, 0, Math.PI); ctx.fill();
+  ctx.fillStyle = woodD;
+  ctx.fillRect(cx + r * 0.35, cy - h, r * 0.65, h);
+  ctx.fillStyle = woodL;
+  ctx.beginPath(); ctx.ellipse(cx, cy - h, r, r * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = shade(wood, -0.24); ctx.lineWidth = 0.7;
+  ctx.beginPath(); ctx.ellipse(cx, cy - h, r * 0.5, r * 0.2, 0, 0, Math.PI * 2); ctx.stroke();
+  // Yunque: base, tas y bigornia.
+  const by = cy - h - 1 * sc;
+  ctx.fillStyle = mD;
+  ctx.fillRect(cx - 4 * sc, by - 3 * sc, 8 * sc, 3 * sc);
+  ctx.fillStyle = mM;
+  ctx.fillRect(cx - 2.2 * sc, by - 6 * sc, 4.6 * sc, 3.4 * sc);
+  poly(ctx, [[cx - 5.4 * sc, by - 9.4 * sc], [cx + 3.6 * sc, by - 9.4 * sc],
+    [cx + 8.4 * sc, by - 8 * sc], [cx + 3.6 * sc, by - 6 * sc], [cx - 5.4 * sc, by - 6 * sc]], mM);
+  ctx.fillStyle = mL;
+  ctx.fillRect(cx - 5.4 * sc, by - 9.4 * sc, 9 * sc, 1.4 * sc);
+  ctx.fillStyle = mD;
+  poly(ctx, [[cx + 3.6 * sc, by - 8.4 * sc], [cx + 8.4 * sc, by - 8 * sc],
+    [cx + 3.6 * sc, by - 6 * sc]], mD);
+}
+
+/** Muela de afilar sobre su cuba de agua, con la manivela. */
+function grindstone(ctx, cx, cy, sc, wood, woodL, woodD, sL, sM, sD, hoop) {
+  // Cuba: duelas y aros, más ancha por la boca.
+  const w = 7 * sc, h = 8 * sc;
+  poly(ctx, [[cx - w, cy - h], [cx + w, cy - h], [cx + w * 0.8, cy], [cx - w * 0.8, cy]], wood);
+  poly(ctx, [[cx + w * 0.3, cy - h], [cx + w, cy - h], [cx + w * 0.8, cy], [cx + w * 0.24, cy]], woodD);
+  ctx.strokeStyle = hoop; ctx.lineWidth = 1.1 * sc; ctx.lineCap = 'butt';
+  for (const k of [0.25, 0.78]) {
+    ctx.beginPath();
+    ctx.moveTo(cx - w * (1 - k * 0.2), cy - h * (1 - k));
+    ctx.lineTo(cx + w * (1 - k * 0.2), cy - h * (1 - k));
+    ctx.stroke();
+  }
+  ctx.fillStyle = shade(wood, 0.16);
+  ctx.beginPath(); ctx.ellipse(cx, cy - h, w, w * 0.32, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = '#3d4a52';
+  ctx.beginPath(); ctx.ellipse(cx, cy - h + 0.4, w * 0.7, w * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+  // Bastidor y disco de arenisca, de canto sobre la cuba.
+  const gy = cy - h - 6 * sc, gr = 7.5 * sc;
+  ctx.strokeStyle = woodD; ctx.lineWidth = 1.8 * sc; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.7, cy - h + 1); ctx.lineTo(cx - 1.5 * sc, gy);
+  ctx.moveTo(cx + w * 0.7, cy - h + 1); ctx.lineTo(cx + 1.5 * sc, gy);
+  ctx.stroke();
+  ctx.fillStyle = sM;
+  ctx.beginPath(); ctx.ellipse(cx, gy, gr, gr * 0.96, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = sL;
+  ctx.beginPath(); ctx.ellipse(cx - gr * 0.18, gy - gr * 0.2, gr * 0.72, gr * 0.7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = sD; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(cx, gy, gr, gr * 0.96, 0, 0, Math.PI * 2); ctx.stroke();
+  ctx.fillStyle = woodD;
+  ctx.beginPath(); ctx.ellipse(cx, gy, gr * 0.2, gr * 0.2, 0, 0, Math.PI * 2); ctx.fill();
+  // Manivela.
+  ctx.strokeStyle = woodL; ctx.lineWidth = 1.4 * sc;
+  ctx.beginPath();
+  ctx.moveTo(cx, gy); ctx.lineTo(cx + gr * 0.7, gy + gr * 0.5);
+  ctx.lineTo(cx + gr * 1.05, gy + gr * 0.42);
+  ctx.stroke();
+}
+
 /** Pozo de brocal de piedra, con su horca de madera y el cubo colgado. */
 function well(ctx, cx, cy, r, M) {
   const h = 8;
@@ -2405,7 +2628,7 @@ function battlements(ctx, x, y, w, d, h, top, left, right) {
  * el bando civil y el militar se distinguen de lejos.
  */
 const ROOFING = {
-  house: 'shingle', miningcamp: 'thatch',
+  house: 'shingle',
 };
 
 function drawBuilding(ctx, type, colorIdx, x, y) {
@@ -2902,21 +3125,179 @@ function drawBuilding(ctx, type, colorIdx, x, y) {
       break;
     }
     case 'miningcamp': {
-      const w = s * 0.55, h = 12;
-      // Cobertizo abierto: cuatro postes, sin muros que valgan.
-      isoPrism(ctx, x + 3, y + 2, w, w, h, woodL, woodD, wood);
-      roofOn(ctx, x + 3, y + 2, w, w, h, 6, roofD, roofM, roofL, mat);
-      const p = iso(x, y, 1.05, 1.3);
-      for (const [dx, dy, r] of [[-8, 0, 6], [4, -3, 7], [10, 2, 5]]) {
-        ctx.beginPath(); ctx.ellipse(p[0] + dx, p[1] + dy, r, r * 0.75, 0, 0, Math.PI * 2);
-        ctx.fillStyle = L.accent; ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,.2)'; ctx.lineWidth = 1; ctx.stroke();
-        ctx.fillStyle = shade(L.accent, 0.22);
+      // Un tajo de cantería al raso. Manda el cobertizo de tablas con su toldo
+      // de arpillera y las bandas del color del jugador, y dentro el yunque
+      // sobre el tocón. Alrededor se reparte el trabajo: la vagoneta cargada de
+      // mineral, la muela de afilar, el pedrusco de labra con su maza, los
+      // sillares ya escuadrados y las herramientas de la cuadrilla.
+      const [soilL, soilM, soilD] = ramp(L.soil || '#a8926a');
+      const [oreL, oreM, oreD] = ramp(L.accent || '#71757b');
+      const [mtL, mtM, mtD] = ramp(L.metal || '#9aa4ad');
+      const [cvL, cvM, cvD] = ramp(L.roof || '#c6ae86');
+      const P = (u, v) => iso(x, y, u, v);
+
+      // --- Era pisada, llena de cascote y polvo de piedra ---
+      const patch = (k) => [
+        [0.5, k], [s - 0.5, k], [s - k, 0.5], [s - k, s - 0.5],
+        [s - 0.5, s - k], [0.5, s - k], [k, s - 0.5], [k, 0.5],
+      ].map(([u, v]) => P(u, v));
+      poly(ctx, patch(0.04), soilD);
+      poly(ctx, patch(0.2), soilM);
+      for (const [u, v, r] of [[0.42, 1.32, 1.6], [1.28, 0.5, 1.3], [0.86, 1.72, 1.5],
+        [1.7, 0.9, 1.2], [0.24, 0.62, 1.4], [1.5, 1.68, 1.3], [1.06, 0.9, 1.1],
+        [0.62, 0.26, 1.2], [1.86, 1.3, 1.4], [0.32, 1.78, 1.2]]) {
+        const p = P(u, v);
+        ctx.fillStyle = oreM;
+        ctx.beginPath(); ctx.ellipse(p[0], p[1], r, r * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = oreL;
         ctx.beginPath();
-        ctx.ellipse(p[0] + dx - r * 0.3, p[1] + dy - r * 0.3, r * 0.3, r * 0.22, 0, 0, Math.PI * 2);
+        ctx.ellipse(p[0] - r * 0.24, p[1] - r * 0.24, r * 0.44, r * 0.28, 0, 0, Math.PI * 2);
         ctx.fill();
       }
-      bannerPole(ctx, x - s * 0.42 * HW, y + s * 0.52 * HH, 26, col);
+
+      // --- Vagoneta de mineral, al fondo ---
+      const cbox = P(0.0, 0.26);
+      // Varas del tiro, asomando hacia el fondo.
+      ctx.strokeStyle = woodD; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
+      for (const dy of [-1.6, 1.6]) {
+        ctx.beginPath();
+        ctx.moveTo(cbox[0] + 1, cbox[1] - 8 + dy); ctx.lineTo(cbox[0] - 13, cbox[1] - 12 + dy);
+        ctx.stroke();
+      }
+      const ch = 12;
+      const cf = isoPrism(ctx, cbox[0], cbox[1] - 4, 0.5, 0.36, ch, shade(wood, -0.4), woodD, wood);
+      // Tablazón de la caja y refuerzos de hierro en los cantos.
+      for (const [a, b, tone] of [[cf.p01, cf.p11, woodD], [cf.p11, cf.p10, shade(wood, -0.1)]]) {
+        for (let i = 1; i < 4; i++) faceBeam(ctx, a, b, ch, i / 4, 0, i / 4, 1, 0.8, tone);
+        faceBeam(ctx, a, b, ch, 0, 0.92, 1, 0.92, 1.6, shade(tone, 0.22));
+        faceBeam(ctx, a, b, ch, 0.5, 0, 0.5, 1, 1.4, mtD);
+      }
+      oreHeap(ctx, cbox[0], cbox[1] - 17, 0.6, oreL, oreM, oreD);
+      // La rueda, apoyada contra la caja como en el original.
+      cartWheel(ctx, cbox[0] - 13, cbox[1] + 6, 6, wood, woodD);
+
+      // --- Muela de afilar, entre la vagoneta y el cobertizo ---
+      const gs = P(0.46, 0.78);
+      grindstone(ctx, gs[0], gs[1], 0.66, wood, woodL, woodD, stoneL, stone, stoneD, mtD);
+
+      // --- Cobertizo (esquina de levante) ---
+      // Dos paredes de tablas -la del fondo se ve por dentro y la de la
+      // derecha por fuera-, cuatro pies derechos y el toldo por encima.
+      const su = 0.95, sv = 0.04, sw = 0.95, sd = 0.7, wallH = 37, roofH = wallH;
+      // Suelo en penumbra bajo el toldo.
+      poly(ctx, [P(su, sv), P(su + sw, sv), P(su + sw, sv + sd), P(su, sv + sd)],
+        'rgba(46,32,16,.32)');
+      // Tapia del fondo: la vemos por dentro, en sombra.
+      const bw = isoPrism(ctx, P(su, sv)[0], P(su, sv)[1], sw, 0.13, wallH,
+        woodL, shade(wood, -0.08), woodD);
+      const bA = bw.p01, bB = bw.p11;
+      for (let i = 1; i < 11; i++) {
+        faceBeam(ctx, bA, bB, wallH, i / 11, 0, i / 11, 1, 0.9, 'rgba(32,20,10,.42)');
+      }
+      faceBeam(ctx, bA, bB, wallH, 0, 0.97, 1, 0.97, 2.4, shade(wood, -0.3));
+      // Banda de tela del color del jugador, atada de través.
+      facePanel(ctx, bA, bB, wallH, 0, 0.46, 1, 0.32, col.dark);
+      facePanel(ctx, bA, bB, wallH, 0, 0.46, 1, 0.39, col.main);
+      // Tapia de la derecha: esta da la cara al sol.
+      const rwx = P(su + sw - 0.13, sv);
+      const rw = isoPrism(ctx, rwx[0], rwx[1], 0.13, sd, wallH, woodL, woodD, wood);
+      const rA = rw.p11, rB = rw.p10;
+      for (let i = 1; i < 9; i++) {
+        faceBeam(ctx, rA, rB, wallH, i / 9, 0, i / 9, 1, 0.9, shade(wood, -0.26));
+      }
+      faceBeam(ctx, rA, rB, wallH, 0, 0.97, 1, 0.97, 2.4, woodL);
+      facePanel(ctx, rA, rB, wallH, 0, 0.46, 1, 0.58, col.dark);
+      facePanel(ctx, rA, rB, wallH, 0, 0.51, 1, 0.58, col.main);
+      // Yunque bajo el alero, sobre su tocón.
+      const anv = P(su + 0.3, sv + sd - 0.12);
+      anvilOnStump(ctx, anv[0], anv[1], 0.8, wood, woodL, woodD, mtL, mtM, mtD);
+      // Pies derechos: rollizos sin desbastar.
+      const pole = (p, h) => {
+        ctx.fillStyle = wood;
+        ctx.fillRect(p[0] - 2.3, p[1] - h, 4.6, h);
+        ctx.fillStyle = woodD;
+        ctx.fillRect(p[0] + 0.7, p[1] - h, 1.6, h);
+        ctx.fillStyle = woodL;
+        ctx.fillRect(p[0] - 2.3, p[1] - h, 1.1, h);
+        ctx.fillStyle = shade(wood, 0.2);
+        ctx.beginPath(); ctx.ellipse(p[0], p[1] - h, 2.3, 1, 0, 0, Math.PI * 2); ctx.fill();
+      };
+      pole(P(su + sw - 0.06, sv + sd - 0.04), roofH + 2);
+      pole(P(su + 0.04, sv + sd - 0.04), roofH + 2);
+      // Toldo de arpillera, montado sobre los pies derechos.
+      tarpRoof(ctx, P(su, sv)[0], P(su, sv)[1], sw, sd, roofH, 11, cvL, cvM, cvD);
+      // Del alero cuelgan la soga y una banda de tela más.
+      const hp = P(su + sw - 0.1, sv + sd + 0.2);
+      ctx.strokeStyle = '#b0a284'; ctx.lineWidth = 0.9; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(hp[0], hp[1] - roofH + 1);
+      ctx.quadraticCurveTo(hp[0] + 1.6, hp[1] - roofH * 0.86, hp[0] + 0.6, hp[1] - roofH * 0.72);
+      ctx.stroke();
+      ctx.fillStyle = '#93866c';
+      ctx.beginPath();
+      ctx.ellipse(hp[0] + 0.6, hp[1] - roofH * 0.72, 1.4, 1, 0, 0, Math.PI * 2); ctx.fill();
+      // Tela del jugador atada al pie derecho, con su cabo colgando.
+      const tie = (p, h) => {
+        ctx.fillStyle = col.main;
+        ctx.fillRect(p[0] - 2.4, p[1] - h, 4.8, 2.6);
+        ctx.fillStyle = col.dark;
+        ctx.fillRect(p[0] + 0.9, p[1] - h, 1.5, 2.6);
+        ctx.fillRect(p[0] - 2.4, p[1] - h + 2, 4.8, 0.6);
+        poly(ctx, [[p[0] + 1, p[1] - h + 2.4], [p[0] + 2.4, p[1] - h + 2.4],
+          [p[0] + 1.9, p[1] - h + 8], [p[0] + 1.1, p[1] - h + 7.6]], col.main);
+      };
+      tie(P(su + 0.04, sv + sd - 0.04), wallH * 0.44);
+
+      // --- Pedrusco de labra, a poniente, con la maza encima ---
+      const bl = P(0.22, 0.94);
+      poly(ctx, [[bl[0] - 9, bl[1] + 1.6], [bl[0] - 10.5, bl[1] - 5], [bl[0] - 5.5, bl[1] - 9.5],
+        [bl[0] + 4, bl[1] - 9], [bl[0] + 9, bl[1] - 3.6], [bl[0] + 7.6, bl[1] + 2.4],
+        [bl[0] - 1.4, bl[1] + 4.4]], stone, shade(stoneD, -0.16));
+      poly(ctx, [[bl[0] - 10.5, bl[1] - 5], [bl[0] - 5.5, bl[1] - 9.5], [bl[0] + 4, bl[1] - 9],
+        [bl[0] + 9, bl[1] - 3.6], [bl[0] + 1.4, bl[1] - 1.4], [bl[0] - 6.2, bl[1] - 2.2]], stoneL);
+      poly(ctx, [[bl[0] + 2.8, bl[1] - 8.6], [bl[0] + 9, bl[1] - 3.6], [bl[0] + 7.6, bl[1] + 2.4],
+        [bl[0] + 2, bl[1] - 0.8]], stoneD);
+      miningTool(ctx, bl[0] - 0.5, bl[1] - 7, -0.14, 14, 'mallet', woodL, woodD, mtL, mtM, mtD);
+
+      // --- Losa sobre los durmientes, en medio de la era ---
+      const sl = P(0.44, 1.16);
+      ctx.strokeStyle = woodD; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+      for (const [dx, dy] of [[-7, 4], [7, 7]]) {
+        ctx.beginPath();
+        ctx.moveTo(sl[0] + dx - 7, sl[1] + dy + 2.4); ctx.lineTo(sl[0] + dx + 9, sl[1] + dy - 3);
+        ctx.stroke();
+      }
+      const slab = ashlar(ctx, sl[0], sl[1], 0.46, 0.32, 3.6, stoneL, stone, stoneD);
+      const st = slab.up(slab.p11);
+      miningTool(ctx, st[0] - 3, st[1] - 3, 0.44, 15, 'pick', woodL, woodD, mtL, mtM, mtD);
+
+      // --- Rimero de sillares, delante del cobertizo ---
+      for (const [u, v, t, dh] of [[1.28, 1.1, 0.06, 0], [1.56, 1.14, -0.05, 0],
+        [1.32, 1.14, 0.02, -5.5], [1.6, 1.18, -0.08, -5.5],
+        [1.34, 1.36, -0.04, 0], [1.62, 1.4, 0.05, 0]]) {
+        const p = P(u, v);
+        ashlar(ctx, p[0], p[1] + dh, 0.26, 0.26, 5.5,
+          shade(stoneL, t), shade(stone, t), shade(stoneD, t));
+      }
+      const top = P(1.46, 1.16);
+      miningTool(ctx, top[0], top[1] - 12, 0.44, 17, 'pick', woodL, woodD, mtL, mtM, mtD);
+      miningTool(ctx, top[0] + 1, top[1] - 8.4, 0.48, 13, 'hammer', woodL, woodD, mtL, mtM, mtD);
+
+      // --- Cubo de agua para enfriar el filo ---
+      const bk = P(0.72, 1.54);
+      barrel(ctx, bk[0], bk[1], 0.72, wood, woodD, mtD);
+      ctx.strokeStyle = woodD; ctx.lineWidth = 1.1; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(bk[0] - 2.2, bk[1] - 6.2);
+      ctx.quadraticCurveTo(bk[0], bk[1] - 11, bk[0] + 2.2, bk[1] - 6.2);
+      ctx.stroke();
+
+      // --- Matas y hierba entre las piedras ---
+      for (const [u, v, sc] of [[0.06, 1.68, 0.95], [1.92, 1.6, 0.85], [1.78, 0.2, 0.8],
+        [1.04, 1.88, 0.75], [0.3, 0.04, 0.7]]) {
+        const p = P(u, v);
+        fern(ctx, p[0], p[1], sc, green);
+      }
       break;
     }
     case 'farm': {
