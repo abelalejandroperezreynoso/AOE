@@ -191,9 +191,14 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
 - **Mapas aleatorios** con semilla reproducible, en cuatro tamaños y con hasta
   7 rivales (ocho jugadores, uno por color). Si el mapa elegido se queda corto
   para tanta base, se agranda solo.
-- **IA rival** que reparte a sus aldeanos por proporciones de recursos, ahorra
-  para subir de edad, se expande, investiga, defiende su base y ataca por oleadas
-  crecientes. Tres niveles de dificultad.
+- **IA rival** al estilo del juego original: explora el mapa con el jinete
+  inicial, reparte a sus aldeanos por proporciones de recursos, ahorra para
+  subir de edad, se expande, investiga y comercia. En lo militar responde a las
+  incursiones donde ocurren (con campana para los aldeanos), repara lo dañado,
+  reconstruye lo que le derriban, concentra al ejército antes de salir, compone
+  las tropas con las contras de lo que se le ha visto al enemigo y lleva cada
+  oleada de objetivo en objetivo hasta arrasar la base o retirarse. Tres niveles
+  de dificultad.
 - Niebla de guerra, minimapa, puntos de reunión, colas de producción, mercado de
   recursos, control de velocidad (1x a 3x) y estadísticas finales.
 - **Catálogo** para consultar y editar todo el juego: sus valores y también el
