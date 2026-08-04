@@ -229,6 +229,10 @@ js/gfx3d/engine.js  Rasterizador 3D por software: proyección dimétrica, z-buff
 js/gfx3d/units.js   Modelos 3D de las unidades, con posturas y 8 orientaciones
 js/gfx3d/buildings.js Modelos 3D de los edificios y sus etapas de obra
 js/gfx3d/nodes.js   Modelos 3D de árboles, minas, bayas y animales
+js/gfx3d/GUIDE.md   Guía del sistema de arte: coordenadas, primitivas y flujo
+tools/viewer.html   Visor de modelos: cada tipo a cualquier zoom, con todas sus
+                    vistas y superposición de imágenes de referencia
+tools/snapshot-models.mjs  Captura los modelos a PNG (necesita Playwright)
 js/ai.js            IA de los rivales
 js/ui.js            HUD, panel de órdenes, ratón, teclado y táctil
 js/audio.js         Efectos de sonido sintetizados con WebAudio
