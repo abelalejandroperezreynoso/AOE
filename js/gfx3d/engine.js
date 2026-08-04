@@ -265,8 +265,53 @@ export function rotZ(tris, ang, cx = 0, cy = 0) {
   ]);
 }
 
+/** Giro alrededor de un eje paralelo a x que pasa por (y=cy, z=cz): cabecear. */
+export function rotX(tris, ang, cy = 0, cz = 0) {
+  const cs = Math.cos(ang), sn = Math.sin(ang);
+  return mapVerts(tris, (p) => [
+    p[0],
+    cy + (p[1] - cy) * cs - (p[2] - cz) * sn,
+    cz + (p[1] - cy) * sn + (p[2] - cz) * cs,
+  ]);
+}
+
+/** Giro alrededor de un eje paralelo a y que pasa por (x=cx, z=cz): inclinar. */
+export function rotY(tris, ang, cx = 0, cz = 0) {
+  const cs = Math.cos(ang), sn = Math.sin(ang);
+  return mapVerts(tris, (p) => [
+    cx + (p[0] - cx) * cs + (p[2] - cz) * sn,
+    p[1],
+    cz - (p[0] - cx) * sn + (p[2] - cz) * cs,
+  ]);
+}
+
 export function scaleMesh(tris, s) {
   return mapVerts(tris, (p) => [p[0] * s, p[1] * s, p[2] * s]);
+}
+
+/**
+ * Copia espejada respecto al plano y=0 (nuevos triángulos, los de entrada no
+ * se tocan). Para modelar una mitad simétrica y doblarla:
+ * `out.push(...mirrorY(mitad))`.
+ */
+export function mirrorY(tris) {
+  return tris.map((t) => ({
+    ...t,
+    p: t.p.map((p) => [p[0], -p[1], p[2]]),
+  }));
+}
+
+/**
+ * Tubo: cadena de tramos por una lista de puntos, con juntas redondeadas.
+ * Cuerdas, arcos, ramas, colas, penachos... `r` puede ser un número o una
+ * función r(i) por punto, para tubos que se afinan.
+ */
+export function tube(out, pts, r, color, o) {
+  const rad = typeof r === 'function' ? r : () => r;
+  for (let i = 0; i < pts.length - 1; i++) {
+    limb(out, pts[i], pts[i + 1], rad(i), color, { ...(o || {}), r2: rad(i + 1) });
+    if (i > 0) sphere(out, pts[i][0], pts[i][1], pts[i][2], rad(i) * 1.15, color, { rings: 2, seg: 5, ...(o || {}) });
+  }
 }
 
 // --- Rasterizador ------------------------------------------------------------
@@ -305,6 +350,9 @@ function ensureBuffers(w, h) {
  */
 export function bake(tris, opts = {}) {
   const pad = opts.pad !== undefined ? opts.pad : 2;
+  // Resolución del horneado (píxeles de lienzo por píxel de mundo). El juego
+  // usa la de serie; el visor de modelos pide más para inspeccionar de cerca.
+  const res = opts.res || OUT;
 
   // Extensión en pantalla de la geometría y de su sombra.
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -324,15 +372,15 @@ export function bake(tris, opts = {}) {
   minX = Math.floor(minX) - pad; minY = Math.floor(minY) - pad;
   maxX = Math.ceil(maxX) + pad; maxY = Math.ceil(maxY) + pad;
 
-  const outW = Math.max(1, (maxX - minX) * OUT);
-  const outH = Math.max(1, (maxY - minY) * OUT);
+  const outW = Math.max(1, (maxX - minX) * res);
+  const outH = Math.max(1, (maxY - minY) * res);
   const W = outW * SS, H = outH * SS;
   ensureBuffers(W, H);
   zbuf.fill(1e9, 0, W * H);
   sbuf.fill(0, 0, W * H);
   cbuf.fill(0, 0, W * H * 4);
 
-  const SC = OUT * SS;
+  const SC = res * SS;
   const toRX = (sx) => (sx - minX) * SC;
   const toRY = (sy) => (sy - minY) * SC;
 
@@ -368,7 +416,7 @@ export function bake(tris, opts = {}) {
     rasterTri(t, r, g, bl, toRX, toRY, W, H);
   }
 
-  return compose(outW, outH, W, minX, minY, pad, opts);
+  return compose(outW, outH, W, minX, minY, opts, res);
 }
 
 /** Marca en el búfer de sombra el triángulo 2D dado en coordenadas de raster. */
@@ -435,7 +483,7 @@ function rasterTri(t, r, g, b, toRX, toRY, W, H) {
  * recorta el lienzo a lo pintado. El resultado es la textura de un sprite
  * clásico: interior suavizado, borde a un bit y perfil oscurecido.
  */
-function compose(outW, outH, W, minX, minY, pad, opts) {
+function compose(outW, outH, W, minX, minY, opts, res) {
   const img = new ImageData(outW, outH);
   const d = img.data;
   const solid = new Uint8Array(outW * outH); // 1 geometría, 2 sombra
@@ -505,9 +553,9 @@ function compose(outW, outH, W, minX, minY, pad, opts) {
 
   return {
     canvas,
-    ox: -minX - cx0 / OUT,
-    oy: -minY - cy0 / OUT,
-    w: cw / OUT,
-    h: ch / OUT,
+    ox: -minX - cx0 / res,
+    oy: -minY - cy0 / res,
+    w: cw / res,
+    h: ch / res,
   };
 }
