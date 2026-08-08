@@ -62,11 +62,14 @@ export class Lobby extends EventTarget {
   async loop() {
     if (!this.polling) return;
     try {
-      const r = await this.call('poll', { name: this.name, busy: !!this.busy });
+      const r = await this.call('poll', { name: this.name, busy: !!this.busy, open: !!this.open });
       this.failures = 0;
       this.players = r.players;
       this.emit('players', r.players);
 
+      // La lista completa, no sólo las nuevas: sirve para cerrar un aviso en
+      // pantalla cuando la invitación que lo abrió ya no está.
+      this.emit('invites', r.invites);
       for (const inv of r.invites) {
         if (this.seenInvites.has(inv.inviteId)) continue;
         this.seenInvites.add(inv.inviteId);
@@ -86,7 +89,8 @@ export class Lobby extends EventTarget {
     if (this.polling) this.timer = setTimeout(() => this.loop(), this.fast ? POLL_FAST_MS : POLL_MS);
   }
 
-  invite(toId) { return this.call('invite', { to: toId }); }
+  /** `ready`: gente ya confirmada en mi partida, para deshacer empates. */
+  invite(toId, ready = 0) { return this.call('invite', { to: toId, ready }); }
   cancel(inviteId) { return this.call('cancel', { inviteId }); }
   respond(inviteId, accept) { return this.call('respond', { inviteId, accept }); }
   signal(to, kind, data) { return this.call('signal', { to, kind, data }); }
