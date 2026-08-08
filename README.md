@@ -58,6 +58,13 @@ De dos a ocho jugadores, cada quien desde su dispositivo:
 4. Cuando estén listas, pulsa **Empezar partida**. Arranca en todos los
    dispositivos a la vez, en cuestión de segundos.
 
+Sólo hace falta que **una** persona invite: quien ya está montando una partida
+aparece en la lista de los demás con un botón **Pedir unirse**, y con aceptar la
+petición entra sin más. Si dos os invitáis a la vez tampoco pasa nada: se
+resuelve solo y los dos acabáis en la misma partida. Y si alguien no ha
+aceptado todavía, el botón avisa (**Empezar sin esperar**) de que se quedará
+fuera.
+
 Quien invita hace de anfitrión: su dispositivo lleva la simulación de todos y
 los demás le mandan sus órdenes. **La partida viaja directa de un navegador a
 otro por WebRTC**, sin pasar por ningún servidor.

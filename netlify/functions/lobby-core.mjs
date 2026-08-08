@@ -9,7 +9,7 @@
 // El almacén se recibe por parámetro (Netlify Blobs en producción, un Map en
 // desarrollo). Cada clave tiene un único escritor, así que no hacen falta
 // transacciones:
-//   p/{id}            el propio jugador (presencia)
+//   p/{id}            el propio jugador (presencia: ocupado y si admite gente)
 //   i/{inviteId}      invitación, la escribe quien invita
 //   a/{inviteId}      respuesta, la escribe el invitado
 //   s/{destino}/{id}  mensaje de conexión, lo escribe el emisor y lo borra el receptor
@@ -45,7 +45,7 @@ export async function handle(store, body, now = Date.now()) {
     const id = rnd(10);
     const token = rnd(16);
     const name = cleanName(body.name);
-    await store.set(`p/${id}`, { id, name, token, lastSeen: now, busy: false });
+    await store.set(`p/${id}`, { id, name, token, lastSeen: now, busy: false, open: false });
     return ok({ id, token, name });
   }
 
@@ -54,7 +54,7 @@ export async function handle(store, body, now = Date.now()) {
   if (!id || !token) return fail(400, 'faltan credenciales');
   let me = await store.get(`p/${id}`);
   // Si caducó por inactividad se recrea, para no echar a nadie que siga ahí.
-  if (!me) me = { id, name: cleanName(body.name), token, lastSeen: now, busy: false };
+  if (!me) me = { id, name: cleanName(body.name), token, lastSeen: now, busy: false, open: false };
   if (me.token !== token) return fail(403, 'credenciales no válidas');
 
   switch (action) {
@@ -62,6 +62,9 @@ export async function handle(store, body, now = Date.now()) {
       me.lastSeen = now;
       if (body.name) me.name = cleanName(body.name);
       if (typeof body.busy === 'boolean') me.busy = body.busy;
+      // `open` es quien está montando una partida y aún admite gente: a ése sí
+      // se le puede escribir aunque esté ocupado, para pedirle entrar.
+      if (typeof body.open === 'boolean') me.open = body.open;
       await store.set(`p/${id}`, me);
 
       const players = [];
@@ -69,7 +72,7 @@ export async function handle(store, body, now = Date.now()) {
         const p = await store.get(key);
         if (!p || p.id === id) continue;
         if (now - p.lastSeen > PLAYER_TTL) { await store.del(key); continue; }
-        players.push({ id: p.id, name: p.name, busy: !!p.busy });
+        players.push({ id: p.id, name: p.name, busy: !!p.busy, open: !!p.open });
       }
 
       const invites = [];   // las que me han enviado y siguen sin responder
@@ -79,7 +82,11 @@ export async function handle(store, body, now = Date.now()) {
         if (!inv) continue;
         if (now - inv.at > INVITE_TTL) { await store.del(key); await store.del(`a/${inv.inviteId}`); continue; }
         const ans = await store.get(`a/${inv.inviteId}`);
-        if (inv.to === id && !ans) invites.push({ inviteId: inv.inviteId, from: inv.from, fromName: inv.fromName });
+        if (inv.to === id && !ans) {
+          invites.push({
+            inviteId: inv.inviteId, from: inv.from, fromName: inv.fromName, ready: inv.ready || 0,
+          });
+        }
         if (inv.from === id && ans) {
           answers.push({ inviteId: inv.inviteId, to: inv.to, toName: inv.toName, accepted: !!ans.accepted });
           if (!ans.accepted) { await store.del(key); await store.del(`a/${inv.inviteId}`); }
@@ -102,10 +109,15 @@ export async function handle(store, body, now = Date.now()) {
       if (!to || to === id) return fail(400, 'destinatario no válido');
       const target = await store.get(`p/${to}`);
       if (!target || now - target.lastSeen > PLAYER_TTL) return fail(404, 'ese jugador ya no está conectado');
-      if (target.busy) return fail(409, 'ese jugador ya está en otra partida');
+      // A quien está montando una partida abierta se le puede escribir: lo leerá
+      // como una petición para entrar en ella.
+      if (target.busy && !target.open) return fail(409, 'ese jugador ya está en otra partida');
       const inviteId = `${id}~${to}~${rnd(6)}`;
+      // `ready`: cuánta gente tiene ya confirmada quien invita. Sirve para
+      // deshacer los empates cuando dos se invitan a la vez.
       await store.set(`i/${inviteId}`, {
         inviteId, from: id, fromName: me.name, to, toName: target.name, at: now,
+        ready: Math.max(0, Math.min(64, Number(body.ready) || 0)),
       });
       return ok({ inviteId });
     }
