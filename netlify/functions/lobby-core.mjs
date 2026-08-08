@@ -84,7 +84,8 @@ export async function handle(store, body, now = Date.now()) {
         const ans = await store.get(`a/${inv.inviteId}`);
         if (inv.to === id && !ans) {
           invites.push({
-            inviteId: inv.inviteId, from: inv.from, fromName: inv.fromName, ready: inv.ready || 0,
+            inviteId: inv.inviteId, from: inv.from, fromName: inv.fromName,
+            ready: inv.ready || 0, reply: inv.reply || '',
           });
         }
         if (inv.from === id && ans) {
@@ -113,11 +114,13 @@ export async function handle(store, body, now = Date.now()) {
       // como una petición para entrar en ella.
       if (target.busy && !target.open) return fail(409, 'ese jugador ya está en otra partida');
       const inviteId = `${id}~${to}~${rnd(6)}`;
-      // `ready`: cuánta gente tiene ya confirmada quien invita. Sirve para
-      // deshacer los empates cuando dos se invitan a la vez.
+      // `ready`: cuánta gente tiene ya confirmada quien invita, para deshacer
+      // los empates cuando dos se invitan a la vez. `reply`: si esta invitación
+      // contesta que sí a la petición de entrar del otro, cuál era.
       await store.set(`i/${inviteId}`, {
         inviteId, from: id, fromName: me.name, to, toName: target.name, at: now,
         ready: Math.max(0, Math.min(64, Number(body.ready) || 0)),
+        reply: String(body.reply || '').slice(0, 64),
       });
       return ok({ inviteId });
     }

@@ -89,8 +89,11 @@ export class Lobby extends EventTarget {
     if (this.polling) this.timer = setTimeout(() => this.loop(), this.fast ? POLL_FAST_MS : POLL_MS);
   }
 
-  /** `ready`: gente ya confirmada en mi partida, para deshacer empates. */
-  invite(toId, ready = 0) { return this.call('invite', { to: toId, ready }); }
+  /**
+   * `ready`: gente ya confirmada en mi partida, para deshacer empates.
+   * `reply`: la petición de entrar a la que contesta que sí, si es el caso.
+   */
+  invite(toId, ready = 0, reply = '') { return this.call('invite', { to: toId, ready, reply }); }
   cancel(inviteId) { return this.call('cancel', { inviteId }); }
   respond(inviteId, accept) { return this.call('respond', { inviteId, accept }); }
   signal(to, kind, data) { return this.call('signal', { to, kind, data }); }

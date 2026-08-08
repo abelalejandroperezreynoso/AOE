@@ -259,7 +259,8 @@ export class LobbyUI {
 
   // --- Anfitrión -------------------------------------------------------------
 
-  async invite(player) {
+  /** `reply`: si con esto contesto que sí a su petición de entrar, cuál era. */
+  async invite(player, reply = '') {
     if (this.starting || this.full || this.mode === 'guest') return;
     this.mode = 'host';
     this.syncPresence();
@@ -270,7 +271,7 @@ export class LobbyUI {
     this.renderParty();
     try {
       const ready = this.party.filter((m) => m.state === 'ready').length;
-      const r = await this.lobby.invite(player.id, ready);
+      const r = await this.lobby.invite(player.id, ready, reply);
       member.inviteId = r.inviteId;
       // Puede haberse ido mientras se enviaba: entonces hay que retirarla, que
       // si no le llega una invitación a una partida que ya no existe.
@@ -438,6 +439,15 @@ export class LobbyUI {
     if (this.mode === 'asking' && inv.from === this.asked) { this.joinAccepted(inv); return; }
     if (this.launched || this.starting) { this.refuse(inv); return; }
 
+    // Contesta que sí a lo que yo le pedí, aunque se lo pidiera con el botón de
+    // invitar. Que él lo haya aceptado a mano manda sobre cualquier otra regla:
+    // deshago mi partida y me voy a la suya.
+    if (inv.reply && this.party.some((m) => m.inviteId === inv.reply)) {
+      this.leaveParty(true);
+      this.accept(inv);
+      return;
+    }
+
     // Nos hemos invitado a la vez. Si cada uno espera al otro no empieza nadie,
     // así que cede el que tenga menos gente confirmada (y si empatan, siempre
     // el mismo): deshace su partida y se mete en la del otro. El que no cede
@@ -504,9 +514,10 @@ export class LobbyUI {
     this.closeDialog();
     if (!d) return;
     if (d.kind === 'join') {
-      // Dejarle entrar es invitarle: la invitación se acepta sola al otro lado.
+      // Dejarle entrar es invitarle: la invitación va marcada como respuesta a
+      // su petición, así que se acepta sola al otro lado.
       if (accept && this.mode === 'host' && !this.starting && !this.full) {
-        this.invite({ id: d.inv.from, name: d.inv.fromName });
+        this.invite({ id: d.inv.from, name: d.inv.fromName }, d.inv.inviteId);
       } else {
         this.refuse(d.inv);
       }
