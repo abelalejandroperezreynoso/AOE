@@ -78,6 +78,12 @@ horneado sea repetible).
   `scaffold`, `foundation`...). Cada constructor recibe `(out, s, M, C, stage)`:
   tamaño en casillas, colores del catálogo (`M`), color del jugador (`C`) y
   etapa de obra (0 cimientos, 1 a medias, 2 terminado).
+- `parts.js`: el vocabulario del **taller de edificios**. Los edificios que hace
+  el jugador no son código sino **datos**: una lista de piezas (`{k, x, y, z,
+  ...}`) que `designParts` convierte en malla con las mismas primitivas y el
+  mismo kit de obra que `buildings.js`. Añadir una pieza nueva es meter una
+  entrada en `PARTS` con sus campos y su `build()`; el editor monta sus
+  controles y el validador la recorta solo, a partir de la tabla `FIELDS`.
 - `nodes.js`: árboles, minas, bayas y animales; `variant` siembra el azar para
   que cada ejemplar sea distinto y siempre el mismo; `depleted` lo muestra
   menguado.
@@ -98,6 +104,11 @@ horneado sea repetible).
    "Referencia"), ajusta opacidad y escala, y arrástrala sobre el detalle para
    compararla superpuesta con el sprite.
 
+Para los edificios hay además el **taller** del propio juego (menú principal →
+Taller de edificios): coloca piezas con el ratón sobre la huella, con la vista
+en vivo a la izquierda y las tres etapas horneadas debajo. El visor de modelos
+también los enseña, porque `BUILD_ORDER` los incluye en cuanto se dan de alta.
+
 ## Reglas de oro
 
 - Modela en unidades de mundo y respecto al origen-ancla; nunca pienses en
@@ -111,5 +122,9 @@ horneado sea repetible).
 - Los sprites se cachean por clave: cualquier dato nuevo que cambie el dibujo
   debe formar parte de la clave de caché en `js/sprites.js` o limpiarse con
   `clearSpriteCaches()`.
+- Un edificio del taller se corta solo para la etapa "en obra" (los triángulos
+  que quedan por encima de la mitad de su altura se van y al resto se le baja lo
+  que sobresale) y sus cimientos son los del kit. Si modelas piezas sueltas muy
+  altas, míralas en esa etapa antes de darlas por buenas.
 - Triángulos: sin miedo dentro de lo razonable (un edificio puede ir de miles);
   el horneado es perezoso y por combinación, no por fotograma de juego.

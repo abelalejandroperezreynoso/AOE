@@ -6,18 +6,36 @@
 // Las órdenes son texto JSON: son pocas y así se leen bien al depurar.
 
 import { UNITS, BUILDINGS, TECHS, UPGRADES } from '../config.js';
+import { designsVersion } from '../data/designs.js';
 
 // Índices estables: ambos lados ejecutan el mismo código, así que el orden de
 // las claves coincide y se pueden mandar como un solo byte.
 export const UNIT_TYPES = Object.keys(UNITS);
-export const BUILDING_TYPES = Object.keys(BUILDINGS);
 export const TECH_KEYS = Object.keys(TECHS);
 export const UPGRADE_KEYS = Object.keys(UPGRADES);
 const RES_LIST = ['food', 'wood', 'gold', 'stone'];
 
 const unitIdx = new Map(UNIT_TYPES.map((t, i) => [t, i]));
-const buildIdx = new Map(BUILDING_TYPES.map((t, i) => [t, i]));
 const resIdx = new Map(RES_LIST.map((t, i) => [t, i]));
+
+/*
+ * La tabla de edificios no se puede congelar al cargar: los que hace el jugador
+ * en el taller entran después, y en una partida en red el invitado adopta los
+ * del anfitrión justo antes de empezar. Se rehace cuando cambia la lista de
+ * diseños, que es lo único que puede moverla, y como éstos se dan de alta en
+ * orden de identificador los dos lados llegan a la misma tabla.
+ */
+let buildTypes = [], buildIdx = new Map(), builtFor = -1;
+
+function buildingTable() {
+  const v = designsVersion();
+  if (builtFor !== v) {
+    builtFor = v;
+    buildTypes = Object.keys(BUILDINGS);
+    buildIdx = new Map(buildTypes.map((t, i) => [t, i]));
+  }
+  return buildTypes;
+}
 
 export const MSG = { SNAPSHOT: 1, OVER: 2 };
 const POS = 64; // las posiciones viajan en centésimas de casilla (punto fijo)
@@ -89,6 +107,7 @@ export function encodeSnapshot(game, viewer, removed, depleted) {
     w.u8(Math.max(0, Math.min(255, Math.round(u.carry))));
   }
 
+  buildingTable(); // pone al día `buildIdx` si se han tocado los diseños
   w.u16(game.buildings.size);
   for (const b of game.buildings) {
     w.u32(b.id);
@@ -192,9 +211,10 @@ export function decodeSnapshot(buf) {
   }
 
   const bc = r.u16();
+  const buildTypes = buildingTable();
   for (let i = 0; i < bc; i++) {
     const b = {
-      id: r.u32(), type: BUILDING_TYPES[r.u8()], owner: r.u8(), tx: r.u8(), ty: r.u8(),
+      id: r.u32(), type: buildTypes[r.u8()], owner: r.u8(), tx: r.u8(), ty: r.u8(),
       hp: r.u16(), maxHp: r.u16(), built: !!r.u8(), progress: r.u8() / 255, farmAmount: r.u16(),
       queue: [], rally: null,
     };

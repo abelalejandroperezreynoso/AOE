@@ -316,7 +316,8 @@ export function tube(out, pts, r, color, o) {
 
 // --- Rasterizador ------------------------------------------------------------
 
-function project(p) {
+/** Punto del mundo a píxeles de pantalla, con la cámara dimétrica del juego. */
+export function project(p) {
   return [(p[0] - p[1]) * HW, (p[0] + p[1]) * HH - p[2] * VZ];
 }
 
@@ -325,8 +326,31 @@ function project(p) {
  * cámara está en el lado de x+y grande, en alto y mirando hacia abajo, así que
  * acercarse a ella es crecer en x+y y en z; de ahí los dos signos negativos.
  */
-function depth(p) {
+/** Distancia a la cámara: menor, más cerca. */
+export function depth(p) {
   return -(p[0] + p[1]) * 0.6116 - p[2] * 0.5018;
+}
+
+/**
+ * Cuánta luz recibe una cara: iluminación plana, la normal siempre mirando a la
+ * cámara (así las caras valen por los dos lados). El visor en vivo del taller la
+ * usa también, de modo que lo que se ve mientras se modela está iluminado
+ * exactamente igual que el sprite horneado.
+ */
+export function faceLight(t) {
+  if (t.unlit) return 1;
+  const [a, b, c] = t.p;
+  const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  let n = normalize([
+    e1[1] * e2[2] - e1[2] * e2[1],
+    e1[2] * e2[0] - e1[0] * e2[2],
+    e1[0] * e2[1] - e1[1] * e2[0],
+  ]);
+  // La mirada (hacia dentro de la escena) es (-0.61, -0.61, -0.50).
+  if (n[0] * -0.6116 + n[1] * -0.6116 + n[2] * -0.5018 > 0) n = [-n[0], -n[1], -n[2]];
+  const lam = Math.max(0, n[0] * SUN[0] + n[1] * SUN[1] + n[2] * SUN[2]);
+  return AMBIENT + DIFFUSE * lam;
 }
 
 // Búferes de trabajo reutilizados entre horneados: el más grande (un castillo)
@@ -391,24 +415,7 @@ export function bake(tris, opts = {}) {
       fillMask(q.map(([sx, sy]) => [toRX(sx), toRY(sy)]), W, H);
     }
 
-    // Iluminación plana por cara.
-    const [a, b, c] = t.p;
-    const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    let n = [
-      e1[1] * e2[2] - e1[2] * e2[1],
-      e1[2] * e2[0] - e1[0] * e2[2],
-      e1[0] * e2[1] - e1[1] * e2[0],
-    ];
-    n = normalize(n);
-    // La normal que mira a la cámara: así las caras valen en ambos sentidos.
-    // La mirada (hacia dentro de la escena) es (-0.61, -0.61, -0.50).
-    if (n[0] * -0.6116 + n[1] * -0.6116 + n[2] * -0.5018 > 0) n = [-n[0], -n[1], -n[2]];
-    let light = 1;
-    if (!t.unlit) {
-      const lam = Math.max(0, n[0] * SUN[0] + n[1] * SUN[1] + n[2] * SUN[2]);
-      light = AMBIENT + DIFFUSE * lam;
-    }
+    const light = faceLight(t);
     const r = Math.min(255, t.c[0] * light);
     const g = Math.min(255, t.c[1] * light);
     const bl = Math.min(255, t.c[2] * light);

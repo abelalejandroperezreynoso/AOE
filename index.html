@@ -57,6 +57,7 @@
     <button id="btn-start" class="primary">Comenzar partida</button>
     <button id="btn-multi" class="secondary">Jugar con otra persona</button>
     <button id="btn-catalog" class="secondary">Catálogo del juego</button>
+    <button id="btn-studio" class="secondary">Taller de edificios</button>
     <button id="btn-fullscreen-menu" class="secondary fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
       <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
         <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
@@ -74,6 +75,7 @@
         <li>Construye <b>casas</b> para subir el límite de población y <b>cuarteles</b> para crear ejército.</li>
         <li>Avanza de <b>edad</b> desde el Centro urbano para desbloquear unidades y mejoras.</li>
         <li>Gana destruyendo todo lo que tengan tus rivales.</li>
+        <li>En el <b>Taller de edificios</b> puedes modelar los tuyos propios y construirlos en la partida.</li>
       </ul>
       <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios. Todo el arte se genera por código.</p>
     </div>
@@ -112,6 +114,58 @@
       al momento. Los cambios se guardan en este navegador y se aplican a las
       partidas nuevas. En multijugador manda quien invita: sus valores se usan
       en los dos lados.
+    </p>
+  </div>
+</div>
+
+<!-- ---------- Taller de edificios ---------- -->
+<div id="studio" class="overlay hidden">
+  <div class="studio-card">
+    <header class="catalog-top">
+      <h2>Taller de edificios</h2>
+      <div class="catalog-top-right">
+        <span id="studio-status" class="catalog-changes"></span>
+        <button id="btn-studio-close" class="primary">Volver al menú</button>
+      </div>
+    </header>
+
+    <div class="studio-body">
+      <aside class="studio-side">
+        <h3>Tus edificios</h3>
+        <ul id="studio-list" class="catalog-list"></ul>
+        <button id="btn-studio-new" class="secondary">Nuevo edificio</button>
+        <div class="studio-side-actions">
+          <button id="btn-studio-dup">Duplicar</button>
+          <button id="btn-studio-del">Borrar</button>
+        </div>
+      </aside>
+
+      <section class="studio-main">
+        <div id="studio-tools" class="studio-tools"></div>
+        <div class="studio-stage">
+          <canvas id="studio-view"></canvas>
+        </div>
+        <div class="studio-bake">
+          <div id="studio-shots" class="studio-shots"></div>
+          <div id="studio-info" class="studio-bake-info"></div>
+        </div>
+      </section>
+
+      <aside class="studio-props">
+        <div id="studio-tabs" class="catalog-tabs">
+          <button data-tab="part" class="active">Pieza</button>
+          <button data-tab="build">Edificio</button>
+          <button data-tab="color">Colores</button>
+        </div>
+        <div id="studio-panel" class="studio-panel"></div>
+      </aside>
+    </div>
+
+    <p class="catalog-foot">
+      Coloca piezas sobre la huella y ve el resultado horneado como saldrá en la
+      partida. Lo que hagas aquí se guarda solo en este navegador y aparece en la
+      barra de construcción de los aldeanos, con su coste y su función. En
+      multijugador se juega con los edificios de quien invita.
     </p>
   </div>
 </div>
@@ -249,6 +303,7 @@
       <tr><td>F11 o el menú</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
       <tr><td>Multijugador</td><td>Desde el menú principal: entra en la sala, elige a alguien e invítalo</td></tr>
       <tr><td>Catálogo</td><td>Desde el menú principal: consulta y edita los valores y el aspecto de todo el juego</td></tr>
+      <tr><td>Taller de edificios</td><td>Desde el menú principal: modela tus propios edificios con piezas y constrúyelos en la partida como uno más</td></tr>
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
       <tr><td>Toque en el mapa</td><td>Manda la selección y nada más: coge lo que toques, cambia de unidad o suelta lo que tuvieras al tocar el suelo. Un toque nunca da órdenes, así que fallar el dedo no manda a nadie a ninguna parte</td></tr>
       <tr><td>Mantener pulsado</td><td>El clic derecho del dedo: por aquí van todas las órdenes —moverse, recolectar, atacar, descargar en el centro urbano o un campamento, y plantar el punto de reunión de un cuartel—, y ninguna toca lo que tengas seleccionado</td></tr>

@@ -69,7 +69,7 @@ function windowAt(out, face, x, y, z, w, h, M) {
  * alternos, que es lo que hace que se lea como bálago o teja y no como un
  * plástico liso. La cumbrera corre a lo largo del eje mayor.
  */
-function gableRoof(out, x0, y0, x1, y1, zb, rise, roofCol, M, o = {}) {
+export function gableRoof(out, x0, y0, x1, y1, zb, rise, roofCol, M, o = {}) {
   const alongX = (o.axis || (x1 - x0 >= y1 - y0 ? 'x' : 'y')) === 'x';
   const ov = o.overhang !== undefined ? o.overhang : 0.14;
   const courses = o.courses || 4;
@@ -100,7 +100,7 @@ function gableRoof(out, x0, y0, x1, y1, zb, rise, roofCol, M, o = {}) {
 }
 
 /** Tejado a cuatro aguas (piramidal si la planta es cuadrada). */
-function hipRoof(out, x0, y0, x1, y1, zb, rise, roofCol, o = {}) {
+export function hipRoof(out, x0, y0, x1, y1, zb, rise, roofCol, o = {}) {
   const ov = o.overhang !== undefined ? o.overhang : 0.16;
   const [rL, rB, rD] = ramp(roofCol);
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, zt = zb + rise;
@@ -132,7 +132,7 @@ function hipRoof(out, x0, y0, x1, y1, zb, rise, roofCol, o = {}) {
 }
 
 /** Almenas alrededor del borde superior de un rectángulo. */
-function battlements(out, x0, y0, x1, y1, z, M) {
+export function battlements(out, x0, y0, x1, y1, z, M) {
   slab(out, x0 - 0.05, y0 - 0.05, x1 + 0.05, y1 + 0.05, z, 0.1, tone(M.wall, -0.06));
   const step = 0.34;
   const edges = [
@@ -150,7 +150,7 @@ function battlements(out, x0, y0, x1, y1, z, M) {
 }
 
 /** Torre redonda con almenas; r y altura en casillas. */
-function roundTower(out, cx, cy, r, h, M) {
+export function roundTower(out, cx, cy, r, h, M) {
   cyl(out, cx, cy, 0, r * 1.12, r, h, M.wall, { seg: 10 });
   cyl(out, cx, cy, h, r * 1.14, r * 1.14, 0.08, tone(M.wall, -0.08), { seg: 10 });
   for (let i = 0; i < 8; i++) {
@@ -165,14 +165,14 @@ function roundTower(out, cx, cy, r, h, M) {
 }
 
 /** Estandarte del jugador: mástil con gallardete. */
-function flag(out, x, y, z, h, col) {
+export function flag(out, x, y, z, h, col) {
   limb(out, [x, y, z], [x, y, z + h], 0.018, '#5b4a2f');
   const t = z + h;
   quad(out, [x, y, t], [x + 0.26, y + 0.05, t - 0.06], [x, y, t - 0.13], [x, y, t - 0.12], col, { noshadow: true });
 }
 
 /** Andamio perimetral para la obra a medias. */
-function scaffold(out, x0, y0, x1, y1, h, M) {
+export function scaffold(out, x0, y0, x1, y1, h, M) {
   for (const [cx, cy] of [[x1 + 0.14, y0 + 0.2], [x1 + 0.14, y1 - 0.2], [x0 + 0.2, y1 + 0.14], [x1 - 0.2, y1 + 0.14]]) {
     limb(out, [cx, cy, 0], [cx, cy, h + 0.35], 0.03, M.wood);
   }
@@ -183,7 +183,7 @@ function scaffold(out, x0, y0, x1, y1, h, M) {
 }
 
 /** Cimientos: el encofrado de vigas sobre tierra removida. */
-function foundation(out, x0, y0, x1, y1, M) {
+export function foundation(out, x0, y0, x1, y1, M) {
   slab(out, x0, y0, x1, y1, 0, 0.045, '#7a5f3d');
   const beams = [
     [[x0, y0], [x1, y0]], [[x1, y0], [x1, y1]], [[x1, y1], [x0, y1]], [[x0, y1], [x0, y0]],
@@ -201,7 +201,7 @@ function foundation(out, x0, y0, x1, y1, M) {
   box(out, x1 - 0.4, y1 - 0.4, 0, 0.26, 0.26, 0.22, tone(M.stone || '#9a9a94', 0.05));
 }
 
-function logPile(out, cx, cy, len, n, wood) {
+export function logPile(out, cx, cy, len, n, wood) {
   for (let i = 0; i < n; i++) {
     const z = 0.06 + Math.floor(i / 3) * 0.11;
     const off = (i % 3) * 0.12 - 0.12 + (Math.floor(i / 3) % 2) * 0.06;
@@ -209,7 +209,7 @@ function logPile(out, cx, cy, len, n, wood) {
   }
 }
 
-function barrel(out, cx, cy, wood) {
+export function barrel(out, cx, cy, wood) {
   lathe(out, cx, cy, [[0.07, 0], [0.09, 0.09], [0.07, 0.18]], wood, { seg: 7 });
 }
 
