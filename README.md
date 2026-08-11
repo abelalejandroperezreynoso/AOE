@@ -104,6 +104,9 @@ Limitaciones conocidas:
   herramientas del navegador podría ver el mapa entero. En pantalla la niebla
   de guerra funciona con normalidad para cada jugador.
 - No hay equipos ni alianzas: todos contra todos.
+- Los edificios del taller que se reparten al empezar tienen un tope de tamaño;
+  si el anfitrión tuviera muchísimos y muy recargados, los últimos se quedarían
+  fuera de esa partida.
 
 ## Catálogo del juego
 
@@ -147,6 +150,49 @@ Detalles a tener en cuenta:
   dispositivos, de modo que todos ven y juegan con las mismas cifras.
 - Los valores se validan y se recortan a un rango razonable, así que no es
   posible dejar el juego en un estado inservible desde el catálogo.
+
+## Taller de edificios
+
+Desde el menú principal, **Taller de edificios**: un editor 3D dentro del propio
+juego para **hacerse edificios nuevos**, que luego se construyen en la partida
+como cualquier otro.
+
+Un edificio se arma con **piezas** —cajas, cilindros, cúpulas, tejados a dos y a
+cuatro aguas, faldones, vigas, ruedas, almenas, torreones, puertas, ventanas,
+estandartes, escalinatas, cercas, pilas de troncos y barriles— colocadas sobre
+la huella que ocupará en el mapa:
+
+- **Se coloca arrastrando**: pulsa una pieza en el modelo y muévela por el
+  suelo; con **Mayús** sube y baja. La rueda acerca y aleja, y arrastrar el
+  fondo mueve la vista. Las flechas la empujan de casilla en casilla (con
+  **Alt** en vertical), **Supr** la borra y **Ctrl+Z** deshace.
+- **Girar vista** enseña el modelo desde otro lado sin tocar el edificio, que
+  para eso la cámara del juego es fija.
+- Lo que se ve mientras se modela usa **la misma proyección y la misma luz** que
+  el horneado, y debajo están las **tres etapas de obra ya horneadas** a tamaño
+  de partida: cimientos, en obra y terminado. Las de en medio salen solas, no
+  hay que modelarlas.
+- En **Edificio** se elige qué hace: sin función, dar población, almacén de los
+  recursos que se marquen, defensa que dispara flechas o edificio que entrena
+  unidades. Y ahí van su coste, su tiempo de construcción, sus puntos de vida,
+  su armadura, su visión, su huella (de 1×1 a 4×4) y en qué edad aparece.
+- En **Colores** se le da color a cada material que use. El **color del
+  jugador** no se elige: lo pone quien construya el edificio, así que conviene
+  darle a alguna pieza (un estandarte, un paño) ese material.
+
+Los edificios hechos aquí se guardan **en ese navegador**, salen en la barra de
+construcción de los aldeanos con su coste y su tecla, aparecen en el catálogo
+—donde se les pueden retocar valores y colores como a los de serie— y se pueden
+duplicar para probar variantes. Caben 24 edificios de hasta 200 piezas.
+
+Detalles a tener en cuenta:
+
+- Al guardar en el taller mandan sus valores: si el catálogo tenía cambios sobre
+  **ese** edificio, se retiran (los del resto del juego no se tocan).
+- En **multijugador manda quien invita**: sus edificios viajan a los demás al
+  empezar la partida y todos juegan con ellos. Los propios vuelven al recargar
+  la página.
+- La máquina no construye edificios del taller: los usa quien los hizo.
 
 ## Cómo se juega
 
@@ -217,6 +263,8 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
   recursos, control de velocidad (1x a 3x) y estadísticas finales.
 - **Catálogo** para consultar y editar todo el juego: sus valores y también el
   aspecto de cada objeto, con vista previa en vivo.
+- **Taller de edificios**: modelado 3D dentro del juego para hacerse edificios
+  propios y construirlos en la partida.
 
 ## Estructura del código
 
@@ -231,11 +279,13 @@ js/map.js           Generación del mapa y de los recursos
 js/path.js          Búsqueda de caminos A* sobre la rejilla
 js/render.js        Renderizador isométrico y niebla de guerra
 js/sprites.js       Sprites: terreno a mano y horneado/caché de los renders 3D
+js/studio.js        Taller de edificios: editor 3D dentro del juego
 js/gfx3d/engine.js  Rasterizador 3D por software: proyección dimétrica, z-buffer,
                     luz, sombras y horneado a sprite
 js/gfx3d/units.js   Modelos 3D de las unidades, con posturas y 8 orientaciones
 js/gfx3d/buildings.js Modelos 3D de los edificios y sus etapas de obra
 js/gfx3d/nodes.js   Modelos 3D de árboles, minas, bayas y animales
+js/gfx3d/parts.js   Piezas del taller: el modelo de un edificio hecho de datos
 js/gfx3d/GUIDE.md   Guía del sistema de arte: coordenadas, primitivas y flujo
 tools/viewer.html   Visor de modelos: cada tipo a cualquier zoom, con todas sus
                     vistas y superposición de imágenes de referencia
@@ -246,6 +296,7 @@ js/audio.js         Efectos de sonido sintetizados con WebAudio
 js/catalog.js       Catálogo: fichas y edición de los datos del juego
 js/data/appearance.js Colores y tamaño con los que se dibuja cada objeto
 js/data/overrides.js  Valores editados: validación, guardado y aplicación
+js/data/designs.js  Edificios hechos en el taller: validación, guardado y alta
 js/lobby-ui.js      Pantalla de la sala de espera
 js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
 js/net/protocol.js  Codificación binaria del estado y de las órdenes
