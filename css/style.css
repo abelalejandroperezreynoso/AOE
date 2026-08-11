@@ -388,11 +388,6 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  */
 .studio-tools { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .studio-view-tools { min-width: 0; }
-.studio-palette {
-  display: flex; flex-wrap: wrap; gap: 4px;
-  max-height: 92px; overflow: auto;
-  padding: 2px;
-}
 .studio-piece {
   display: flex; align-items: center; gap: 5px;
   padding: 4px 9px; font-size: 12px; border-radius: 6px;
@@ -400,8 +395,30 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .studio-glyph { font-size: 13px; color: var(--gold-l); }
 .studio-view-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .studio-view-tools button { padding: 5px 11px; font-size: 12.5px; }
-.studio-inline { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #cbb68c; }
-.studio-inline select, .cat-field select {
+
+/* Menú desplegable: el botón y su panel colgando debajo. */
+.studio-menu { position: relative; }
+.studio-menu-btn.on {
+  background: linear-gradient(180deg, #b8912f, #7c5c17);
+  border-color: #e0c470; color: #241a08; font-weight: bold;
+}
+.studio-pop {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 8;
+  width: max-content; max-width: min(340px, 86vw);
+  background: linear-gradient(180deg, #3f3020, #241a10);
+  border: 1px solid var(--panel-edge); border-radius: 9px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .6);
+  padding: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+  /* Diecisiete piezas en una columna no caben en ninguna pantalla: el menú se
+     queda a lo alto de lo que hay y se desplaza por dentro. */
+  max-height: 62vh; overflow: auto;
+}
+/* Si no cabe hacia la derecha, se descuelga por el otro lado. */
+.studio-pop.right { left: auto; right: 0; }
+.studio-pop .cat-field { gap: 12px; }
+.studio-menu-item { text-align: left; padding: 8px 10px; font-size: 13px; }
+.cat-field select {
   background: #1b140d; color: var(--parch);
   border: 1px solid #6b5334; border-radius: 5px;
   padding: 4px 6px; font-size: 12.5px; font-family: inherit;
@@ -454,7 +471,14 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   font-size: 16px; line-height: 1; border-radius: 6px;
 }
 
-.studio-bake { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.studio-bake { display: flex; flex-direction: column; gap: 6px; }
+.studio-bake-head { display: flex; align-items: center; gap: 10px; }
+.studio-fold {
+  padding: 4px 10px; font-size: 12px; flex: none;
+  background: none; border-color: transparent; color: var(--gold-l);
+}
+.studio-fold:hover { border-color: #6b5334; }
+.studio-card[data-preview="off"] .studio-shots { display: none; }
 .studio-shots { display: flex; gap: 10px; align-items: flex-end; }
 .studio-shot { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: #8e7c5c; }
 .studio-shot canvas {
@@ -473,6 +497,16 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   padding: 12px 14px;
 }
 .studio-panel .cat-group { margin-bottom: 12px; }
+.studio-group > summary {
+  cursor: pointer; list-style: none;
+  margin-bottom: 8px; padding: 4px 0;
+  font-size: 12px; color: var(--gold-l);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.studio-group > summary::-webkit-details-marker { display: none; }
+.studio-group > summary::before { content: '▾ '; }
+.studio-group:not([open]) > summary::before { content: '▸ '; }
+.studio-group:not([open]) > summary { margin-bottom: 0; }
 .studio-panel .cat-grid { grid-template-columns: 1fr; gap: 7px; }
 
 .studio-parts {
@@ -490,8 +524,17 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .studio-actions { display: flex; gap: 8px; }
 .studio-actions button { flex: 1; padding: 6px 10px; font-size: 12.5px; }
 .studio-del { background: linear-gradient(180deg, #8d3229, #521c16); border-color: #c06a5e; }
-.studio-add-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 6px; }
-.studio-add-grid .studio-piece { justify-content: flex-start; padding: 10px 10px; font-size: 13px; }
+/* Ancho fijo para que las piezas salgan en dos columnas y el menú no se haga
+   una tira de un palmo. */
+.studio-add-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 6px; width: min(292px, 84vw);
+}
+.studio-add-grid .studio-piece {
+  justify-content: flex-start; padding: 10px; font-size: 13px;
+  /* Que parta en dos líneas: "Tejado a cuatro aguas" no cabe de una. */
+  white-space: normal; text-align: left; line-height: 1.25;
+}
 .studio-mtab, .studio-sheet-toggle { display: none; }
 .studio-template { display: block; width: 100%; text-align: left; margin-bottom: 6px; padding: 9px 12px; }
 .studio-template b { display: block; color: var(--gold-l); font-size: 14px; margin-bottom: 2px; }
@@ -551,16 +594,17 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   .studio-main { order: 1; flex: 1 1 auto; min-height: 120px; }
   .studio-props { order: 2; width: 100%; flex: none; }
   .studio-side { display: none; }
-  .studio-palette { display: none; }
-  .studio-view-tools { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
-  .studio-view-tools button, .studio-inline select { white-space: nowrap; }
   .studio-stage { flex: 1; height: auto; min-height: 120px; }
 
-  .studio-bake { gap: 8px; }
+  .studio-bake { gap: 4px; }
+  .studio-bake-head { gap: 6px; }
   .studio-shots { gap: 6px; }
   .studio-shot canvas { max-height: 44px; }
   .studio-shot { font-size: 10px; gap: 1px; }
-  .studio-bake-info { font-size: 10.5px; padding-bottom: 0; }
+  .studio-bake-info {
+    font-size: 10.5px; padding-bottom: 0; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 
   /* `flex: none` a propósito: con el `flex: 1` de base el alto declarado no
      valdría nada y la hoja se quedaría en un hilo. */
@@ -583,8 +627,6 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   .studio-main { order: 1; flex: 1 1 auto; min-width: 0; min-height: 0; }
   .studio-props { order: 2; width: 300px; flex: none; }
   .studio-side { display: none; }
-  .studio-palette { display: none; }
-  .studio-view-tools { flex-wrap: nowrap; overflow-x: auto; }
   .studio-stage { flex: 1; height: auto; min-height: 90px; }
   .studio-panel { flex: 1; height: auto; overflow: auto; }
   .studio-shot canvas { max-height: 46px; }
@@ -601,11 +643,11 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   .studio-sheet-toggle { display: block; }
   /* Los botones de la barra, de una línea: partidos en dos hacen la fila el
      doble de alta y en apaisado eso es medio lienzo. */
-  .studio-view-tools button, .studio-inline, .studio-inline select { white-space: nowrap; }
+  .studio-view-tools button { white-space: nowrap; }
   /* Rejilla en vez de fila: las cinco pestañas y el botón de plegar caben de
      una vez, sin partirse en dos renglones ni obligar a desplazar de lado. */
   .studio-props .catalog-tabs {
-    display: grid; grid-template-columns: repeat(5, 1fr) 32px;
+    display: grid; grid-template-columns: repeat(4, 1fr) 34px;
     margin-bottom: 5px; gap: 3px;
   }
   .studio-props .catalog-tabs button {
