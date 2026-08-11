@@ -74,9 +74,7 @@ export class Studio {
     // Con el móvil los paneles van en una hoja de abajo; plegarla deja el
     // modelo a pantalla completa, que es lo que se quiere para mirarlo.
     el('btn-studio-sheet').onclick = () => {
-      const card = el('studio-card');
-      card.dataset.sheet = card.dataset.sheet === 'off' ? 'on' : 'off';
-      el('btn-studio-sheet').textContent = card.dataset.sheet === 'off' ? '⌃' : '⌄';
+      this.foldSheet(el('studio-card').dataset.sheet !== 'off');
     };
 
     const c = el('studio-view');
@@ -98,19 +96,30 @@ export class Studio {
     this.buildPad();
   }
 
-  /** Cambia de pestaña (y, en el móvil, de hoja). */
+  /**
+   * Cambia de pestaña (y, en el móvil, de hoja). Volver a tocar la que ya está
+   * puesta la pliega: es la forma rápida de dejar la mesa despejada sin ir a
+   * buscar el botón de plegar.
+   */
   showTab(tab) {
+    const card = el('studio-card');
+    if (tab === this.tab && card.dataset.sheet !== 'off') { this.foldSheet(true); return; }
     this.tab = tab;
     for (const b of document.querySelectorAll('#studio-tabs button')) {
       b.classList.toggle('active', b.dataset.tab === tab);
     }
-    const card = el('studio-card');
     card.dataset.mtab = tab;
-    if (card.dataset.sheet === 'off') {
-      card.dataset.sheet = 'on';
-      el('btn-studio-sheet').textContent = '⌄';
-    }
+    if (card.dataset.sheet === 'off') this.foldSheet(false);
     this.renderPanel();
+  }
+
+  /** Pliega la hoja de los paneles para dejar el modelo a pantalla completa. */
+  foldSheet(folded) {
+    el('studio-card').dataset.sheet = folded ? 'off' : 'on';
+    el('btn-studio-sheet').textContent = folded ? '⌃' : '⌄';
+    el('btn-studio-sheet').title = folded
+      ? 'Desplegar el panel'
+      : 'Plegar el panel y ver el modelo entero';
   }
 
   isOpen() { return !el('studio').classList.contains('hidden'); }
@@ -341,10 +350,6 @@ export class Studio {
     if (bar.dataset.ready) return;
     bar.dataset.ready = '1';
 
-    const palette = document.createElement('div');
-    palette.className = 'studio-palette';
-    for (const b of this.paletteButtons()) palette.appendChild(b);
-
     const view = document.createElement('div');
     view.className = 'studio-view-tools';
 
@@ -356,53 +361,118 @@ export class Studio {
       return b;
     };
 
+    // Las piezas, en un desplegable: son diecisiete y en fila ocupaban tres
+    // renglones de mesa que ahora se lleva el modelo.
+    view.appendChild(this.dropdown('＋ Añadir', 'Añadir una pieza al edificio', (pop) => {
+      const grid = document.createElement('div');
+      grid.className = 'studio-add-grid';
+      for (const b of this.paletteButtons()) grid.appendChild(b);
+      pop.appendChild(grid);
+    }));
+
     /*
      * Mover por el suelo o subir y bajar. Con ratón basta Mayús, pero con el
      * dedo no hay Mayús que valga: sin este interruptor no habría manera de
      * levantar una pieza del suelo en un móvil.
      */
-    this.modeBtn = mkBtn('⇕ Altura', 'Con la altura puesta, arrastrar sube y baja la pieza en vez de moverla por el suelo', () => {
+    this.modeBtn = mkBtn('✥ Mover', 'Cambia entre mover por el suelo y subir o bajar la pieza (con ratón, Mayús mientras arrastras)', () => {
       this.moveMode = this.moveMode === 'z' ? 'xy' : 'z';
       this.modeBtn.classList.toggle('on', this.moveMode === 'z');
       this.modeBtn.textContent = this.moveMode === 'z' ? '⇕ Altura' : '✥ Mover';
       this.updatePad();
+      this.redraw();
     });
-    this.modeBtn.textContent = '✥ Mover';
     view.appendChild(this.modeBtn);
+    view.appendChild(mkBtn('↶', 'Deshacer el último cambio [Ctrl+Z]', () => this.undoLast()));
 
-    view.appendChild(mkBtn('↻ Girar vista', 'Mira el modelo desde otro lado. No cambia el edificio.', () => {
-      this.viewYaw = (this.viewYaw + 1) % 4;
-      this.redraw();
+    // Y lo que se toca de vez en cuando, en otro desplegable.
+    view.appendChild(this.dropdown('⚙ Vista', 'Girar, encajar, rejilla y color del jugador', (pop) => {
+      pop.appendChild(this.menuButton('↻ Girar la vista', 'Mira el modelo desde otro lado. No cambia el edificio.', () => {
+        this.viewYaw = (this.viewYaw + 1) % 4;
+        this.redraw();
+      }));
+      pop.appendChild(this.menuButton('⤢ Encajar el modelo', 'Vuelve a centrar y ajustar el zoom.', () => {
+        this.fit();
+        this.redraw();
+      }));
+      pop.appendChild(selectRow('Rejilla', String(this.snap), SNAPS.map(([v, l]) => [String(v), l]), (v) => {
+        this.snap = Number(v);
+      }));
+      pop.appendChild(selectRow('Color del jugador', String(this.colorIdx),
+        PLAYER_COLORS.map((c, i) => [String(i), c.name]), (v) => {
+          this.colorIdx = Number(v);
+          this.redraw();
+          this.renderList();
+          this.schedulePreview();
+        }));
+      pop.appendChild(checkRow('Ver la vista previa', !this.foldedPreview, (on) => {
+        this.foldPreview(!on);
+      }));
     }));
-    view.appendChild(mkBtn('⤢ Encajar', 'Vuelve a centrar y ajustar el zoom.', () => { this.fit(); this.redraw(); }));
-    view.appendChild(mkBtn('↶ Deshacer', 'Deshace el último cambio [Ctrl+Z]', () => this.undoLast()));
 
-    const snap = document.createElement('label');
-    snap.className = 'studio-inline';
-    snap.innerHTML = '<span>Rejilla</span>';
-    const snapSel = document.createElement('select');
-    for (const [v, label] of SNAPS) snapSel.add(new Option(label, v));
-    snapSel.value = String(this.snap);
-    snapSel.onchange = () => { this.snap = Number(snapSel.value); };
-    snap.appendChild(snapSel);
-    view.appendChild(snap);
+    bar.appendChild(view);
 
-    const color = document.createElement('label');
-    color.className = 'studio-inline';
-    color.innerHTML = '<span>Jugador</span>';
-    const colorSel = document.createElement('select');
-    for (const [i, p] of PLAYER_COLORS.entries()) colorSel.add(new Option(p.name, i));
-    colorSel.value = String(this.colorIdx);
-    colorSel.onchange = () => {
-      this.colorIdx = Number(colorSel.value);
-      this.redraw();
-      this.renderList();
-      this.schedulePreview();
+    // La vista previa horneada se pliega: en un móvil son sesenta píxeles de
+    // mesa, y no hace falta tenerla delante mientras se coloca una viga.
+    el('btn-studio-preview').onclick = () => this.foldPreview(!this.foldedPreview);
+    this.foldPreview(window.matchMedia('(max-width: 620px)').matches);
+  }
+
+  /**
+   * Un botón con su menú desplegable. Se cierra al elegir algo, al tocar fuera
+   * o con Escape, y se ancla al lado que le quepa.
+   */
+  dropdown(label, title, build) {
+    const wrap = document.createElement('div');
+    wrap.className = 'studio-menu';
+    const btn = document.createElement('button');
+    btn.className = 'studio-menu-btn';
+    btn.textContent = `${label} ▾`;
+    btn.title = title;
+    const pop = document.createElement('div');
+    pop.className = 'studio-pop hidden';
+    // El contenido se monta al abrir: así refleja el estado de ese momento
+    // (la rejilla, el color, si la vista previa está plegada...).
+    // El cierre global va por `pointerdown`, que llega antes que el `click`: sin
+    // pararlo aquí, volver a pulsar el botón cerraría el menú y lo abriría otra
+    // vez, y no habría forma de cerrarlo desde donde se abrió.
+    btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const open = !pop.classList.contains('hidden');
+      closeMenus();
+      if (open) return;
+      pop.innerHTML = '';
+      build(pop);
+      pop.classList.remove('hidden');
+      btn.classList.add('on');
+      // Si no cabe hacia la derecha, se descuelga por el otro lado.
+      pop.classList.remove('right');
+      const box = pop.getBoundingClientRect();
+      if (box.right > window.innerWidth - 8) pop.classList.add('right');
     };
-    color.appendChild(colorSel);
-    view.appendChild(color);
+    // Sin esto, el cierre global se dispararía al tocar dentro del propio menú.
+    pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+    wrap.append(btn, pop);
+    return wrap;
+  }
 
-    bar.append(palette, view);
+  /** Una fila de menú que hace algo y lo cierra. */
+  menuButton(label, title, fn) {
+    const b = document.createElement('button');
+    b.className = 'studio-menu-item';
+    b.textContent = label;
+    b.title = title;
+    b.onclick = () => { closeMenus(); fn(); };
+    return b;
+  }
+
+  /** Pliega o despliega la vista previa horneada. */
+  foldPreview(folded) {
+    this.foldedPreview = folded;
+    el('studio-card').dataset.preview = folded ? 'off' : 'on';
+    el('btn-studio-preview').textContent = folded ? '▸ Vista previa' : '▾ Vista previa';
+    if (!folded) this.renderPreview();
   }
 
   /** Los botones que añaden pieza. Salen en la barra y en la pestaña Añadir. */
@@ -415,7 +485,7 @@ export class Studio {
       b.innerHTML = '<span class="studio-glyph"></span><span class="studio-piece-name"></span>';
       b.querySelector('.studio-glyph').textContent = spec.glyph;
       b.querySelector('.studio-piece-name').textContent = spec.label;
-      b.onclick = () => this.addPart(k);
+      b.onclick = () => { closeMenus(); this.addPart(k); };
       return b;
     });
   }
@@ -543,6 +613,11 @@ export class Studio {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const W = Math.max(120, Math.round(box.width)), H = Math.max(120, Math.round(box.height));
     if (c.width !== W * dpr || c.height !== H * dpr) {
+      // Al cambiar de tamaño (al plegar la hoja, al girar el teléfono) se
+      // corrige el encuadre para que lo que estaba en el centro siga estando en
+      // el centro, sin tocar el zoom que hubiera puesto quien modela.
+      if (this.lastW) { this.ox += (W - this.lastW) / 2; this.oy += (H - this.lastH) / 2; }
+      this.lastW = W; this.lastH = H;
       c.width = W * dpr; c.height = H * dpr;
     }
     const ctx = c.getContext('2d');
@@ -1024,24 +1099,11 @@ export class Studio {
       box.innerHTML = '<p class="cat-empty">Crea un edificio para empezar.</p>';
       return;
     }
-    if (this.tab === 'add') box.appendChild(this.addPanel());
-    else if (this.tab === 'part') box.appendChild(this.partPanel());
+    if (this.tab === 'part') box.appendChild(this.partPanel());
     else if (this.tab === 'build') box.appendChild(this.buildPanel());
     else box.appendChild(this.colorPanel());
   }
 
-  /** La paleta a lo ancho, con botones grandes: así se pulsa con el dedo. */
-  addPanel() {
-    const wrap = document.createElement('div');
-    const grid = document.createElement('div');
-    grid.className = 'studio-add-grid';
-    for (const b of this.paletteButtons()) grid.appendChild(b);
-    const hint = document.createElement('p');
-    hint.className = 'studio-hint-text';
-    hint.textContent = 'La pieza nueva aparece encima de la que tengas elegida, lista para colocarla.';
-    wrap.append(hint, grid);
-    return wrap;
-  }
 
   templatePanel() {
     const wrap = document.createElement('div');
@@ -1316,6 +1378,15 @@ export class Studio {
 
 // --- Ayudas -----------------------------------------------------------------
 
+/** Cierra cualquier menú desplegable que hubiera abierto. */
+function closeMenus() {
+  for (const pop of document.querySelectorAll('.studio-pop:not(.hidden)')) {
+    pop.classList.add('hidden');
+    pop.previousElementSibling?.classList.remove('on');
+  }
+}
+document.addEventListener('pointerdown', closeMenus);
+
 function pointInTri(px, py, [a, b, c]) {
   const d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
   if (Math.abs(d) < 1e-9) return false;
@@ -1370,18 +1441,27 @@ function clampField(key, v) {
 
 const round = (v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v);
 
-function group(title, rows) {
-  const sec = document.createElement('section');
-  sec.className = 'cat-group';
-  if (title) {
-    const h = document.createElement('h4');
-    h.textContent = title;
-    sec.appendChild(h);
-  }
+/**
+ * Un grupo de campos que se puede plegar. Con título sale como desplegable
+ * (abierto de partida) para poder cerrar lo que no se está tocando; sin título
+ * es una rejilla suelta.
+ */
+function group(title, rows, open = true) {
   const grid = document.createElement('div');
   grid.className = 'cat-grid';
   for (const r of rows) grid.appendChild(r);
-  sec.appendChild(grid);
+  if (!title) {
+    const sec = document.createElement('section');
+    sec.className = 'cat-group';
+    sec.appendChild(grid);
+    return sec;
+  }
+  const sec = document.createElement('details');
+  sec.className = 'cat-group studio-group';
+  sec.open = open;
+  const sum = document.createElement('summary');
+  sum.textContent = title;
+  sec.append(sum, grid);
   return sec;
 }
 
