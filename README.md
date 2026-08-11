@@ -163,11 +163,17 @@ estandartes, escalinatas, cercas, pilas de troncos y barriles— colocadas sobre
 la huella que ocupará en el mapa:
 
 - **Se coloca arrastrando**: pulsa una pieza en el modelo y muévela por el
-  suelo; con **Mayús** sube y baja. La rueda acerca y aleja, y arrastrar el
-  fondo mueve la vista. Las flechas la empujan de casilla en casilla (con
-  **Alt** en vertical), **Supr** la borra y **Ctrl+Z** deshace.
+  suelo. La rueda acerca y aleja, y arrastrar el fondo mueve la vista.
+- Debajo del modelo hay una **cruceta**: sus cuatro flechas empujan la pieza un
+  paso de rejilla en la dirección que se ve, y las otras dos la suben y la
+  bajan. Al lado, duplicar y borrar.
+- Para **subir y bajar arrastrando**, el botón **Mover / Altura** (o mantener
+  **Mayús**) cambia lo que hace el arrastre.
 - **Girar vista** enseña el modelo desde otro lado sin tocar el edificio, que
-  para eso la cámara del juego es fija.
+  para eso la cámara del juego es fija. Las flechas y la cruceta giran con la
+  vista: siempre empujan hacia donde apuntan en la pantalla.
+- Con **teclado**: flechas para mover (con **Alt**, arriba y abajo), **Mayús**
+  para ir de cuatro en cuatro, **Supr** borra y **Ctrl+Z** deshace.
 - Lo que se ve mientras se modela usa **la misma proyección y la misma luz** que
   el horneado, y debajo están las **tres etapas de obra ya horneadas** a tamaño
   de partida: cimientos, en obra y terminado. Las de en medio salen solas, no
@@ -179,6 +185,23 @@ la huella que ocupará en el mapa:
 - En **Colores** se le da color a cada material que use. El **color del
   jugador** no se elige: lo pone quien construya el edificio, así que conviene
   darle a alguna pieza (un estandarte, un paño) ese material.
+
+### En móvil y tablet
+
+El taller cabe en un teléfono sin renunciar a nada:
+
+- La **mesa se lleva toda la pantalla** y los paneles pasan a una hoja de abajo
+  con pestañas —Añadir, Pieza, Edificio, Colores y Míos—, de la que sólo se ve
+  una cosa a la vez. El botón de la esquina la **pliega** para mirar el modelo
+  a pantalla completa. En apaisado la hoja se pone de pie a la derecha.
+- **Un dedo** elige y arrastra piezas; con el botón **Altura** puesto, ese mismo
+  arrastre las sube y las baja. **Dos dedos** acercan, alejan y mueven la vista,
+  y nunca descolocan la pieza: al apoyar el segundo dedo, lo que hubiera movido
+  el primero se deshace.
+- Los toques tienen **margen**: si no aciertas de lleno en una pieza se coge la
+  que tengas más cerca, que un dedo tapa más de lo que apunta.
+- Los números llevan botones de **menos y más** para afinar sin sacar el
+  teclado.
 
 Los edificios hechos aquí se guardan **en ese navegador**, salen en la barra de
 construcción de los aldeanos con su coste y su tecla, aparecen en el catálogo

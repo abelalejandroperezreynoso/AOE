@@ -264,7 +264,7 @@ export const PARTS = {
   },
 
   door: {
-    label: 'Puerta', glyph: '▯',
+    label: 'Puerta', glyph: '□',
     hint: 'Se pega sobre una cara: ponla justo en el plano del muro que mira a la cámara.',
     fields: ['x', 'y', 'z', 'w', 'h', 'face'],
     def: { x: 2, y: 1, z: 0, w: 0.45, h: 0.6, face: 'x', m: 'door' },
