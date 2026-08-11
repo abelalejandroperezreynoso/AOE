@@ -160,6 +160,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 window.__lobbyUi = lobbyUi; // útil para depurar la conexión desde la consola
+window.__studio = studio;   // y el taller, para trastear con un diseño a mano
 
 // Si se cierra la pestaña estando en la sala, se avisa para no dejar un
 // jugador fantasma en la lista de los demás.
