@@ -43,7 +43,11 @@ export class Studio {
     this.snap = 0.05;
     this.undo = [];
     this.picks = [];         // triángulos ya proyectados, para saber qué se pulsa
+    this.anchors = [];       // el ancla de cada pieza en pantalla, para el dedo
     this.drag = null;
+    this.moveMode = 'xy';    // 'xy' por el suelo, 'z' en vertical (con el dedo)
+    this.pointers = new Map(); // dedos o punteros que hay ahora mismo encima
+    this.pinch = null;
     this.bind();
   }
 
@@ -62,28 +66,51 @@ export class Studio {
       this.renderList();
       return this.status(`Copiado como «${d.name}».`);
     };
-    el('btn-studio-del').onclick = () => this.confirmDelete();
+    el('btn-studio-del').onclick = (e) => this.confirmDelete(e.currentTarget);
 
     for (const btn of document.querySelectorAll('#studio-tabs button')) {
-      btn.onclick = () => {
-        this.tab = btn.dataset.tab;
-        for (const b of document.querySelectorAll('#studio-tabs button')) {
-          b.classList.toggle('active', b === btn);
-        }
-        this.renderPanel();
-      };
+      btn.onclick = () => this.showTab(btn.dataset.tab);
     }
+    // Con el móvil los paneles van en una hoja de abajo; plegarla deja el
+    // modelo a pantalla completa, que es lo que se quiere para mirarlo.
+    el('btn-studio-sheet').onclick = () => {
+      const card = el('studio-card');
+      card.dataset.sheet = card.dataset.sheet === 'off' ? 'on' : 'off';
+      el('btn-studio-sheet').textContent = card.dataset.sheet === 'off' ? '⌃' : '⌄';
+    };
 
     const c = el('studio-view');
     c.addEventListener('pointerdown', (e) => this.onDown(e));
     c.addEventListener('pointermove', (e) => this.onMove(e));
     c.addEventListener('pointerup', (e) => this.onUp(e));
-    c.addEventListener('pointercancel', () => { this.drag = null; });
+    c.addEventListener('pointercancel', (e) => this.onUp(e));
     c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
 
     window.addEventListener('keydown', (e) => this.onKey(e));
-    window.addEventListener('resize', () => { if (this.isOpen()) this.redraw(); });
+    // El lienzo cambia de tamaño sin que cambie la ventana: al plegar la hoja,
+    // al girar el teléfono o al abrirse el teclado. Vale más mirar la mesa.
+    if (window.ResizeObserver) {
+      new ResizeObserver(() => { if (this.isOpen()) this.redraw(); }).observe(el('studio-stage'));
+    } else {
+      window.addEventListener('resize', () => { if (this.isOpen()) this.redraw(); });
+    }
+    this.buildPad();
+  }
+
+  /** Cambia de pestaña (y, en el móvil, de hoja). */
+  showTab(tab) {
+    this.tab = tab;
+    for (const b of document.querySelectorAll('#studio-tabs button')) {
+      b.classList.toggle('active', b.dataset.tab === tab);
+    }
+    const card = el('studio-card');
+    card.dataset.mtab = tab;
+    if (card.dataset.sheet === 'off') {
+      card.dataset.sheet = 'on';
+      el('btn-studio-sheet').textContent = '⌄';
+    }
+    this.renderPanel();
   }
 
   isOpen() { return !el('studio').classList.contains('hidden'); }
@@ -94,12 +121,10 @@ export class Studio {
     this.renderTools();
     this.renderList();
     const first = allDesigns()[0];
-    if (first) { this.load(first.id); return; }
+    if (first) { this.showTab(this.tab === 'new' ? 'part' : this.tab); this.load(first.id); return; }
     // Sin nada guardado se enseñan las plantillas: es la primera visita.
-    this.tab = 'new';
-    for (const b of document.querySelectorAll('#studio-tabs button')) b.classList.remove('active');
+    this.showTab('new');
     this.clearView();
-    this.renderPanel();
   }
 
   close() {
@@ -132,9 +157,7 @@ export class Studio {
 
   askTemplate() {
     if (!canAddDesign()) { this.status(`No caben más de ${MAX_DESIGNS} edificios.`); return; }
-    this.tab = 'new';
-    for (const b of document.querySelectorAll('#studio-tabs button')) b.classList.remove('active');
-    this.renderPanel();
+    this.showTab('new');
   }
 
   newDesign(templateKey) {
@@ -144,16 +167,12 @@ export class Studio {
     if (!saved) { this.status('No se ha podido crear el edificio.'); return; }
     captureBuilding(saved.id);
     clearSpriteCaches();
-    this.tab = 'part';
-    for (const b of document.querySelectorAll('#studio-tabs button')) {
-      b.classList.toggle('active', b.dataset.tab === 'part');
-    }
+    this.showTab('part');
     this.load(saved.id);
     this.status(`«${saved.name}» ya se puede construir en la partida.`);
   }
 
-  confirmDelete() {
-    const btn = el('btn-studio-del');
+  confirmDelete(btn = el('btn-studio-del')) {
     if (!this.design) return;
     if (!this.confirming) {
       this.confirming = true;
@@ -179,9 +198,11 @@ export class Studio {
   cancelDelete() {
     clearTimeout(this.delTimer);
     this.confirming = false;
-    const btn = el('btn-studio-del');
-    btn.textContent = 'Borrar';
-    btn.classList.remove('confirming');
+    // Hay dos botones de borrar: el de la columna y el de la hoja del móvil.
+    for (const b of document.querySelectorAll('.studio-del-btn')) {
+      b.textContent = 'Borrar';
+      b.classList.remove('confirming');
+    }
   }
 
   /**
@@ -237,7 +258,17 @@ export class Studio {
   // --- Lista de edificios -----------------------------------------------------
 
   renderList() {
-    const list = el('studio-list');
+    this.fillList(el('studio-list'));
+    // En pantallas pequeñas la lista vive en la hoja de abajo, en su pestaña.
+    if (this.tab === 'list') this.fillList(el('studio-panel').querySelector('.studio-list-panel'));
+    el('btn-studio-dup').disabled = !this.design;
+    el('btn-studio-del').disabled = !this.design;
+    el('btn-studio-new').disabled = !canAddDesign();
+  }
+
+  /** Pinta los edificios guardados en una lista cualquiera. */
+  fillList(list) {
+    if (!list) return;
     list.innerHTML = '';
     const designs = allDesigns();
     if (!designs.length) {
@@ -261,9 +292,32 @@ export class Studio {
       li.onclick = () => { this.persist(true); this.load(d.id); };
       list.appendChild(li);
     }
-    el('btn-studio-dup').disabled = !this.design;
-    el('btn-studio-del').disabled = !this.design;
-    el('btn-studio-new').disabled = !canAddDesign();
+  }
+
+  /** La misma lista, con sus botones, para la hoja del móvil. */
+  listPanel() {
+    const wrap = document.createElement('div');
+    const ul = document.createElement('ul');
+    ul.className = 'catalog-list studio-list-panel';
+    this.fillList(ul);
+    const acts = document.createElement('div');
+    acts.className = 'studio-actions';
+    const mk = (text, fn, cls = '') => {
+      const b = document.createElement('button');
+      b.textContent = text;
+      b.className = cls;
+      b.onclick = fn;
+      return b;
+    };
+    const nuevo = mk('Nuevo edificio', () => this.askTemplate());
+    nuevo.disabled = !canAddDesign();
+    const dup = mk('Duplicar', () => el('btn-studio-dup').click());
+    const del = mk('Borrar', (e) => this.confirmDelete(e.currentTarget), 'studio-del studio-del-btn');
+    dup.disabled = !this.design;
+    del.disabled = !this.design;
+    acts.append(nuevo, dup, del);
+    wrap.append(ul, acts);
+    return wrap;
   }
 
   /** Miniatura horneada de un diseño, encajada en su hueco. */
@@ -289,17 +343,7 @@ export class Studio {
 
     const palette = document.createElement('div');
     palette.className = 'studio-palette';
-    for (const k of PART_KEYS) {
-      const spec = PARTS[k];
-      const b = document.createElement('button');
-      b.className = 'studio-piece';
-      b.title = `${spec.label} — ${spec.hint}`;
-      b.innerHTML = '<span class="studio-glyph"></span><span class="studio-piece-name"></span>';
-      b.querySelector('.studio-glyph').textContent = spec.glyph;
-      b.querySelector('.studio-piece-name').textContent = spec.label;
-      b.onclick = () => this.addPart(k);
-      palette.appendChild(b);
-    }
+    for (const b of this.paletteButtons()) palette.appendChild(b);
 
     const view = document.createElement('div');
     view.className = 'studio-view-tools';
@@ -311,6 +355,21 @@ export class Studio {
       b.onclick = fn;
       return b;
     };
+
+    /*
+     * Mover por el suelo o subir y bajar. Con ratón basta Mayús, pero con el
+     * dedo no hay Mayús que valga: sin este interruptor no habría manera de
+     * levantar una pieza del suelo en un móvil.
+     */
+    this.modeBtn = mkBtn('⇕ Altura', 'Con la altura puesta, arrastrar sube y baja la pieza en vez de moverla por el suelo', () => {
+      this.moveMode = this.moveMode === 'z' ? 'xy' : 'z';
+      this.modeBtn.classList.toggle('on', this.moveMode === 'z');
+      this.modeBtn.textContent = this.moveMode === 'z' ? '⇕ Altura' : '✥ Mover';
+      this.updatePad();
+    });
+    this.modeBtn.textContent = '✥ Mover';
+    view.appendChild(this.modeBtn);
+
     view.appendChild(mkBtn('↻ Girar vista', 'Mira el modelo desde otro lado. No cambia el edificio.', () => {
       this.viewYaw = (this.viewYaw + 1) % 4;
       this.redraw();
@@ -346,6 +405,21 @@ export class Studio {
     bar.append(palette, view);
   }
 
+  /** Los botones que añaden pieza. Salen en la barra y en la pestaña Añadir. */
+  paletteButtons() {
+    return PART_KEYS.map((k) => {
+      const spec = PARTS[k];
+      const b = document.createElement('button');
+      b.className = 'studio-piece';
+      b.title = `${spec.label} — ${spec.hint}`;
+      b.innerHTML = '<span class="studio-glyph"></span><span class="studio-piece-name"></span>';
+      b.querySelector('.studio-glyph').textContent = spec.glyph;
+      b.querySelector('.studio-piece-name').textContent = spec.label;
+      b.onclick = () => this.addPart(k);
+      return b;
+    });
+  }
+
   // --- Piezas -----------------------------------------------------------------
 
   addPart(kind) {
@@ -366,6 +440,9 @@ export class Studio {
     if (p.z !== undefined && sel) p.z = Math.min(FIELDS.z.max, this.topOf(sel));
     this.design.parts.push(p);
     this.selected = this.design.parts.length - 1;
+    // Quien acaba de añadir una pieza quiere colocarla: se pasa a su ficha, que
+    // en el móvil además es cambiar de hoja (la paleta tapaba el resultado).
+    if (this.tab !== 'part') this.showTab('part');
     this.afterChange();
     this.status(`${spec.label} añadida.`);
   }
@@ -405,6 +482,9 @@ export class Studio {
     ctx.clearRect(0, 0, c.width, c.height);
     el('studio-shots').innerHTML = '';
     el('studio-info').textContent = '';
+    this.picks = [];
+    this.anchors = [];
+    el('studio-pad').classList.add('hidden');
   }
 
   /** Punto del mundo (ya girado por la vista) a píxeles del lienzo. */
@@ -447,10 +527,14 @@ export class Studio {
       if (px < x0) x0 = px; if (px > x1) x1 = px;
       if (py < y0) y0 = py; if (py > y1) y1 = py;
     }
-    const pad = 24;
-    this.zoom = Math.max(1.5, Math.min(12, Math.min((W - pad * 2) / (x1 - x0 || 1), (H - pad * 2) / (y1 - y0 || 1))));
+    // Arriba está la cinta de datos y abajo la cruceta: el modelo se encaja en
+    // lo que queda entre las dos, para que no lo tapen.
+    const pad = 18, top = 24, bottom = 44;
+    const usable = Math.max(60, H - top - bottom);
+    this.zoom = Math.max(1.5, Math.min(12,
+      Math.min((W - pad * 2) / (x1 - x0 || 1), usable / (y1 - y0 || 1))));
     this.ox = W / 2 - ((x0 + x1) / 2) * this.zoom;
-    this.oy = H / 2 - ((y0 + y1) / 2) * this.zoom;
+    this.oy = top + usable / 2 - ((y0 + y1) / 2) * this.zoom;
   }
 
   redraw() {
@@ -490,6 +574,15 @@ export class Studio {
     }
     list.sort((a, b) => b.dep - a.dep);
     this.picks = list;
+    // El ancla de cada pieza en pantalla: es a lo que se agarra un dedo cuando
+    // no acierta de lleno en una cara.
+    this.anchors = [];
+    this.design.parts.forEach((p, i) => {
+      if (p.x === undefined) return;
+      const [rx, ry] = this.spin(p.x, p.y);
+      const [ax, ay] = this.toScreen([rx, ry, p.z || 0]);
+      this.anchors.push({ gi: i, x: ax, y: ay });
+    });
 
     for (const it of list) {
       const l = it.light;
@@ -508,7 +601,8 @@ export class Studio {
     }
 
     this.drawSelection(ctx);
-    this.drawLegend(ctx, W, H);
+    this.drawLegend(ctx, W);
+    this.updatePad();
   }
 
   /** La huella del edificio: las casillas que ocupará en el mapa. */
@@ -587,63 +681,124 @@ export class Studio {
     ctx.fill();
   }
 
-  drawLegend(ctx, W, H) {
+  /**
+   * La cinta de arriba: dónde está la pieza y cómo se mueve. Va arriba para no
+   * pelearse con la cruceta, y en un lienzo estrecho se queda en lo
+   * imprescindible en vez de salirse por el borde.
+   */
+  drawLegend(ctx, W) {
     const part = this.design.parts[this.selected];
     ctx.fillStyle = 'rgba(20,16,11,.65)';
-    ctx.fillRect(0, H - 22, W, 22);
+    ctx.fillRect(0, 0, W, 22);
     ctx.fillStyle = '#d5c6a2';
     ctx.font = '12px "Trebuchet MS", sans-serif';
     ctx.textAlign = 'left';
     const pos = part && part.x !== undefined
-      ? ` · en (${part.x.toFixed(2)}, ${part.y.toFixed(2)}, ${(part.z || 0).toFixed(2)})`
-      : '';
-    ctx.fillText(
-      `Arrastra para mover · Mayús + arrastrar sube y baja · rueda para el zoom${pos}`,
-      10, H - 7,
-    );
+      ? `(${part.x.toFixed(2)}, ${part.y.toFixed(2)}, ${(part.z || 0).toFixed(2)})`
+      : 'Nada elegido';
+    const how = this.moveMode === 'z'
+      ? 'arrastrar sube y baja'
+      : 'arrastra para mover · dos dedos o rueda para el zoom';
+    ctx.fillText(W < 420 ? pos : `${pos} · ${how}`, 10, 15);
   }
 
-  // --- Ratón ------------------------------------------------------------------
+  // --- Ratón y dedos ----------------------------------------------------------
 
   pointerAt(e) {
     const box = el('studio-view').getBoundingClientRect();
     return [e.clientX - box.left, e.clientY - box.top];
   }
 
-  /** Qué pieza hay bajo el puntero: la cara más cercana que lo contiene. */
-  pick(px, py) {
+  /**
+   * Qué pieza hay bajo el puntero: la cara más cercana que lo contiene. Si no
+   * cae en ninguna se coge la pieza cuyo ancla esté más cerca, dentro de un
+   * margen: un dedo tapa mucho más de lo que apunta, y una viga de dos píxeles
+   * sería imposible de pillar si hubiera que acertarla justo.
+   */
+  pick(px, py, slack = 0) {
     for (let i = this.picks.length - 1; i >= 0; i--) {
       const it = this.picks[i];
       if (pointInTri(px, py, it.pts)) return it.gi;
     }
-    return -1;
+    if (!slack) return -1;
+    let best = -1, bestD = slack * slack;
+    for (const a of this.anchors) {
+      const d = (a.x - px) ** 2 + (a.y - py) ** 2;
+      if (d < bestD) { bestD = d; best = a.gi; }
+    }
+    return best;
   }
+
+  /** Margen de acierto: con el dedo hace falta bastante más que con el ratón. */
+  slackFor(e) { return e.pointerType === 'mouse' ? 6 : 26; }
 
   onDown(e) {
     if (!this.design) return;
-    el('studio-view').setPointerCapture(e.pointerId);
     const [px, py] = this.pointerAt(e);
-    const hit = e.button === 2 ? -1 : this.pick(px, py);
+    this.pointers.set(e.pointerId, [px, py]);
+    el('studio-view').setPointerCapture(e.pointerId);
+    if (this.pointers.size >= 2) { this.startPinch(); return; }
+
+    const hit = e.button === 2 ? -1 : this.pick(px, py, this.slackFor(e));
     if (hit >= 0 && this.design.parts[hit]) {
       if (hit !== this.selected) { this.selected = hit; this.renderPanel(); }
       const part = this.design.parts[hit];
       this.drag = {
-        mode: e.shiftKey ? 'z' : 'xy',
+        mode: e.shiftKey || this.moveMode === 'z' ? 'z' : 'xy',
         px, py, moved: false,
         start: { x: part.x, y: part.y, z: part.z },
       };
       this.pushUndo();
     } else {
-      this.drag = { mode: 'pan', px, py, moved: false, ox: this.ox, oy: this.oy, hit };
+      this.drag = { mode: 'pan', px, py, moved: false, ox: this.ox, oy: this.oy };
     }
     this.redraw();
   }
 
+  /**
+   * Empieza un pellizco. El arrastre de pieza que hubiera se cancela y la pieza
+   * vuelve donde estaba: al apoyar el segundo dedo el primero siempre se mueve
+   * un poco, y sería muy fácil descolocar algo sin querer al ir a hacer zoom.
+   */
+  startPinch() {
+    if (this.drag && this.drag.start) {
+      const part = this.design.parts[this.selected];
+      if (part) Object.assign(part, this.drag.start);
+      this.undo.pop();
+    }
+    this.drag = null;
+    const [a, b] = [...this.pointers.values()];
+    this.pinch = {
+      dist: Math.max(1, Math.hypot(b[0] - a[0], b[1] - a[1])),
+      mid: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2],
+      zoom: this.zoom, ox: this.ox, oy: this.oy,
+    };
+    this.redraw();
+  }
+
   onMove(e) {
-    if (!this.drag || !this.design) return;
+    if (!this.design) return;
     const [px, py] = this.pointerAt(e);
+    if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, [px, py]);
+
+    // Dos dedos: pellizcar acerca y aleja, y moverlos arrastra la vista. El
+    // punto que estaba entre los dedos se queda entre los dedos.
+    if (this.pinch) {
+      if (this.pointers.size < 2) return;
+      const [a, b] = [...this.pointers.values()];
+      const dist = Math.max(1, Math.hypot(b[0] - a[0], b[1] - a[1]));
+      const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const next = Math.max(1.5, Math.min(16, (this.pinch.zoom * dist) / this.pinch.dist));
+      this.zoom = next;
+      this.ox = mid[0] - ((this.pinch.mid[0] - this.pinch.ox) / this.pinch.zoom) * next;
+      this.oy = mid[1] - ((this.pinch.mid[1] - this.pinch.oy) / this.pinch.zoom) * next;
+      this.redraw();
+      return;
+    }
+
+    if (!this.drag) return;
     const dsx = px - this.drag.px, dsy = py - this.drag.py;
-    if (Math.abs(dsx) > 2 || Math.abs(dsy) > 2) this.drag.moved = true;
+    if (Math.abs(dsx) > 3 || Math.abs(dsy) > 3) this.drag.moved = true;
 
     if (this.drag.mode === 'pan') {
       this.ox = this.drag.ox + dsx;
@@ -660,26 +815,46 @@ export class Studio {
       part.z = clampField('z', snapTo(this.drag.start.z + dz, this.snap));
     } else {
       if (part.x === undefined) return;
-      // Del desplazamiento en pantalla al desplazamiento en el suelo, y de ahí
-      // deshaciendo el giro de la vista para llegar a los ejes del edificio.
-      const rx = (dsx / (HW * this.zoom) + dsy / (HH * this.zoom)) / 2;
-      const ry = (dsy / (HH * this.zoom) - dsx / (HW * this.zoom)) / 2;
-      const a = -(this.viewYaw * Math.PI) / 2;
-      const dx = rx * Math.cos(a) - ry * Math.sin(a);
-      const dy = rx * Math.sin(a) + ry * Math.cos(a);
+      const [dx, dy] = this.screenToGround(dsx, dsy);
       part.x = clampField('x', snapTo(this.drag.start.x + dx, this.snap));
       part.y = clampField('y', snapTo(this.drag.start.y + dy, this.snap));
     }
     this.redraw();
+    this.updatePad();
+  }
+
+  /**
+   * Del desplazamiento en pantalla al desplazamiento por el suelo, deshaciendo
+   * el giro de la vista: se arrastra hacia donde se mira, no hacia donde
+   * apuntan los ejes del edificio.
+   */
+  screenToGround(dsx, dsy) {
+    const rx = (dsx / (HW * this.zoom) + dsy / (HH * this.zoom)) / 2;
+    const ry = (dsy / (HH * this.zoom) - dsx / (HW * this.zoom)) / 2;
+    return this.unspin(rx, ry);
+  }
+
+  /** Un vector de la vista girada a los ejes del edificio. */
+  unspin(rx, ry) {
+    const a = -(this.viewYaw * Math.PI) / 2;
+    return [rx * Math.cos(a) - ry * Math.sin(a), rx * Math.sin(a) + ry * Math.cos(a)];
   }
 
   onUp(e) {
+    this.pointers.delete(e.pointerId);
+    if (this.pinch) {
+      // El pellizco no acaba hasta que se levantan todos los dedos: si no, al
+      // soltar uno el otro se pondría a arrastrar piezas de golpe.
+      if (!this.pointers.size) this.pinch = null;
+      return;
+    }
     if (!this.drag) return;
     const wasPan = this.drag.mode === 'pan';
     const moved = this.drag.moved;
     this.drag = null;
     if (wasPan) {
-      // Un clic limpio en el suelo suelta la selección; arrastrar sólo movía la vista.
+      // Un toque limpio en el suelo suelta la selección; arrastrar sólo movía
+      // la vista.
       if (!moved && e.button !== 2 && this.selected >= 0) {
         this.selected = -1;
         this.renderPanel();
@@ -711,21 +886,84 @@ export class Studio {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); this.undoLast(); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); this.duplicatePart(); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.deletePart(); return; }
+    if (!this.design?.parts[this.selected]) return;
+    // Las flechas empujan hacia donde apuntan en pantalla, y con Alt suben y
+    // bajan la pieza. Van por pasos de la rejilla elegida.
+    const big = e.shiftKey ? 4 : 1;
+    const dir = {
+      ArrowRight: [1, 0, 0], ArrowLeft: [-1, 0, 0],
+      ArrowDown: [0, 1, 0], ArrowUp: [0, -1, 0],
+    }[e.key];
+    if (!dir) return;
+    e.preventDefault();
+    if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+      this.nudge(0, 0, (e.key === 'ArrowUp' ? 1 : -1) * big);
+    } else {
+      this.nudge(dir[0] * big, dir[1] * big, 0);
+    }
+  }
+
+  // --- Cruceta ----------------------------------------------------------------
+
+  /**
+   * Los botones flotantes que empujan la pieza. Con el dedo son la forma fina
+   * de colocar algo —arrastrar sirve para ponerlo más o menos y esto para
+   * clavarlo—, y sustituyen a unas flechas de teclado que en un móvil no hay.
+   * Las direcciones son las de la pantalla, así que siguen al giro de la vista.
+   */
+  buildPad() {
+    const pad = el('studio-pad');
+    const mk = (glyph, title, fn, cls = '') => {
+      const b = document.createElement('button');
+      b.textContent = glyph;
+      b.title = title;
+      b.className = cls;
+      b.onclick = fn;
+      return b;
+    };
+    const cross = document.createElement('div');
+    cross.className = 'studio-cross';
+    cross.append(
+      mk('↖', 'Mover hacia arriba a la izquierda', () => this.nudge(-1, 0, 0)),
+      mk('↗', 'Mover hacia arriba a la derecha', () => this.nudge(0, -1, 0)),
+      mk('↙', 'Mover hacia abajo a la izquierda', () => this.nudge(0, 1, 0)),
+      mk('↘', 'Mover hacia abajo a la derecha', () => this.nudge(1, 0, 0)),
+    );
+    const lift = document.createElement('div');
+    lift.className = 'studio-lift';
+    lift.append(
+      mk('▲', 'Subir la pieza', () => this.nudge(0, 0, 1)),
+      mk('▼', 'Bajar la pieza', () => this.nudge(0, 0, -1)),
+    );
+    const acts = document.createElement('div');
+    acts.className = 'studio-pad-acts';
+    acts.append(
+      mk('⧉', 'Duplicar la pieza', () => this.duplicatePart()),
+      mk('✕', 'Borrar la pieza', () => this.deletePart(), 'studio-del'),
+    );
+    pad.append(cross, lift, acts);
+  }
+
+  /** Empuja la pieza un paso de rejilla en la dirección que se ve. */
+  nudge(dxr, dyr, dz) {
     const part = this.design?.parts[this.selected];
     if (!part) return;
-    const step = e.shiftKey ? this.snap * 4 : this.snap;
-    const nudge = (key, delta) => {
-      if (part[key] === undefined) return;
-      this.pushUndo();
-      part[key] = clampField(key, snapTo(part[key] + delta, this.snap));
-      e.preventDefault();
-      this.afterChange();
-    };
-    // Las flechas mueven por el suelo tal y como se ve; ↑↓ con Alt suben la pieza.
-    if (e.key === 'ArrowUp') nudge(e.altKey ? 'z' : 'y', e.altKey ? step : -step);
-    else if (e.key === 'ArrowDown') nudge(e.altKey ? 'z' : 'y', e.altKey ? -step : step);
-    else if (e.key === 'ArrowLeft') nudge('x', -step);
-    else if (e.key === 'ArrowRight') nudge('x', step);
+    const step = this.snap || 0.05;
+    this.pushUndo();
+    if (dz && part.z !== undefined) part.z = clampField('z', snapTo(part.z + dz * step, step));
+    if ((dxr || dyr) && part.x !== undefined) {
+      const [dx, dy] = this.unspin(dxr * step, dyr * step);
+      part.x = clampField('x', snapTo(part.x + dx, step));
+      part.y = clampField('y', snapTo(part.y + dy, step));
+    }
+    this.afterChange();
+  }
+
+  /** La cruceta sólo está cuando hay algo que empujar. */
+  updatePad() {
+    const part = this.design?.parts[this.selected];
+    el('studio-pad').classList.toggle('hidden', !part);
+    el('studio-view').classList.toggle('lifting', this.moveMode === 'z');
   }
 
   // --- Vista previa horneada --------------------------------------------------
@@ -779,13 +1017,30 @@ export class Studio {
     const box = el('studio-panel');
     box.innerHTML = '';
     if (this.tab === 'new') { box.appendChild(this.templatePanel()); return; }
+    // "Míos" trae la lista de edificios a la hoja: en un móvil no hay sitio
+    // para tenerla siempre en una columna aparte.
+    if (this.tab === 'list') { box.appendChild(this.listPanel()); return; }
     if (!this.design) {
       box.innerHTML = '<p class="cat-empty">Crea un edificio para empezar.</p>';
       return;
     }
-    if (this.tab === 'part') box.appendChild(this.partPanel());
+    if (this.tab === 'add') box.appendChild(this.addPanel());
+    else if (this.tab === 'part') box.appendChild(this.partPanel());
     else if (this.tab === 'build') box.appendChild(this.buildPanel());
     else box.appendChild(this.colorPanel());
+  }
+
+  /** La paleta a lo ancho, con botones grandes: así se pulsa con el dedo. */
+  addPanel() {
+    const wrap = document.createElement('div');
+    const grid = document.createElement('div');
+    grid.className = 'studio-add-grid';
+    for (const b of this.paletteButtons()) grid.appendChild(b);
+    const hint = document.createElement('p');
+    hint.className = 'studio-hint-text';
+    hint.textContent = 'La pieza nueva aparece encima de la que tengas elegida, lista para colocarla.';
+    wrap.append(hint, grid);
+    return wrap;
   }
 
   templatePanel() {
@@ -872,28 +1127,21 @@ export class Studio {
     const name = document.createElement('span');
     name.className = 'cat-label';
     name.textContent = f.unit ? `${f.label} (${f.unit})` : f.label;
-    let input;
     if (f.type === 'choice') {
-      input = document.createElement('select');
+      const input = document.createElement('select');
       for (const [v, label] of f.options) input.add(new Option(label, v));
       input.value = part[key];
       input.onchange = () => { this.pushUndo(); part[key] = input.value; this.afterChange(); };
-    } else {
-      input = document.createElement('input');
-      input.type = 'number';
-      input.min = f.min; input.max = f.max; input.step = f.step;
-      input.value = round(part[key]);
-      const commit = () => {
-        const v = Number(input.value);
-        this.pushUndo();
-        part[key] = Number.isFinite(v) ? clampField(key, v) : part[key];
-        input.value = round(part[key]);
-        this.afterChange();
-      };
-      input.onchange = commit;
-      input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
+      row.append(name, input);
+      return row;
     }
-    row.append(name, input);
+    const stepper = numberStepper(part[key], f, (v) => {
+      this.pushUndo();
+      part[key] = clampField(key, v);
+      this.afterChange();
+      return part[key];
+    });
+    row.append(name, stepper);
     return row;
   }
 
@@ -1003,19 +1251,11 @@ export class Studio {
     const name = document.createElement('span');
     name.className = 'cat-label';
     name.textContent = f.unit ? `${f.label} (${f.unit})` : f.label;
-    const input = document.createElement('input');
-    input.type = 'number';
-    input.min = f.min; input.max = f.max; input.step = f.step;
-    input.value = round(obj[f.key] ?? f.min);
-    const commit = () => {
-      const v = Number(input.value);
-      obj[f.key] = Number.isFinite(v) ? Math.min(f.max, Math.max(f.min, v)) : (obj[f.key] ?? f.min);
-      input.value = round(obj[f.key]);
+    row.append(name, numberStepper(obj[f.key] ?? f.min, f, (v) => {
+      obj[f.key] = Math.min(f.max, Math.max(f.min, v));
       this.afterChange();
-    };
-    input.onchange = commit;
-    input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
-    row.append(name, input);
+      return obj[f.key];
+    }));
     return row;
   }
 
@@ -1085,6 +1325,42 @@ function pointInTri(px, py, [a, b, c]) {
 }
 
 const snapTo = (v, step) => (step ? Math.round(v / step) * step : v);
+
+/**
+ * Un número con sus botones de menos y más. Escribir a mano sigue valiendo,
+ * pero en un móvil los pasos evitan sacar el teclado para bajar dos décimas, y
+ * los botoncitos que trae el navegador son inpulsables con el dedo.
+ */
+function numberStepper(value, f, apply) {
+  const wrap = document.createElement('span');
+  wrap.className = 'studio-num';
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.inputMode = 'decimal';
+  input.min = f.min; input.max = f.max; input.step = f.step;
+  input.value = round(value);
+  const set = (v) => { input.value = round(apply(v)); };
+  const bump = (dir) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'studio-bump';
+    b.textContent = dir > 0 ? '+' : '−';
+    b.title = dir > 0 ? 'Subir un paso' : 'Bajar un paso';
+    b.onclick = (e) => {
+      e.preventDefault();
+      const v = Number(input.value);
+      set((Number.isFinite(v) ? v : f.min) + dir * f.step);
+    };
+    return b;
+  };
+  input.onchange = () => {
+    const v = Number(input.value);
+    set(Number.isFinite(v) ? v : f.min);
+  };
+  input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
+  wrap.append(bump(-1), input, bump(1));
+  return wrap;
+}
 
 function clampField(key, v) {
   const f = FIELDS[key];
