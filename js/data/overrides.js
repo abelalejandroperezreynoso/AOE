@@ -155,6 +155,31 @@ function capture() {
   }
 }
 
+/**
+ * Da de alta los valores de fábrica de un edificio que aparece con la partida
+ * ya arrancada: los que hace el jugador en el taller. Sin esto el catálogo no
+ * sabría con qué comparar ni qué restablecer.
+ */
+export function captureBuilding(type) {
+  capture();
+  const def = BUILDINGS[type];
+  if (def) {
+    defaults.building[type] = {};
+    for (const f of fieldsFor('building', def)) defaults.building[type][f.key] = getPath(def, f.key);
+  }
+  const l = LOOK.building[type];
+  if (l) defaults.buildingLook[type] = { ...l };
+}
+
+/** Olvida un edificio que ya no existe y tira los cambios que tuviera. */
+export function forgetBuilding(type) {
+  delete defaults.building[type];
+  delete defaults.buildingLook[type];
+  delete overrides.building[type];
+  delete overrides.buildingLook[type];
+  save();
+}
+
 export function defaultValue(kind, type, key) {
   capture();
   if (kind === 'rate') return defaults.rate[type];
@@ -246,13 +271,18 @@ function restoreDefaults() {
     for (const [key, value] of Object.entries(values)) setPath(UNITS[type], key, value);
   }
   for (const [type, values] of Object.entries(defaults.building)) {
+    // Un edificio del taller puede haberse borrado (o haber cedido el sitio a
+    // los del anfitrión en una partida en red) desde que se tomó la copia.
+    if (!BUILDINGS[type]) continue;
     for (const [key, value] of Object.entries(values)) setPath(BUILDINGS[type], key, value);
   }
   for (const [type, values] of Object.entries(defaults.node)) RESOURCE_NODES[type].amount = values.amount;
   for (const [key, value] of Object.entries(defaults.rate)) GATHER_RATE[key] = value;
   for (const [key, value] of Object.entries(defaults.terrain)) TERRAIN_COLORS[key] = value;
   for (const [kind, sub] of Object.entries(LOOK_KINDS)) {
-    for (const [type, values] of Object.entries(defaults[kind])) Object.assign(LOOK[sub][type], values);
+    for (const [type, values] of Object.entries(defaults[kind])) {
+      if (LOOK[sub][type]) Object.assign(LOOK[sub][type], values);
+    }
   }
 }
 

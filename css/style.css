@@ -345,6 +345,139 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   .catalog-foot { display: none; }
 }
 
+/* ---------- Taller de edificios ---------- */
+
+/* Tres columnas: los edificios guardados, la mesa de trabajo y las
+   propiedades. Los formularios reutilizan las clases del catálogo (`cat-*`)
+   porque son exactamente los mismos controles. */
+.studio-card {
+  width: min(1320px, 100%);
+  height: min(840px, 100%);
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  border: 2px solid var(--panel-edge);
+  border-radius: 12px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, .7);
+  padding: 18px 20px 12px;
+}
+
+.studio-body { flex: 1; display: flex; gap: 14px; min-height: 0; margin-top: 12px; }
+
+.studio-side { width: 226px; flex: none; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.studio-side h3 {
+  margin: 0; font-size: 12px; color: var(--gold-l);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.studio-side .catalog-list { flex: 1; }
+.studio-side > button { margin: 0; width: 100%; padding: 8px 12px; font-size: 13.5px; }
+.studio-side-actions { display: flex; gap: 6px; }
+.studio-side-actions button { flex: 1; padding: 6px 8px; font-size: 12.5px; }
+#btn-studio-del.confirming {
+  background: linear-gradient(180deg, #8d3229, #521c16);
+  border-color: #c06a5e; color: #ffd9d3;
+}
+.studio-side button:disabled { opacity: .45; cursor: default; }
+
+.studio-main { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 0; }
+
+.studio-tools { display: flex; flex-direction: column; gap: 6px; }
+.studio-palette {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  max-height: 92px; overflow: auto;
+  padding: 2px;
+}
+.studio-piece {
+  display: flex; align-items: center; gap: 5px;
+  padding: 4px 9px; font-size: 12px; border-radius: 6px;
+}
+.studio-glyph { font-size: 13px; color: var(--gold-l); }
+.studio-view-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.studio-view-tools button { padding: 5px 11px; font-size: 12.5px; }
+.studio-inline { display: flex; align-items: center; gap: 5px; font-size: 12.5px; color: #cbb68c; }
+.studio-inline select, .cat-field select {
+  background: #1b140d; color: var(--parch);
+  border: 1px solid #6b5334; border-radius: 5px;
+  padding: 4px 6px; font-size: 12.5px; font-family: inherit;
+}
+.cat-field select { max-width: 148px; }
+.cat-field input[type="checkbox"] { width: auto; height: 16px; accent-color: var(--gold); }
+
+/* La mesa: el lienzo se come todo el hueco que sobre. */
+.studio-stage {
+  flex: 1; min-height: 200px;
+  border: 1px solid #5a4a2e; border-radius: 8px;
+  overflow: hidden;
+}
+#studio-view { display: block; width: 100%; height: 100%; touch-action: none; cursor: move; }
+
+.studio-bake { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.studio-shots { display: flex; gap: 10px; align-items: flex-end; }
+.studio-shot { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 11px; color: #8e7c5c; }
+.studio-shot canvas {
+  image-rendering: pixelated;
+  border: 1px solid #4a3f2a; border-radius: 4px;
+  max-height: 104px; width: auto;
+}
+.studio-bake-info { font-size: 12px; color: #8e7c5c; padding-bottom: 4px; }
+
+.studio-props { width: 306px; flex: none; display: flex; flex-direction: column; min-height: 0; }
+.studio-props .catalog-tabs { margin-bottom: 10px; }
+.studio-panel {
+  flex: 1; overflow: auto; padding-right: 6px;
+  background: rgba(0, 0, 0, .18);
+  border: 1px solid #4a3f2a; border-radius: 8px;
+  padding: 12px 14px;
+}
+.studio-panel .cat-group { margin-bottom: 12px; }
+.studio-panel .cat-grid { grid-template-columns: 1fr; gap: 7px; }
+
+.studio-parts {
+  list-style: none; margin: 0 0 12px; padding: 0;
+  max-height: 168px; overflow: auto;
+  border: 1px solid #4a3f2a; border-radius: 6px;
+}
+.studio-part { display: flex; align-items: center; gap: 8px; padding: 5px 9px; font-size: 12.5px; cursor: pointer; }
+.studio-part:hover { background: rgba(255, 225, 170, .07); }
+.studio-part.active { background: rgba(201, 162, 39, .2); color: var(--gold-l); }
+.studio-swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(0, 0, 0, .55); flex: none; }
+
+.studio-hint-text { margin: 0 0 10px; font-size: 12px; color: #8e7c5c; line-height: 1.5; }
+.studio-h { margin: 0 0 8px; font-size: 12px; color: var(--gold-l); text-transform: uppercase; letter-spacing: 1px; }
+.studio-actions { display: flex; gap: 8px; }
+.studio-actions button { flex: 1; padding: 6px 10px; font-size: 12.5px; }
+.studio-del { background: linear-gradient(180deg, #8d3229, #521c16); border-color: #c06a5e; }
+.studio-template { display: block; width: 100%; text-align: left; margin-bottom: 6px; padding: 9px 12px; }
+.studio-template b { display: block; color: var(--gold-l); font-size: 14px; margin-bottom: 2px; }
+.studio-template small { color: #a8926a; font-size: 11.5px; line-height: 1.4; }
+.studio-more summary { cursor: pointer; font-size: 12.5px; color: #cbb68c; margin: 10px 0 6px; }
+
+/* En pantallas estrechas la mesa manda y se pone arriba; la lista y las
+   propiedades bajan debajo y la tarjeta entera se desplaza. Todo pasa a alto
+   automático y quien desplaza es `.studio-body`: si las columnas siguieran
+   repartiéndose un alto fijo, la mesa se quedaría sin sitio y se saldría por
+   encima de lo de abajo. */
+@media (max-width: 1040px) {
+  .studio-card { height: 100%; padding: 12px; }
+  .studio-body { flex-wrap: wrap; overflow: auto; align-items: flex-start; }
+  .studio-main { flex: 0 0 100%; order: -1; }
+  .studio-stage { flex: none; height: 40vh; min-height: 200px; }
+  .studio-side { width: 42%; flex: none; }
+  .studio-side .catalog-list { flex: none; max-height: 210px; }
+  .studio-props { width: calc(58% - 14px); flex: none; }
+  .studio-panel { overflow: visible; }
+}
+
+@media (max-width: 620px) {
+  .studio-body { flex-direction: column; flex-wrap: nowrap; }
+  /* En columna, un `flex-basis` del 100% sería el 100% del ALTO: la mesa se
+     comería la tarjeta entera y se saldría por encima de lo demás. */
+  .studio-main { flex: none; }
+  .studio-side, .studio-props { width: 100%; }
+  .studio-side .catalog-list { max-height: 160px; }
+  .studio-stage { height: 44vh; }
+  .studio-palette { max-height: 74px; }
+}
+
 /* ---------- Sala de espera ---------- */
 
 .lobby-head {

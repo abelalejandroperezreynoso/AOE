@@ -8,14 +8,20 @@ import { Audio } from './audio.js';
 import { LobbyUI } from './lobby-ui.js';
 import { NetSession } from './net/session.js';
 import { Catalog } from './catalog.js';
+import { Studio } from './studio.js';
 import { loadOverrides, adoptOverrides } from './data/overrides.js';
+import { loadDesigns, adoptDesigns } from './data/designs.js';
+import { clearSpriteCaches } from './sprites.js';
 
 const el = (id) => document.getElementById(id);
 
-// Los valores que el jugador haya cambiado en el catálogo se aplican antes de
-// que nada lea la configuración.
+// Primero los edificios que haya hecho el jugador en el taller: se dan de alta
+// como edificios más del juego, y a partir de ahí el catálogo puede tocarlos y
+// sus valores guardados se aplican encima igual que a los de serie.
+loadDesigns();
 loadOverrides();
 const catalog = new Catalog();
+const studio = new Studio();
 
 const audio = new Audio();
 let game = null, renderer = null, ui = null, raf = 0;
@@ -79,8 +85,13 @@ function startGame(opts, net = null) {
 const lobbyUi = new LobbyUI((s) => {
   audio.ensure();
   // En multijugador mandan los valores del anfitrión: si un invitado tiene
-  // otros, se adoptan los del anfitrión mientras dure la partida.
-  if (s.role === 'guest' && s.overrides) adoptOverrides(s.overrides);
+  // otros, se adoptan los del anfitrión mientras dure la partida. Lo mismo con
+  // los edificios del taller: se juega con los suyos, que son los que él va a
+  // simular, y los propios vuelven al recargar la página.
+  if (s.role === 'guest') {
+    if (s.designs) { adoptDesigns(s.designs); clearSpriteCaches(); }
+    if (s.overrides) adoptOverrides(s.overrides);
+  }
   startGame({
     playerCount: s.playerCount,
     difficulty: 'normal',
