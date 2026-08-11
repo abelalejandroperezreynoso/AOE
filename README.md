@@ -160,7 +160,16 @@ como cualquier otro.
 Un edificio se arma con **piezas** —cajas, cilindros, cúpulas, tejados a dos y a
 cuatro aguas, faldones, vigas, ruedas, almenas, torreones, puertas, ventanas,
 estandartes, escalinatas, cercas, pilas de troncos y barriles— colocadas sobre
-la huella que ocupará en el mapa:
+la huella que ocupará en el mapa.
+
+La mesa de trabajo va despejada a propósito: encima del modelo sólo hay cuatro
+controles, y lo demás sale en **menús desplegables** —**Añadir** abre la caja de
+piezas y **Vista** el giro, el encaje, la rejilla y el color del jugador—.
+La vista previa horneada, los grupos de valores y el panel entero **se pliegan**
+cuando estorban; volver a tocar la pestaña que ya está puesta deja el modelo a
+pantalla completa.
+
+Para colocar:
 
 - **Se coloca arrastrando**: pulsa una pieza en el modelo y muévela por el
   suelo. La rueda acerca y aleja, y arrastrar el fondo mueve la vista.
@@ -191,9 +200,10 @@ la huella que ocupará en el mapa:
 El taller cabe en un teléfono sin renunciar a nada:
 
 - La **mesa se lleva toda la pantalla** y los paneles pasan a una hoja de abajo
-  con pestañas —Añadir, Pieza, Edificio, Colores y Míos—, de la que sólo se ve
-  una cosa a la vez. El botón de la esquina la **pliega** para mirar el modelo
-  a pantalla completa. En apaisado la hoja se pone de pie a la derecha.
+  con pestañas —Pieza, Edificio, Colores y Míos—, de la que sólo se ve una cosa
+  a la vez. Se **pliega** con el botón de la esquina o tocando otra vez la
+  pestaña que ya está puesta, y entonces el modelo ocupa casi el doble. En
+  apaisado la hoja se pone de pie a la derecha.
 - **Un dedo** elige y arrastra piezas; con el botón **Altura** puesto, ese mismo
   arrastre las sube y las baja. **Dos dedos** acercan, alejan y mueven la vista,
   y nunca descolocan la pieza: al apoyar el segundo dedo, lo que hubiera movido
