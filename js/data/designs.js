@@ -13,6 +13,7 @@
 import { BUILDINGS, BUILD_ORDER, UNITS, RESOURCES, AGES } from '../config.js';
 import { LOOK } from './appearance.js';
 import { PARTS, FIELDS, MATERIAL_KEYS, DEFAULT_PALETTE } from '../gfx3d/parts.js';
+import { BUILTIN_DESIGNS } from './builtin-designs.js';
 
 const STORAGE_KEY = 'aor-designs-v1';
 
@@ -67,6 +68,13 @@ export const ROLE_FIELDS = {
 
 // --- Estado ------------------------------------------------------------------
 
+/*
+ * Dos listas: los que vienen con el juego (builtin-designs.js, iguales en todos
+ * los dispositivos) y los que ha hecho quien juega (guardados en su navegador).
+ * Las dos se dan de alta igual; lo único que las distingue es que las primeras
+ * no se pueden tocar desde el taller, porque no son de un navegador.
+ */
+let builtin = [];
 let designs = [];
 const registered = new Set();
 let version = 0;
@@ -78,18 +86,30 @@ let version = 0;
  */
 export function designsVersion() { return version; }
 
-export function allDesigns() { return designs; }
+/** Todos los edificios del taller: primero los del juego, luego los del jugador. */
+export function allDesigns() { return [...builtin, ...designs]; }
 
-export function getDesign(id) { return designs.find((d) => d.id === id) || null; }
+/** Sólo los que ha hecho quien juega, que son los que se pueden tocar. */
+export function myDesigns() { return designs; }
 
-/** Los identificadores propios llevan prefijo: nunca chocan con los de serie. */
-const isCustomId = (id) => typeof id === 'string' && /^c_[a-z0-9]{4,12}$/.test(id);
+export function getDesign(id) { return allDesigns().find((d) => d.id === id) || null; }
+
+/** ¿Viene con el juego? Entonces es de todos y no se edita desde el taller. */
+export const isBuiltin = (id) => typeof id === 'string' && id.startsWith('b_');
+
+/*
+ * Los identificadores llevan prefijo para no chocar nunca con los edificios de
+ * serie: `b_` los que trae el juego y `c_` los que hace cada quien. Como el
+ * alta va en orden de identificador, además salen siempre en el mismo orden en
+ * cualquier dispositivo, que es lo que necesita el protocolo de red.
+ */
+const isDesignId = (id) => typeof id === 'string' && /^[bc]_[a-z0-9]{4,12}$/.test(id);
 
 function newId() {
   let id;
   do {
     id = `c_${Math.random().toString(36).slice(2, 9)}`;
-  } while (!isCustomId(id) || getDesign(id) || BUILDINGS[id]);
+  } while (!isDesignId(id) || getDesign(id) || BUILDINGS[id]);
   return id;
 }
 
@@ -103,9 +123,13 @@ function num(v, min, max, fallback, step) {
   const n = Number(v);
   if (!Number.isFinite(n)) return fallback;
   const c = Math.min(max, Math.max(min, n));
+  if (!step) return c;
   // Se redondea al escalón del campo para que no entren valores con veinte
-  // decimales que luego no se pueden reproducir desde la interfaz.
-  return step ? Math.round(c / step) * step : c;
+  // decimales que luego no se pueden reproducir desde la interfaz. Y luego a
+  // cuatro decimales, porque multiplicar por el escalón vuelve a dejar cola
+  // binaria (0,05 × 48 = 2,4000000000000004) y esa cola acaba en lo guardado,
+  // en lo que viaja por la red y en el texto que se comparte.
+  return Math.round(Math.round(c / step) * step * 1e4) / 1e4;
 }
 
 /** Una pieza válida: tipo conocido, sólo sus campos y todos dentro de rango. */
@@ -135,7 +159,7 @@ export function cleanDesign(raw, keepId = true) {
   if (!raw || typeof raw !== 'object') return null;
   const role = ROLES[raw.role] ? raw.role : 'decor';
   const d = {
-    id: keepId && isCustomId(raw.id) ? raw.id : newId(),
+    id: keepId && isDesignId(raw.id) ? raw.id : newId(),
     name: clean(raw.name, MAX_NAME) || 'Edificio sin nombre',
     desc: clean(raw.desc, MAX_DESC) || 'Edificio hecho en el taller.',
     size: num(raw.size, 1, 4, 2, 1),
@@ -227,7 +251,7 @@ function applyRegistry() {
     if (i >= 0) BUILD_ORDER.splice(i, 1);
   }
   registered.clear();
-  for (const d of [...designs].sort((a, b) => (a.id < b.id ? -1 : 1))) {
+  for (const d of allDesigns().sort((a, b) => (a.id < b.id ? -1 : 1))) {
     BUILDINGS[d.id] = definitionOf(d);
     const palette = {};
     for (const m of usedMaterials(d)) palette[m] = d.palette[m];
@@ -246,25 +270,32 @@ function save() {
   } catch { /* sin espacio o modo privado: se sigue jugando con lo que hay */ }
 }
 
-/** Carga los diseños guardados y los da de alta. Se llama una vez, al arrancar. */
+/** Carga los del juego y los guardados, y los da de alta. Se llama al arrancar. */
 export function loadDesigns() {
+  builtin = [];
+  for (const item of Array.isArray(BUILTIN_DESIGNS) ? BUILTIN_DESIGNS : []) {
+    const d = cleanDesign(item);
+    // Los del juego pasan por el mismo validador que todo lo demás: un fallo al
+    // pegar uno no puede tumbar el arranque de nadie.
+    if (d && isBuiltin(d.id) && !getDesign(d.id)) builtin.push(d);
+  }
   let raw = null;
   try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { raw = null; }
   designs = [];
   if (Array.isArray(raw)) {
     for (const item of raw.slice(0, MAX_DESIGNS)) {
       const d = cleanDesign(item);
-      if (d && !getDesign(d.id)) designs.push(d);
+      if (d && !isBuiltin(d.id) && !getDesign(d.id)) designs.push(d);
     }
   }
   applyRegistry();
-  return designs;
+  return allDesigns();
 }
 
 /** Guarda un diseño (nuevo o editado) y lo deja listo para construir. */
 export function saveDesign(raw) {
   const d = cleanDesign(raw);
-  if (!d) return null;
+  if (!d || isBuiltin(d.id)) return null;
   const i = designs.findIndex((x) => x.id === d.id);
   if (i >= 0) designs[i] = d;
   else {
@@ -277,6 +308,7 @@ export function saveDesign(raw) {
 }
 
 export function deleteDesign(id) {
+  if (isBuiltin(id)) return false;
   const i = designs.findIndex((d) => d.id === id);
   if (i < 0) return false;
   designs.splice(i, 1);
@@ -310,11 +342,16 @@ export function exportDesigns() {
  */
 const SHARE_BUDGET = 48000;
 
-/** Los diseños que caben en un mensaje de red, en orden de identificador. */
+/**
+ * Los diseños que caben en un mensaje de red, en orden de identificador. Van
+ * también los que trae el juego: si el anfitrión tiene una versión con
+ * edificios que el invitado no conoce, la tabla de tipos tiene que salir igual
+ * en los dos lados o las instantáneas se leerían mal.
+ */
 export function shareableDesigns() {
   const out = [];
   let size = 0;
-  for (const d of [...designs].sort((a, b) => (a.id < b.id ? -1 : 1))) {
+  for (const d of allDesigns().sort((a, b) => (a.id < b.id ? -1 : 1))) {
     const bytes = JSON.stringify(d).length;
     if (size + bytes > SHARE_BUDGET) break;
     size += bytes;
@@ -330,15 +367,18 @@ export function shareableDesigns() {
  * dos lados tienen que tener exactamente la misma tabla de edificios.
  */
 export function adoptDesigns(incoming) {
+  builtin = [];
   designs = [];
   if (Array.isArray(incoming)) {
-    for (const item of incoming.slice(0, MAX_DESIGNS)) {
+    for (const item of incoming.slice(0, MAX_DESIGNS * 2)) {
       const d = cleanDesign(item);
-      if (d && !getDesign(d.id)) designs.push(d);
+      if (!d || getDesign(d.id)) continue;
+      if (isBuiltin(d.id)) builtin.push(d);
+      else designs.push(d);
     }
   }
   applyRegistry();
-  return designs;
+  return allDesigns();
 }
 
 // --- Plantillas --------------------------------------------------------------
