@@ -187,10 +187,14 @@ Para colocar:
   el horneado, y debajo están las **tres etapas de obra ya horneadas** a tamaño
   de partida: cimientos, en obra y terminado. Las de en medio salen solas, no
   hay que modelarlas.
-- En **Edificio** se elige qué hace: sin función, dar población, almacén de los
-  recursos que se marquen, defensa que dispara flechas o edificio que entrena
-  unidades. Y ahí van su coste, su tiempo de construcción, sus puntos de vida,
-  su armadura, su visión, su huella (de 1×1 a 4×4) y en qué edad aparece.
+- En **Edificio** se elige qué es. O bien **el aspecto de un edificio que ya
+  existe** —la casa, el molino, el cuartel...—, y entonces el modelo se ajusta
+  solo a la huella de ese edificio y lo que cuesta y lo que hace lo sigue
+  poniendo el juego: se le cambia la cara sin tocar el equilibrio. O bien un
+  edificio nuevo, y ahí se elige qué hace (sin función, dar población, almacén
+  de los recursos que se marquen, defensa que dispara flechas o edificio que
+  entrena unidades) junto con su coste, su tiempo de construcción, sus puntos de
+  vida, su armadura, su visión, su huella (de 1×1 a 4×4) y en qué edad aparece.
 - En **Colores** se le da color a cada material que use. El **color del
   jugador** no se elige: lo pone quien construya el edificio, así que conviene
   darle a alguna pieza (un estandarte, un paño) ese material.
@@ -236,6 +240,9 @@ que empiece por `b_`. Los de ese fichero viajan con el código: se dan de alta a
 arrancar en cualquier dispositivo, sin que nadie importe nada. En el taller
 salen marcados como «del juego» y no se editan ni se borran desde la interfaz
 —no son de un navegador—, pero se duplican con un botón y la copia ya es tuya.
+
+La **casa** del juego es justo eso: su modelo sale de un diseño hecho en el
+taller, con la ficha de siempre (25 de madera, +5 de población, dos casillas).
 
 Detalles a tener en cuenta:
 

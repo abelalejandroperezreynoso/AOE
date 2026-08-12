@@ -11,19 +11,19 @@
 // al arrastre del ratón, no clavar el resultado, que para eso está la vista
 // previa horneada de al lado.
 
-import { PLAYER_COLORS, AGES, UNITS, RESOURCES, RES_NAME } from './config.js';
+import { PLAYER_COLORS, AGES, UNITS, BUILDINGS, RESOURCES, RES_NAME } from './config.js';
 import { project, depth, faceLight, rotZ, bake, HW, HH, VZ } from './gfx3d/engine.js';
 import {
   PARTS, PART_KEYS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
   DEFAULT_PALETTE, designParts, designMesh,
 } from './gfx3d/parts.js';
 import {
-  allDesigns, getDesign, saveDesign, deleteDesign, duplicateDesign, canAddDesign,
-  designFromTemplate, isBuiltin, TEMPLATES, ROLES, STAT_FIELDS, ROLE_FIELDS,
-  MAX_PARTS, MAX_DESIGNS,
+  allDesigns, myDesigns, getDesign, saveDesign, deleteDesign, duplicateDesign, canAddDesign,
+  designFromTemplate, isBuiltin, resizeDesign, TEMPLATES, ROLES, STAT_FIELDS,
+  ROLE_FIELDS, STOCK_BUILDINGS, MAX_PARTS, MAX_DESIGNS,
 } from './data/designs.js';
 import { clearSpriteCaches, drawSprite } from './sprites.js';
-import { captureBuilding, forgetBuilding, reset } from './data/overrides.js';
+import { captureBuilding, captureBuildingLook, forgetBuilding, reset } from './data/overrides.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -153,9 +153,14 @@ export class Studio {
     el('studio').classList.remove('hidden');
     this.renderTools();
     this.renderList();
-    const first = allDesigns()[0];
+    /*
+     * Se vuelve al que se estaba tocando y, si es la primera vez, al primero
+     * propio. Los que trae el juego no se abren solos: no se pueden editar, y
+     * empezar por algo que no se deja tocar es un mal recibimiento.
+     */
+    const first = getDesign(this.lastId) || myDesigns()[0];
     if (first) { this.showTab(this.tab === 'new' ? 'part' : this.tab); this.load(first.id); return; }
-    // Sin nada guardado se enseñan las plantillas: es la primera visita.
+    // Sin nada propio se enseñan las plantillas; los del juego están en la lista.
     this.showTab('new');
     this.clearView();
   }
@@ -179,6 +184,7 @@ export class Studio {
     const d = getDesign(id);
     if (!d) return;
     this.design = structuredClone(d);
+    this.lastId = d.id;
     this.selected = this.design.parts.length ? 0 : -1;
     this.undo = [];
     this.fit();
@@ -251,9 +257,17 @@ export class Studio {
     const doIt = () => {
       const saved = saveDesign(this.design);
       if (!saved) { this.status('No se ha podido guardar.'); return; }
-      captureBuilding(saved.id);
-      reset('building', saved.id);
-      reset('buildingLook', saved.id);
+      if (saved.replaces) {
+        // Le ha cambiado la cara a un edificio de serie: lo que pasa a ser suyo
+        // son los colores, y nada más. Sus cifras siguen siendo las del juego,
+        // con los retoques que tengan en el catálogo.
+        captureBuildingLook(saved.replaces);
+        reset('buildingLook', saved.replaces);
+      } else {
+        captureBuilding(saved.id);
+        reset('building', saved.id);
+        reset('buildingLook', saved.id);
+      }
       clearSpriteCaches();
       this.renderList();
     };
@@ -321,7 +335,9 @@ export class Studio {
       n.textContent = d.name;
       const s = document.createElement('div');
       s.className = 'cat-sub';
-      s.textContent = `${ROLES[d.role].short} · ${d.size}×${d.size} · ${AGES[d.age].short}`
+      s.textContent = (d.replaces
+        ? `Aspecto de ${BUILDINGS[d.replaces]?.name || d.replaces}`
+        : `${ROLES[d.role].short} · ${d.size}×${d.size} · ${AGES[d.age].short}`)
         + (isBuiltin(d.id) ? ' · del juego' : '');
       text.append(n, s);
       li.append(thumb, text);
@@ -1415,6 +1431,30 @@ export class Studio {
     const nameRow = textRow('Nombre', d.name, 28, (v) => { d.name = v; this.afterChange(); });
     const descRow = textRow('Descripción', d.desc, 120, (v) => { d.desc = v; this.afterChange(); });
 
+    /*
+     * Un diseño puede ser un edificio nuevo o **el aspecto de uno que ya
+     * existe**. Lo segundo es lo que se quiere casi siempre: cambiarle la cara
+     * a la casa o al cuartel sin tocar lo que cuestan ni lo que hacen. Al
+     * elegir a quién viste, el modelo se ajusta solo a la huella de ese
+     * edificio, que es la que manda.
+     */
+    const skinRow = selectRow('Aspecto de', d.replaces || '',
+      [['', 'Nada: es un edificio nuevo'],
+        ...STOCK_BUILDINGS.map((t) => [t, `${BUILDINGS[t].name} (${BUILDINGS[t].size}×${BUILDINGS[t].size})`])],
+      (v) => this.setSkinTarget(v));
+    wrap.appendChild(group('Ficha', [nameRow, descRow, skinRow]));
+
+    if (d.replaces) {
+      const note = document.createElement('div');
+      note.className = 'studio-builtin-note';
+      const p = document.createElement('p');
+      p.textContent = `Este modelo es la cara de ${BUILDINGS[d.replaces].name}: se dibuja en su sitio, con su huella de `
+        + `${BUILDINGS[d.replaces].size}×${BUILDINGS[d.replaces].size}, y lo que cuesta y lo que hace lo sigue poniendo el juego.`;
+      note.appendChild(p);
+      wrap.appendChild(note);
+      return wrap;
+    }
+
     const sizeRow = selectRow('Huella', String(d.size), [1, 2, 3, 4].map((n) => [String(n), `${n}×${n} casillas`]), (v) => {
       d.size = Number(v);
       this.fit();
@@ -1424,7 +1464,7 @@ export class Studio {
       d.age = Number(v);
       this.afterChange();
     });
-    wrap.appendChild(group('Ficha', [nameRow, descRow, sizeRow, ageRow]));
+    wrap.appendChild(group('Dónde y cuándo', [sizeRow, ageRow]));
 
     const roleRow = selectRow('Función', d.role,
       Object.entries(ROLES).map(([k, r]) => [k, r.label]), (v) => {
@@ -1471,6 +1511,29 @@ export class Studio {
     wrap.appendChild(group('Coste', costRows));
     wrap.appendChild(group('Valores', STAT_FIELDS.map((f) => this.statField(d, f))));
     return wrap;
+  }
+
+  /**
+   * Pone (o quita) el edificio al que este modelo le da la cara. El modelo se
+   * estira o encoge hasta la huella del edificio elegido, de modo que lo que se
+   * ve en el taller es exactamente lo que se verá en la partida.
+   */
+  setSkinTarget(type) {
+    const d = this.design;
+    if (!d) return;
+    this.pushUndo();
+    if (!type) {
+      delete d.replaces;
+    } else {
+      d.replaces = type;
+      const size = BUILDINGS[type].size;
+      if (d.size !== size) {
+        Object.assign(d, resizeDesign(d, size));
+        this.status(`Modelo ajustado a la huella de ${BUILDINGS[type].name} (${size}×${size}).`);
+      }
+    }
+    this.fit();
+    this.afterChange();
   }
 
   statField(obj, f) {

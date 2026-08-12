@@ -17,6 +17,14 @@ import { BUILTIN_DESIGNS } from './builtin-designs.js';
 
 const STORAGE_KEY = 'aor-designs-v1';
 
+/*
+ * Los edificios de serie, tal y como están antes de que se dé de alta ningún
+ * diseño: son los que un diseño puede re-vestir. Se toma la lista aquí, en la
+ * carga del módulo, justo por eso: después se le añaden los del taller y ya no
+ * serviría.
+ */
+export const STOCK_BUILDINGS = Object.keys(BUILDINGS);
+
 /** Topes: un diseño desmedido no puede reventar ni la memoria ni la red. */
 export const MAX_DESIGNS = 24;
 export const MAX_PARTS = 200;
@@ -174,6 +182,11 @@ export function cleanDesign(raw, keepId = true) {
     palette: {},
     parts: [],
   };
+  // Un diseño puede ser un edificio nuevo o el aspecto de uno que ya existe.
+  // En el segundo caso su ficha no pinta nada: los valores los pone el
+  // edificio original, y de aquí sale sólo el modelo.
+  if (STOCK_BUILDINGS.includes(raw.replaces)) d.replaces = raw.replaces;
+
   for (const r of RESOURCES) d.cost[r] = num(raw.cost?.[r], 0, 5000, 0, 1);
   if (!RESOURCES.some((r) => d.cost[r] > 0)) d.cost.wood = 50;
 
@@ -238,6 +251,17 @@ function usedMaterials(d) {
   return used;
 }
 
+/** El modelo con el que se dibuja cada edificio de serie re-vestido. */
+const models = new Map();
+
+/** Los colores originales de los que se han re-vestido, para poder devolverlos. */
+const stockLooks = new Map();
+
+/** El diseño con el que se dibuja un edificio, sea propio o re-vestido. */
+export function modelForBuilding(type) {
+  return models.get(type) || getDesign(type) || null;
+}
+
 /**
  * Vuelve a dar de alta todos los diseños. Se hace de una vez y en orden de
  * identificador para que la tabla de edificios salga igual en cualquier
@@ -251,15 +275,56 @@ function applyRegistry() {
     if (i >= 0) BUILD_ORDER.splice(i, 1);
   }
   registered.clear();
+  // Los edificios re-vestidos recuperan sus colores de fábrica antes de volver
+  // a repartir: si se quita el diseño que vestía a la casa, la casa vuelve a
+  // ser la de siempre.
+  for (const [type, look] of stockLooks) LOOK.building[type] = look;
+  models.clear();
+
   for (const d of allDesigns().sort((a, b) => (a.id < b.id ? -1 : 1))) {
-    BUILDINGS[d.id] = definitionOf(d);
     const palette = {};
     for (const m of usedMaterials(d)) palette[m] = d.palette[m];
+    if (d.replaces) {
+      // No es un edificio nuevo: es el aspecto de uno que ya existe.
+      if (!stockLooks.has(d.replaces)) stockLooks.set(d.replaces, LOOK.building[d.replaces]);
+      models.set(d.replaces, d);
+      LOOK.building[d.replaces] = palette;
+      continue;
+    }
+    BUILDINGS[d.id] = definitionOf(d);
     LOOK.building[d.id] = palette;
     BUILD_ORDER.push(d.id);
     registered.add(d.id);
   }
   version++;
+}
+
+/*
+ * Campos de una pieza que son medidas y hay que escalar al cambiar la huella;
+ * los demás (giros, número de lados, peldaños) no se tocan.
+ */
+const SCALED_FIELDS = ['x', 'y', 'z', 'w', 'd', 'h', 'r', 'r0', 'r1', 'rise', 'over', 'len', 'th'];
+
+/**
+ * Lleva un diseño a otra huella, estirando o encogiendo el modelo entero. Es lo
+ * que pasa al ponerle a un diseño el aspecto de un edificio que ya existe: la
+ * huella la manda el edificio, no el diseño, así que el modelo se ajusta a ella
+ * y lo que se ve en el taller es lo que se verá en la partida.
+ */
+export function resizeDesign(design, size) {
+  const from = design.size || 2;
+  const to = Math.min(4, Math.max(1, Math.round(size)));
+  if (to === from) return design;
+  const k = to / from;
+  const scaled = { ...design, size: to, parts: design.parts.map((p) => ({ ...p })) };
+  for (const p of scaled.parts) {
+    for (const key of SCALED_FIELDS) {
+      if (p[key] === undefined) continue;
+      const f = FIELDS[key];
+      p[key] = num(p[key] * k, f.min, f.max, p[key], f.step);
+    }
+  }
+  return scaled;
 }
 
 // --- Guardar y cargar --------------------------------------------------------

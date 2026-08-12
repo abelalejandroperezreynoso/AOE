@@ -13,10 +13,10 @@
 // hornea con la misma luz, la misma sombra y el mismo contorno: en la partida
 // no se distingue de los demás.
 
-import { PLAYER_COLORS } from '../config.js';
-import { look } from '../data/appearance.js';
+import { PLAYER_COLORS, BUILDINGS } from '../config.js';
+import { LOOK } from '../data/appearance.js';
 import {
-  quad, box, cyl, sphere, limb, wheel, tone, srand, translate,
+  quad, box, cyl, sphere, limb, wheel, tone, srand, translate, scaleMesh,
 } from './engine.js';
 import {
   gableRoof, hipRoof, battlements, roundTower, flag, scaffold, foundation,
@@ -61,9 +61,21 @@ function paletteOf(design, live) {
   // El catálogo puede haber recoloreado el edificio después de crearlo, así que
   // manda lo que diga LOOK; la paleta del diseño es el punto de partida. En el
   // taller (`live`) manda la paleta que se está tocando ahora mismo, que aún no
-  // ha llegado a ninguna otra parte.
-  const saved = !live && design.id ? look('building', design.id) : null;
+  // ha llegado a ninguna otra parte. Si el diseño viste a un edificio de serie,
+  // los colores editables son los de ese edificio, no los del diseño.
+  const key = design.replaces || design.id;
+  const saved = !live && key ? LOOK.building[key] : null;
   return { ...DEFAULT_PALETTE, ...(design.palette || {}), ...(saved || {}) };
+}
+
+/**
+ * La huella sobre la que se dibuja. Cuando un diseño viste a un edificio de
+ * serie, la manda el edificio: la casa mide dos casillas, se haya modelado
+ * sobre las que se haya modelado.
+ */
+export function renderSize(design) {
+  const stock = design.replaces && BUILDINGS[design.replaces];
+  return (stock && stock.size) || design.size || 2;
 }
 
 // --- Campos editables --------------------------------------------------------
@@ -433,7 +445,12 @@ function meshHeight(groups) {
 export function designParts(design, colorIdx = 0, stage = 2, live = false) {
   const M = paletteOf(design, live);
   const C = PLAYER_COLORS[colorIdx] || PLAYER_COLORS[0];
-  const s = design.size || 2;
+  const s = renderSize(design);
+  // Si el modelo se hizo sobre otra huella (por ejemplo, uno de tres casillas
+  // puesto a vestir la casa, que mide dos), se ajusta entero a la de verdad en
+  // vez de salirse de ella. El taller lo deja ya adaptado, pero un diseño que
+  // llegue de fuera puede no estarlo.
+  const k = s / (design.size || s);
   const c = { M, C, s };
   srand(hash(design.id || design.name || 'x') + stage * 7 + 1);
 
@@ -450,6 +467,7 @@ export function designParts(design, colorIdx = 0, stage = 2, live = false) {
     const tris = [];
     try {
       spec.build(tris, part, c);
+      if (k !== 1) scaleMesh(tris, k);
     } catch {
       // Una pieza con valores imposibles no puede tumbar el edificio entero.
     }

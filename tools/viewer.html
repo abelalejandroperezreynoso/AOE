@@ -70,7 +70,7 @@ import { bake } from '../js/gfx3d/engine.js';
 import { unitMesh } from '../js/gfx3d/units.js';
 import { buildingMesh } from '../js/gfx3d/buildings.js';
 import { designMesh } from '../js/gfx3d/parts.js';
-import { loadDesigns, getDesign } from '../js/data/designs.js';
+import { loadDesigns, modelForBuilding } from '../js/data/designs.js';
 import { nodeMesh } from '../js/gfx3d/nodes.js';
 import { UNITS, BUILD_ORDER, PLAYER_COLORS, RESOURCE_NODES } from '../js/config.js';
 
@@ -121,7 +121,7 @@ function syncURL() {
 function mesh(kind, type, colorIdx, a, b) {
   if (kind === 'unit') return unitMesh(type, colorIdx, a, b);
   if (kind === 'building') {
-    const design = getDesign(type);
+    const design = modelForBuilding(type);
     return design ? designMesh(design, colorIdx, a) : buildingMesh(type, colorIdx, a);
   }
   return nodeMesh(type, a, b === 1);

@@ -11,7 +11,7 @@ import { bake } from './gfx3d/engine.js';
 import { unitMesh } from './gfx3d/units.js';
 import { buildingMesh } from './gfx3d/buildings.js';
 import { designMesh } from './gfx3d/parts.js';
-import { getDesign } from './data/designs.js';
+import { modelForBuilding } from './data/designs.js';
 import { nodeMesh } from './gfx3d/nodes.js';
 
 const HW = TILE_W / 2; // 32
@@ -360,12 +360,13 @@ export function paintUnit(ctx, x, y, type, colorIdx, face, f) {
 }
 
 /**
- * Malla de un edificio. Los de serie los construye su código en buildings.js;
- * los que ha hecho el jugador en el taller salen de su diseño, y a partir de
- * aquí el camino es el mismo: mismo horneado, misma luz, mismo contorno.
+ * Malla de un edificio. Los de serie los construye su código en buildings.js,
+ * salvo que un diseño del taller les haya dado otro aspecto; los que ha hecho
+ * el jugador salen siempre de su diseño. A partir de aquí el camino es el
+ * mismo: mismo horneado, misma luz, mismo contorno.
  */
 function meshForBuilding(type, colorIdx, stage) {
-  const design = getDesign(type);
+  const design = modelForBuilding(type);
   return design
     ? designMesh(design, colorIdx, stage)
     : buildingMesh(type, colorIdx, stage);
