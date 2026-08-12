@@ -19,7 +19,8 @@ import {
 } from './gfx3d/parts.js';
 import {
   allDesigns, getDesign, saveDesign, deleteDesign, duplicateDesign, canAddDesign,
-  designFromTemplate, TEMPLATES, ROLES, STAT_FIELDS, ROLE_FIELDS, MAX_PARTS, MAX_DESIGNS,
+  designFromTemplate, isBuiltin, TEMPLATES, ROLES, STAT_FIELDS, ROLE_FIELDS,
+  MAX_PARTS, MAX_DESIGNS,
 } from './data/designs.js';
 import { clearSpriteCaches, drawSprite } from './sprites.js';
 import { captureBuilding, forgetBuilding, reset } from './data/overrides.js';
@@ -67,6 +68,17 @@ export class Studio {
       return this.status(`Copiado como «${d.name}».`);
     };
     el('btn-studio-del').onclick = (e) => this.confirmDelete(e.currentTarget);
+    el('btn-studio-share').onclick = () => this.openShare('export');
+    el('btn-studio-import').onclick = () => this.openShare('import');
+    el('btn-share-close').onclick = () => el('studio-share').classList.add('hidden');
+    // Tocar el fondo del diálogo también lo cierra, como en cualquier ventana.
+    el('studio-share').onclick = (e) => {
+      if (e.target === el('studio-share')) el('studio-share').classList.add('hidden');
+    };
+    el('btn-share-copy').onclick = () => this.copyShare();
+    el('btn-share-file').onclick = () => this.downloadShare();
+    el('btn-share-paste').onclick = () => this.pasteShare();
+    el('btn-share-apply').onclick = () => this.applyShare();
 
     for (const btn of document.querySelectorAll('#studio-tabs button')) {
       btn.onclick = () => this.showTab(btn.dataset.tab);
@@ -123,6 +135,18 @@ export class Studio {
   }
 
   isOpen() { return !el('studio').classList.contains('hidden'); }
+
+  /**
+   * Los edificios que vienen con el juego se miran pero no se tocan: son
+   * iguales en todos los dispositivos y no viven en este navegador. Para
+   * cambiar uno se duplica, y la copia ya es de quien la hace.
+   */
+  get readOnly() { return !!this.design && isBuiltin(this.design.id); }
+
+  /** Avisa de por qué no se deja tocar, y de cómo sí. */
+  warnReadOnly() {
+    this.status('Ese edificio viene con el juego: duplícalo para poder cambiarlo.');
+  }
 
   open() {
     el('main-menu').classList.add('hidden');
@@ -183,6 +207,7 @@ export class Studio {
 
   confirmDelete(btn = el('btn-studio-del')) {
     if (!this.design) return;
+    if (this.readOnly) { this.warnReadOnly(); return; }
     if (!this.confirming) {
       this.confirming = true;
       btn.textContent = '¿Seguro?';
@@ -193,7 +218,7 @@ export class Studio {
     }
     this.cancelDelete();
     const id = this.design.id;
-    deleteDesign(id);
+    if (!deleteDesign(id)) { this.warnReadOnly(); return; }
     forgetBuilding(id);
     clearSpriteCaches();
     this.design = null;
@@ -222,7 +247,7 @@ export class Studio {
    */
   persist(now = false) {
     clearTimeout(this.saveTimer);
-    if (!this.design) return;
+    if (!this.design || this.readOnly) return;
     const doIt = () => {
       const saved = saveDesign(this.design);
       if (!saved) { this.status('No se ha podido guardar.'); return; }
@@ -270,8 +295,9 @@ export class Studio {
     this.fillList(el('studio-list'));
     // En pantallas pequeñas la lista vive en la hoja de abajo, en su pestaña.
     if (this.tab === 'list') this.fillList(el('studio-panel').querySelector('.studio-list-panel'));
-    el('btn-studio-dup').disabled = !this.design;
-    el('btn-studio-del').disabled = !this.design;
+    el('btn-studio-dup').disabled = !this.design || !canAddDesign();
+    el('btn-studio-del').disabled = !this.design || this.readOnly;
+    el('btn-studio-share').disabled = !this.design;
     el('btn-studio-new').disabled = !canAddDesign();
   }
 
@@ -295,7 +321,8 @@ export class Studio {
       n.textContent = d.name;
       const s = document.createElement('div');
       s.className = 'cat-sub';
-      s.textContent = `${ROLES[d.role].short} · ${d.size}×${d.size} · ${AGES[d.age].short}`;
+      s.textContent = `${ROLES[d.role].short} · ${d.size}×${d.size} · ${AGES[d.age].short}`
+        + (isBuiltin(d.id) ? ' · del juego' : '');
       text.append(n, s);
       li.append(thumb, text);
       li.onclick = () => { this.persist(true); this.load(d.id); };
@@ -323,9 +350,14 @@ export class Studio {
     const dup = mk('Duplicar', () => el('btn-studio-dup').click());
     const del = mk('Borrar', (e) => this.confirmDelete(e.currentTarget), 'studio-del studio-del-btn');
     dup.disabled = !this.design;
-    del.disabled = !this.design;
+    del.disabled = !this.design || this.readOnly;
     acts.append(nuevo, dup, del);
-    wrap.append(ul, acts);
+    const acts2 = document.createElement('div');
+    acts2.className = 'studio-actions';
+    const share = mk('Compartir', () => this.openShare('export'));
+    share.disabled = !this.design;
+    acts2.append(share, mk('Importar', () => this.openShare('import')));
+    wrap.append(ul, acts, acts2);
     return wrap;
   }
 
@@ -341,6 +373,104 @@ export class Studio {
       drawSprite(ctx, s, size / 2 - (s.w / 2 - s.ox) * sc, size - 2 - (s.h - s.oy) * sc, sc);
     } catch { /* un diseño vacío no tiene nada que enseñar */ }
     return c;
+  }
+
+  // --- Compartir --------------------------------------------------------------
+
+  /**
+   * Sacar un edificio de aquí y meterlo en otro sitio. Un diseño es sólo datos,
+   * así que cabe en una línea de texto: se copia, se manda por donde sea y al
+   * otro lado se pega. Y esa misma línea es lo que se pone en
+   * `js/data/builtin-designs.js` para que el edificio viaje con el juego y le
+   * llegue a todo el mundo, sin que nadie tenga que importar nada.
+   */
+  openShare(mode) {
+    this.shareMode = mode;
+    const box = el('studio-share');
+    const exporting = mode === 'export';
+    if (exporting && !this.design) { this.status('Elige antes un edificio.'); return; }
+    el('share-title').textContent = exporting ? 'Compartir edificio' : 'Importar edificio';
+    el('share-hint').textContent = exporting
+      ? 'Cópialo y mándalo a quien quieras. Quien lo reciba lo pega en Importar y lo tendrá en su juego.'
+      : 'Pega aquí el texto de un edificio. Entra como uno nuevo tuyo, sin tocar los que ya tienes.';
+    el('share-text').value = exporting ? JSON.stringify(this.design) : '';
+    el('share-text').readOnly = exporting;
+    el('share-note').textContent = '';
+    el('btn-share-copy').classList.toggle('hidden', !exporting);
+    el('btn-share-file').classList.toggle('hidden', !exporting);
+    el('btn-share-paste').classList.toggle('hidden', exporting);
+    el('btn-share-apply').classList.toggle('hidden', exporting);
+    box.classList.remove('hidden');
+    if (exporting) {
+      el('share-text').focus();
+      el('share-text').select();
+    }
+  }
+
+  shareNote(msg) { el('share-note').textContent = msg; }
+
+  async copyShare() {
+    const text = el('share-text').value;
+    try {
+      await navigator.clipboard.writeText(text);
+      this.shareNote('Copiado. Ya lo puedes pegar donde quieras.');
+    } catch {
+      // Sin permiso de portapapeles (o sin https) queda seleccionarlo a mano.
+      el('share-text').select();
+      this.shareNote('Cópialo a mano: ya está seleccionado.');
+    }
+  }
+
+  downloadShare() {
+    const name = (this.design?.name || 'edificio').replace(/[^\w\-]+/g, '-').toLowerCase();
+    const blob = new Blob([el('share-text').value], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${name}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    this.shareNote('Descargado.');
+  }
+
+  async pasteShare() {
+    try {
+      el('share-text').value = await navigator.clipboard.readText();
+      this.shareNote('Pegado. Comprueba que es el edificio y dale a importar.');
+    } catch {
+      el('share-text').focus();
+      this.shareNote('Pega el texto en el recuadro con el teclado.');
+    }
+  }
+
+  /** Mete lo pegado como un edificio nuevo, pasando por el validador de siempre. */
+  applyShare() {
+    let raw = null;
+    try {
+      raw = JSON.parse(el('share-text').value);
+    } catch {
+      this.shareNote('Eso no es un edificio: el texto no se entiende.');
+      return;
+    }
+    // Vale tanto un edificio suelto como una lista de ellos.
+    const list = Array.isArray(raw) ? raw : [raw];
+    const added = [];
+    for (const item of list) {
+      if (!canAddDesign()) { this.shareNote(`No caben más de ${MAX_DESIGNS} edificios.`); break; }
+      // Sin identificador: entra como uno nuevo y nunca pisa lo que ya había.
+      const saved = saveDesign({ ...item, id: null });
+      if (saved) {
+        captureBuilding(saved.id);
+        added.push(saved);
+      }
+    }
+    if (!added.length) { this.shareNote('No se ha podido importar: el edificio no es válido.'); return; }
+    clearSpriteCaches();
+    el('studio-share').classList.add('hidden');
+    this.showTab('part');
+    this.load(added[0].id);
+    this.status(added.length === 1
+      ? `«${added[0].name}» importado: ya se puede construir.`
+      : `${added.length} edificios importados.`);
   }
 
   // --- Barra de herramientas --------------------------------------------------
@@ -493,6 +623,7 @@ export class Studio {
   // --- Piezas -----------------------------------------------------------------
 
   addPart(kind) {
+    if (this.readOnly) return this.warnReadOnly();
     if (!this.design) return;
     if (this.design.parts.length >= MAX_PARTS) {
       this.status(`Un edificio no puede pasar de ${MAX_PARTS} piezas.`);
@@ -526,6 +657,7 @@ export class Studio {
   }
 
   deletePart() {
+    if (this.readOnly) return this.warnReadOnly();
     if (!this.design || this.selected < 0) return;
     this.pushUndo();
     this.design.parts.splice(this.selected, 1);
@@ -534,6 +666,7 @@ export class Studio {
   }
 
   duplicatePart() {
+    if (this.readOnly) return this.warnReadOnly();
     if (!this.design || this.selected < 0) return;
     if (this.design.parts.length >= MAX_PARTS) return;
     this.pushUndo();
@@ -815,7 +948,9 @@ export class Studio {
     if (this.pointers.size >= 2) { this.startPinch(); return; }
 
     const hit = e.button === 2 ? -1 : this.pick(px, py, this.slackFor(e));
-    if (hit >= 0 && this.design.parts[hit]) {
+    // En un edificio del juego se puede elegir una pieza para verle la ficha,
+    // pero no arrastrarla: el dedo mueve la vista.
+    if (hit >= 0 && this.design.parts[hit] && !this.readOnly) {
       if (hit !== this.selected) { this.selected = hit; this.renderPanel(); }
       const part = this.design.parts[hit];
       this.drag = {
@@ -825,6 +960,7 @@ export class Studio {
       };
       this.pushUndo();
     } else {
+      if (hit >= 0 && hit !== this.selected) { this.selected = hit; this.renderPanel(); }
       this.drag = { mode: 'pan', px, py, moved: false, ox: this.ox, oy: this.oy };
     }
     this.redraw();
@@ -955,7 +1091,15 @@ export class Studio {
 
   onKey(e) {
     if (!this.isOpen()) return;
-    if (e.key === 'Escape') { this.close(); return; }
+    if (e.key === 'Escape') {
+      // Primero se cierra lo que esté por encima: el diálogo de compartir.
+      if (!el('studio-share').classList.contains('hidden')) {
+        el('studio-share').classList.add('hidden');
+        return;
+      }
+      this.close();
+      return;
+    }
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); this.undoLast(); return; }
@@ -1021,6 +1165,7 @@ export class Studio {
 
   /** Empuja la pieza un paso de rejilla en la dirección que se ve. */
   nudge(dxr, dyr, dz) {
+    if (this.readOnly) return this.warnReadOnly();
     const part = this.design?.parts[this.selected];
     if (!part) return;
     const step = this.snap || 0.05;
@@ -1037,7 +1182,7 @@ export class Studio {
   /** La cruceta sólo está cuando hay algo que empujar. */
   updatePad() {
     const part = this.design?.parts[this.selected];
-    el('studio-pad').classList.toggle('hidden', !part);
+    el('studio-pad').classList.toggle('hidden', !part || this.readOnly);
     el('studio-view').classList.toggle('lifting', this.moveMode === 'z');
   }
 
@@ -1099,9 +1244,30 @@ export class Studio {
       box.innerHTML = '<p class="cat-empty">Crea un edificio para empezar.</p>';
       return;
     }
+    if (this.readOnly) box.appendChild(this.builtinNotice());
     if (this.tab === 'part') box.appendChild(this.partPanel());
     else if (this.tab === 'build') box.appendChild(this.buildPanel());
     else box.appendChild(this.colorPanel());
+    // Los del juego se enseñan enteros, pero con los controles apagados.
+    if (this.readOnly) {
+      for (const input of box.querySelectorAll('input, select, .studio-actions button')) {
+        input.disabled = true;
+      }
+    }
+  }
+
+  /** Cartel de los edificios que trae el juego, con la salida a mano. */
+  builtinNotice() {
+    const wrap = document.createElement('div');
+    wrap.className = 'studio-builtin-note';
+    const p = document.createElement('p');
+    p.textContent = 'Este edificio viene con el juego, igual en todos los dispositivos. Duplícalo y la copia será tuya para cambiarla.';
+    const b = document.createElement('button');
+    b.textContent = 'Duplicar para editarlo';
+    b.onclick = () => el('btn-studio-dup').click();
+    b.disabled = !canAddDesign();
+    wrap.append(p, b);
+    return wrap;
   }
 
 

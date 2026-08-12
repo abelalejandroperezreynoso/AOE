@@ -138,6 +138,10 @@
           <button id="btn-studio-dup">Duplicar</button>
           <button id="btn-studio-del" class="studio-del-btn">Borrar</button>
         </div>
+        <div class="studio-side-actions">
+          <button id="btn-studio-share">Compartir</button>
+          <button id="btn-studio-import">Importar</button>
+        </div>
       </aside>
 
       <section class="studio-main">
@@ -178,6 +182,23 @@
       barra de construcción de los aldeanos, con su coste y su función. En
       multijugador se juega con los edificios de quien invita.
     </p>
+  </div>
+</div>
+
+<!-- ---------- Compartir un edificio del taller ---------- -->
+<div id="studio-share" class="overlay hidden">
+  <div class="menu-card small">
+    <h2 id="share-title">Compartir edificio</h2>
+    <p id="share-hint" class="subtitle"></p>
+    <textarea id="share-text" class="share-text" spellcheck="false" autocomplete="off"></textarea>
+    <div class="menu-actions">
+      <button id="btn-share-copy">Copiar</button>
+      <button id="btn-share-file">Descargar</button>
+      <button id="btn-share-paste">Pegar</button>
+      <button id="btn-share-apply" class="wide primary">Importar el edificio</button>
+    </div>
+    <p id="share-note" class="share-note"></p>
+    <button id="btn-share-close" class="secondary">Cerrar</button>
   </div>
 </div>
 
@@ -314,7 +335,7 @@
       <tr><td>F11 o el menú</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
       <tr><td>Multijugador</td><td>Desde el menú principal: entra en la sala, elige a alguien e invítalo</td></tr>
       <tr><td>Catálogo</td><td>Desde el menú principal: consulta y edita los valores y el aspecto de todo el juego</td></tr>
-      <tr><td>Taller de edificios</td><td>Desde el menú principal: modela tus propios edificios con piezas y constrúyelos en la partida como uno más. Con el ratón, arrastra para mover y Mayús para subir y bajar; con el dedo, uno arrastra la pieza y dos acercan y mueven la vista. La cruceta de debajo del modelo la coloca al detalle. Las piezas y los controles de vista están en menús desplegables, y la vista previa y el panel se pliegan para dejar la pantalla libre</td></tr>
+      <tr><td>Taller de edificios</td><td>Desde el menú principal: modela tus propios edificios con piezas y constrúyelos en la partida como uno más. Con el ratón, arrastra para mover y Mayús para subir y bajar; con el dedo, uno arrastra la pieza y dos acercan y mueven la vista. La cruceta de debajo del modelo la coloca al detalle. Las piezas y los controles de vista están en menús desplegables, y la vista previa y el panel se pliegan para dejar la pantalla libre. Con Compartir e Importar, un edificio se copia como texto y se lleva a otro dispositivo o a otra persona</td></tr>
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
       <tr><td>Toque en el mapa</td><td>Manda la selección y nada más: coge lo que toques, cambia de unidad o suelta lo que tuvieras al tocar el suelo. Un toque nunca da órdenes, así que fallar el dedo no manda a nadie a ninguna parte</td></tr>
       <tr><td>Mantener pulsado</td><td>El clic derecho del dedo: por aquí van todas las órdenes —moverse, recolectar, atacar, descargar en el centro urbano o un campamento, y plantar el punto de reunión de un cuartel—, y ninguna toca lo que tengas seleccionado</td></tr>

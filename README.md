@@ -218,13 +218,33 @@ construcción de los aldeanos con su coste y su tecla, aparecen en el catálogo
 —donde se les pueden retocar valores y colores como a los de serie— y se pueden
 duplicar para probar variantes. Caben 24 edificios de hasta 200 piezas.
 
+### Compartir un edificio
+
+Un diseño es sólo datos, así que cabe en una línea de texto y viaja por donde
+sea:
+
+- **Compartir** saca el edificio entero como texto, con botones para copiarlo al
+  portapapeles o descargarlo como fichero.
+- **Importar** hace lo contrario: se pega el texto y entra como un edificio nuevo
+  —con identificador nuevo, así que nunca pisa lo que ya había—. Pasa por el
+  mismo validador que todo lo demás, de modo que un texto raro se queda en un
+  edificio soso y nunca en una partida rota.
+
+Y para que un edificio deje de ser de un navegador y **le llegue a todo el
+mundo**, su texto se pega en `js/data/builtin-designs.js` con un identificador
+que empiece por `b_`. Los de ese fichero viajan con el código: se dan de alta al
+arrancar en cualquier dispositivo, sin que nadie importe nada. En el taller
+salen marcados como «del juego» y no se editan ni se borran desde la interfaz
+—no son de un navegador—, pero se duplican con un botón y la copia ya es tuya.
+
 Detalles a tener en cuenta:
 
 - Al guardar en el taller mandan sus valores: si el catálogo tenía cambios sobre
   **ese** edificio, se retiran (los del resto del juego no se tocan).
 - En **multijugador manda quien invita**: sus edificios viajan a los demás al
-  empezar la partida y todos juegan con ellos. Los propios vuelven al recargar
-  la página.
+  empezar la partida y todos juegan con ellos —también los que trae el juego,
+  por si los dos lados no van con la misma versión—. Los propios vuelven al
+  recargar la página.
 - La máquina no construye edificios del taller: los usa quien los hizo.
 
 ## Cómo se juega
@@ -330,6 +350,7 @@ js/catalog.js       Catálogo: fichas y edición de los datos del juego
 js/data/appearance.js Colores y tamaño con los que se dibuja cada objeto
 js/data/overrides.js  Valores editados: validación, guardado y aplicación
 js/data/designs.js  Edificios hechos en el taller: validación, guardado y alta
+js/data/builtin-designs.js  Edificios del taller que vienen con el juego
 js/lobby-ui.js      Pantalla de la sala de espera
 js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
 js/net/protocol.js  Codificación binaria del estado y de las órdenes
