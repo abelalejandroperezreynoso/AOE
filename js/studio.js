@@ -311,18 +311,49 @@ export class Studio {
     if (this.tab === 'list') this.fillList(el('studio-panel').querySelector('.studio-list-panel'));
     el('btn-studio-dup').disabled = !this.design || !canAddDesign();
     el('btn-studio-del').disabled = !this.design || this.readOnly;
+    el('btn-studio-del').title = this.readOnly
+      ? 'Este edificio viene con el juego: no se borra desde aquí. Duplícalo si quieres una versión tuya.'
+      : 'Borra el edificio elegido.';
     el('btn-studio-share').disabled = !this.design;
     el('btn-studio-new').disabled = !canAddDesign();
   }
 
   /** Pinta los edificios guardados en una lista cualquiera. */
+  /**
+   * Los edificios del taller, en dos bloques: primero los que ha hecho quien
+   * juega y luego los que trae el juego. Van separados y con su rótulo porque
+   * si no, un edificio que no se puede borrar en medio de los propios sólo
+   * lleva a preguntarse qué hace ahí.
+   */
   fillList(list) {
     if (!list) return;
     list.innerHTML = '';
-    const designs = allDesigns();
-    if (!designs.length) {
+    const mine = myDesigns();
+    const stock = allDesigns().filter((d) => isBuiltin(d.id));
+    if (!mine.length && !stock.length) {
       list.innerHTML = '<li class="cat-empty">Todavía no has hecho ninguno.</li>';
+      return;
     }
+    if (mine.length) this.listSection(list, 'Tuyos', mine);
+    else if (stock.length) {
+      const li = document.createElement('li');
+      li.className = 'cat-empty';
+      li.textContent = 'Todavía no has hecho ninguno.';
+      list.appendChild(li);
+    }
+    if (stock.length) {
+      this.listSection(list, 'Del juego', stock,
+        'Vienen con el juego, iguales en todos los dispositivos. Se pueden mirar y duplicar, pero no borrar desde aquí.');
+    }
+  }
+
+  /** Un bloque de la lista, con su rótulo. */
+  listSection(list, title, designs, hint) {
+    const head = document.createElement('li');
+    head.className = 'studio-list-head';
+    head.textContent = title;
+    if (hint) head.title = hint;
+    list.appendChild(head);
     for (const d of designs) {
       const li = document.createElement('li');
       li.className = 'cat-item' + (this.design && d.id === this.design.id ? ' active' : '');
@@ -333,14 +364,14 @@ export class Studio {
       const n = document.createElement('div');
       n.className = 'cat-name';
       n.textContent = d.name;
-      const s = document.createElement('div');
-      s.className = 'cat-sub';
-      s.textContent = (d.replaces
+      const sub = document.createElement('div');
+      sub.className = 'cat-sub';
+      sub.textContent = d.replaces
         ? `Aspecto de ${BUILDINGS[d.replaces]?.name || d.replaces}`
-        : `${ROLES[d.role].short} · ${d.size}×${d.size} · ${AGES[d.age].short}`)
-        + (isBuiltin(d.id) ? ' · del juego' : '');
-      text.append(n, s);
+        : `${ROLES[d.role].short} · ${d.size}×${d.size} · ${AGES[d.age].short}`;
+      text.append(n, sub);
       li.append(thumb, text);
+      if (hint) li.title = hint;
       li.onclick = () => { this.persist(true); this.load(d.id); };
       list.appendChild(li);
     }
