@@ -79,8 +79,9 @@ export const ROLE_FIELDS = {
 /*
  * Dos listas: los que vienen con el juego (builtin-designs.js, iguales en todos
  * los dispositivos) y los que ha hecho quien juega (guardados en su navegador).
- * Las dos se dan de alta igual; lo único que las distingue es que las primeras
- * no se pueden tocar desde el taller, porque no son de un navegador.
+ * Las dos se dan de alta igual, pero sólo las segundas salen en el taller: un
+ * diseño que viene con el juego no es una cosa que esté en el taller, es la
+ * cara de un edificio del juego, y de casa sólo hay una.
  */
 let builtin = [];
 let designs = [];
@@ -94,15 +95,15 @@ let version = 0;
  */
 export function designsVersion() { return version; }
 
-/** Todos los edificios del taller: primero los del juego, luego los del jugador. */
+/** Todos los diseños dados de alta: primero los del juego, luego los propios. */
 export function allDesigns() { return [...builtin, ...designs]; }
 
-/** Sólo los que ha hecho quien juega, que son los que se pueden tocar. */
+/** Sólo los que ha hecho quien juega: son los que salen en el taller. */
 export function myDesigns() { return designs; }
 
 export function getDesign(id) { return allDesigns().find((d) => d.id === id) || null; }
 
-/** ¿Viene con el juego? Entonces es de todos y no se edita desde el taller. */
+/** ¿Viene con el juego? Entonces no es de un navegador y no se toca desde aquí. */
 export const isBuiltin = (id) => typeof id === 'string' && id.startsWith('b_');
 
 /*
@@ -281,22 +282,36 @@ function applyRegistry() {
   for (const [type, look] of stockLooks) LOOK.building[type] = look;
   models.clear();
 
+  /*
+   * Primero los que le dan la cara a un edificio que ya existe. De casa sólo
+   * hay una a la vez, así que aquí sólo puede quedar un modelo por edificio: se
+   * recorren en orden y manda el último, y como los del jugador van después de
+   * los del juego, el suyo gana sobre el que viniera de fábrica.
+   */
+  for (const d of [...builtin, ...designs]) {
+    if (!d.replaces) continue;
+    if (!stockLooks.has(d.replaces)) stockLooks.set(d.replaces, LOOK.building[d.replaces]);
+    models.set(d.replaces, d);
+    LOOK.building[d.replaces] = paletteOf(d);
+  }
+
+  // Y luego los que sí son edificios nuevos, en orden de identificador para que
+  // la tabla salga igual en cualquier dispositivo.
   for (const d of allDesigns().sort((a, b) => (a.id < b.id ? -1 : 1))) {
-    const palette = {};
-    for (const m of usedMaterials(d)) palette[m] = d.palette[m];
-    if (d.replaces) {
-      // No es un edificio nuevo: es el aspecto de uno que ya existe.
-      if (!stockLooks.has(d.replaces)) stockLooks.set(d.replaces, LOOK.building[d.replaces]);
-      models.set(d.replaces, d);
-      LOOK.building[d.replaces] = palette;
-      continue;
-    }
+    if (d.replaces) continue;
     BUILDINGS[d.id] = definitionOf(d);
-    LOOK.building[d.id] = palette;
+    LOOK.building[d.id] = paletteOf(d);
     BUILD_ORDER.push(d.id);
     registered.add(d.id);
   }
   version++;
+}
+
+/** Los colores que el catálogo podrá retocar: sólo los materiales que se usan. */
+function paletteOf(d) {
+  const palette = {};
+  for (const m of usedMaterials(d)) palette[m] = d.palette[m];
+  return palette;
 }
 
 /*
