@@ -171,6 +171,19 @@ export function captureBuilding(type) {
   if (l) defaults.buildingLook[type] = { ...l };
 }
 
+/**
+ * Sólo los colores de fábrica de un edificio. Es lo que hace falta cuando un
+ * diseño del taller le cambia la cara a un edificio de serie: su modelo y su
+ * paleta son otros, pero lo que cuesta y lo que aguanta sigue siendo lo suyo y
+ * no hay que volver a tomarlo (si no, unos valores ya retocados en el catálogo
+ * pasarían por ser los de fábrica).
+ */
+export function captureBuildingLook(type) {
+  capture();
+  const l = LOOK.building[type];
+  if (l) defaults.buildingLook[type] = { ...l };
+}
+
 /** Olvida un edificio que ya no existe y tira los cambios que tuviera. */
 export function forgetBuilding(type) {
   delete defaults.building[type];
