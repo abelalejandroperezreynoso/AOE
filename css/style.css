@@ -273,14 +273,6 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 }
 .cat-empty { padding: 14px; color: #8e7c5c; font-size: 13px; text-align: center; }
 
-/* Rótulo de bloque dentro de la lista del taller: los tuyos y los del juego. */
-.studio-list-head {
-  padding: 8px 10px 4px;
-  font-size: 11px; color: #8e7c5c;
-  text-transform: uppercase; letter-spacing: 1px;
-  border-top: 1px solid rgba(255, 225, 170, .1);
-}
-.studio-list-head:first-child { border-top: none; }
 
 .catalog-detail {
   flex: 1; overflow-y: auto;
