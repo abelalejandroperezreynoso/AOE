@@ -22,9 +22,13 @@
 // juego— y su modelo se ajusta solo a la huella de ese edificio. Es la forma de
 // cambiarle el aspecto a algo del juego sin tocar el equilibrio.
 //
-// Los de aquí salen en el taller marcados como «del juego» y no se pueden
-// editar ni borrar desde la interfaz —son de todos, no de un navegador—, pero
-// se duplican con un botón y la copia ya es tuya para cambiarla.
+// Los de aquí **no salen en la lista del taller**: no son cosas que estén en el
+// taller, son la cara de un edificio del juego. De casa hay una sola, y este
+// fichero dice cómo es. Por eso también hay como mucho una entrada por edificio
+// vestido: un diseño nuevo para la casa sustituye al que hubiera, no se suma.
+//
+// Si quien juega hace en su taller un diseño para el mismo edificio, el suyo
+// manda sobre este mientras lo tenga.
 
 export const BUILTIN_DESIGNS = [
   // La casa de aldea: le da la cara al edificio «Casa» del juego, que sigue

@@ -237,9 +237,11 @@ sea:
 Y para que un edificio deje de ser de un navegador y **le llegue a todo el
 mundo**, su texto se pega en `js/data/builtin-designs.js` con un identificador
 que empiece por `b_`. Los de ese fichero viajan con el código: se dan de alta al
-arrancar en cualquier dispositivo, sin que nadie importe nada. En el taller
-salen marcados como «del juego» y no se editan ni se borran desde la interfaz
-—no son de un navegador—, pero se duplican con un botón y la copia ya es tuya.
+arrancar en cualquier dispositivo, sin que nadie importe nada. No salen en la
+lista del taller —no son cosas del taller, son la cara de un edificio del
+juego—, y hay como mucho uno por edificio vestido: un diseño nuevo para la casa
+sustituye al que hubiera. Si quien juega hace el suyo para ese mismo edificio,
+el suyo manda mientras lo tenga.
 
 La **casa** del juego es justo eso: su modelo sale de un diseño hecho en el
 taller, con la ficha de siempre (25 de madera, +5 de población, dos casillas).

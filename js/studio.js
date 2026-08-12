@@ -18,8 +18,8 @@ import {
   DEFAULT_PALETTE, designParts, designMesh,
 } from './gfx3d/parts.js';
 import {
-  allDesigns, myDesigns, getDesign, saveDesign, deleteDesign, duplicateDesign, canAddDesign,
-  designFromTemplate, isBuiltin, resizeDesign, TEMPLATES, ROLES, STAT_FIELDS,
+  myDesigns, getDesign, saveDesign, deleteDesign, duplicateDesign, canAddDesign,
+  designFromTemplate, resizeDesign, TEMPLATES, ROLES, STAT_FIELDS,
   ROLE_FIELDS, STOCK_BUILDINGS, MAX_PARTS, MAX_DESIGNS,
 } from './data/designs.js';
 import { clearSpriteCaches, drawSprite } from './sprites.js';
@@ -136,18 +136,6 @@ export class Studio {
 
   isOpen() { return !el('studio').classList.contains('hidden'); }
 
-  /**
-   * Los edificios que vienen con el juego se miran pero no se tocan: son
-   * iguales en todos los dispositivos y no viven en este navegador. Para
-   * cambiar uno se duplica, y la copia ya es de quien la hace.
-   */
-  get readOnly() { return !!this.design && isBuiltin(this.design.id); }
-
-  /** Avisa de por qué no se deja tocar, y de cómo sí. */
-  warnReadOnly() {
-    this.status('Ese edificio viene con el juego: duplícalo para poder cambiarlo.');
-  }
-
   open() {
     el('main-menu').classList.add('hidden');
     el('studio').classList.remove('hidden');
@@ -213,7 +201,6 @@ export class Studio {
 
   confirmDelete(btn = el('btn-studio-del')) {
     if (!this.design) return;
-    if (this.readOnly) { this.warnReadOnly(); return; }
     if (!this.confirming) {
       this.confirming = true;
       btn.textContent = '¿Seguro?';
@@ -228,7 +215,7 @@ export class Studio {
     forgetBuilding(id);
     clearSpriteCaches();
     this.design = null;
-    const next = allDesigns()[0];
+    const next = myDesigns()[0];
     this.renderList();
     if (next) this.load(next.id);
     else { this.clearView(); this.renderPanel(); }
@@ -253,7 +240,7 @@ export class Studio {
    */
   persist(now = false) {
     clearTimeout(this.saveTimer);
-    if (!this.design || this.readOnly) return;
+    if (!this.design) return;
     const doIt = () => {
       const saved = saveDesign(this.design);
       if (!saved) { this.status('No se ha podido guardar.'); return; }
@@ -310,50 +297,25 @@ export class Studio {
     // En pantallas pequeñas la lista vive en la hoja de abajo, en su pestaña.
     if (this.tab === 'list') this.fillList(el('studio-panel').querySelector('.studio-list-panel'));
     el('btn-studio-dup').disabled = !this.design || !canAddDesign();
-    el('btn-studio-del').disabled = !this.design || this.readOnly;
-    el('btn-studio-del').title = this.readOnly
-      ? 'Este edificio viene con el juego: no se borra desde aquí. Duplícalo si quieres una versión tuya.'
-      : 'Borra el edificio elegido.';
+    el('btn-studio-del').disabled = !this.design;
     el('btn-studio-share').disabled = !this.design;
     el('btn-studio-new').disabled = !canAddDesign();
   }
 
   /** Pinta los edificios guardados en una lista cualquiera. */
   /**
-   * Los edificios del taller, en dos bloques: primero los que ha hecho quien
-   * juega y luego los que trae el juego. Van separados y con su rótulo porque
-   * si no, un edificio que no se puede borrar en medio de los propios sólo
-   * lleva a preguntarse qué hace ahí.
+   * Los edificios que ha hecho quien juega. Los que trae el juego no salen: no
+   * son cosas que estén en el taller, son la cara de un edificio del juego, y
+   * de casa (o de molino, o de cuartel) sólo hay una a la vez.
    */
   fillList(list) {
     if (!list) return;
     list.innerHTML = '';
-    const mine = myDesigns();
-    const stock = allDesigns().filter((d) => isBuiltin(d.id));
-    if (!mine.length && !stock.length) {
+    const designs = myDesigns();
+    if (!designs.length) {
       list.innerHTML = '<li class="cat-empty">Todavía no has hecho ninguno.</li>';
       return;
     }
-    if (mine.length) this.listSection(list, 'Tuyos', mine);
-    else if (stock.length) {
-      const li = document.createElement('li');
-      li.className = 'cat-empty';
-      li.textContent = 'Todavía no has hecho ninguno.';
-      list.appendChild(li);
-    }
-    if (stock.length) {
-      this.listSection(list, 'Del juego', stock,
-        'Vienen con el juego, iguales en todos los dispositivos. Se pueden mirar y duplicar, pero no borrar desde aquí.');
-    }
-  }
-
-  /** Un bloque de la lista, con su rótulo. */
-  listSection(list, title, designs, hint) {
-    const head = document.createElement('li');
-    head.className = 'studio-list-head';
-    head.textContent = title;
-    if (hint) head.title = hint;
-    list.appendChild(head);
     for (const d of designs) {
       const li = document.createElement('li');
       li.className = 'cat-item' + (this.design && d.id === this.design.id ? ' active' : '');
@@ -371,7 +333,6 @@ export class Studio {
         : `${ROLES[d.role].short} · ${d.size}×${d.size} · ${AGES[d.age].short}`;
       text.append(n, sub);
       li.append(thumb, text);
-      if (hint) li.title = hint;
       li.onclick = () => { this.persist(true); this.load(d.id); };
       list.appendChild(li);
     }
@@ -397,7 +358,7 @@ export class Studio {
     const dup = mk('Duplicar', () => el('btn-studio-dup').click());
     const del = mk('Borrar', (e) => this.confirmDelete(e.currentTarget), 'studio-del studio-del-btn');
     dup.disabled = !this.design;
-    del.disabled = !this.design || this.readOnly;
+    del.disabled = !this.design;
     acts.append(nuevo, dup, del);
     const acts2 = document.createElement('div');
     acts2.className = 'studio-actions';
@@ -670,7 +631,6 @@ export class Studio {
   // --- Piezas -----------------------------------------------------------------
 
   addPart(kind) {
-    if (this.readOnly) return this.warnReadOnly();
     if (!this.design) return;
     if (this.design.parts.length >= MAX_PARTS) {
       this.status(`Un edificio no puede pasar de ${MAX_PARTS} piezas.`);
@@ -704,7 +664,6 @@ export class Studio {
   }
 
   deletePart() {
-    if (this.readOnly) return this.warnReadOnly();
     if (!this.design || this.selected < 0) return;
     this.pushUndo();
     this.design.parts.splice(this.selected, 1);
@@ -713,7 +672,6 @@ export class Studio {
   }
 
   duplicatePart() {
-    if (this.readOnly) return this.warnReadOnly();
     if (!this.design || this.selected < 0) return;
     if (this.design.parts.length >= MAX_PARTS) return;
     this.pushUndo();
@@ -995,9 +953,7 @@ export class Studio {
     if (this.pointers.size >= 2) { this.startPinch(); return; }
 
     const hit = e.button === 2 ? -1 : this.pick(px, py, this.slackFor(e));
-    // En un edificio del juego se puede elegir una pieza para verle la ficha,
-    // pero no arrastrarla: el dedo mueve la vista.
-    if (hit >= 0 && this.design.parts[hit] && !this.readOnly) {
+    if (hit >= 0 && this.design.parts[hit]) {
       if (hit !== this.selected) { this.selected = hit; this.renderPanel(); }
       const part = this.design.parts[hit];
       this.drag = {
@@ -1007,7 +963,6 @@ export class Studio {
       };
       this.pushUndo();
     } else {
-      if (hit >= 0 && hit !== this.selected) { this.selected = hit; this.renderPanel(); }
       this.drag = { mode: 'pan', px, py, moved: false, ox: this.ox, oy: this.oy };
     }
     this.redraw();
@@ -1212,7 +1167,6 @@ export class Studio {
 
   /** Empuja la pieza un paso de rejilla en la dirección que se ve. */
   nudge(dxr, dyr, dz) {
-    if (this.readOnly) return this.warnReadOnly();
     const part = this.design?.parts[this.selected];
     if (!part) return;
     const step = this.snap || 0.05;
@@ -1229,7 +1183,7 @@ export class Studio {
   /** La cruceta sólo está cuando hay algo que empujar. */
   updatePad() {
     const part = this.design?.parts[this.selected];
-    el('studio-pad').classList.toggle('hidden', !part || this.readOnly);
+    el('studio-pad').classList.toggle('hidden', !part);
     el('studio-view').classList.toggle('lifting', this.moveMode === 'z');
   }
 
@@ -1291,30 +1245,9 @@ export class Studio {
       box.innerHTML = '<p class="cat-empty">Crea un edificio para empezar.</p>';
       return;
     }
-    if (this.readOnly) box.appendChild(this.builtinNotice());
     if (this.tab === 'part') box.appendChild(this.partPanel());
     else if (this.tab === 'build') box.appendChild(this.buildPanel());
     else box.appendChild(this.colorPanel());
-    // Los del juego se enseñan enteros, pero con los controles apagados.
-    if (this.readOnly) {
-      for (const input of box.querySelectorAll('input, select, .studio-actions button')) {
-        input.disabled = true;
-      }
-    }
-  }
-
-  /** Cartel de los edificios que trae el juego, con la salida a mano. */
-  builtinNotice() {
-    const wrap = document.createElement('div');
-    wrap.className = 'studio-builtin-note';
-    const p = document.createElement('p');
-    p.textContent = 'Este edificio viene con el juego, igual en todos los dispositivos. Duplícalo y la copia será tuya para cambiarla.';
-    const b = document.createElement('button');
-    b.textContent = 'Duplicar para editarlo';
-    b.onclick = () => el('btn-studio-dup').click();
-    b.disabled = !canAddDesign();
-    wrap.append(p, b);
-    return wrap;
   }
 
 
