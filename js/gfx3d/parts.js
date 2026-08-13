@@ -345,15 +345,22 @@ export const PARTS = {
     build(out, p, c) {
       const col = matColor(p, c), o = matOpts(p);
       const n = Math.round(p.steps);
+      const sd = p.d / n;
+      /*
+       * Cada peldaño es una losa suya, pegada a la siguiente y sin meterse
+       * dentro de ella. Antes cada uno abarcaba desde el fondo, así que unos
+       * quedaban metidos dentro de otros: el horneado lo resolvía con su
+       * z-buffer, pero cualquier dibujo por orden de lejanía —el del propio
+       * taller— no tiene forma de ordenar dos cuerpos que se solapan, y la
+       * escalera salía deshecha. Con losas contiguas la silueta es la misma y
+       * no hay nada que ordenar.
+       */
       for (let i = 0; i < n; i++) {
-        const t = (i + 1) / n;                 // altura acumulada
-        const depth = p.d * (1 - i / n);       // cada peldaño llega menos lejos
+        const rise = p.h * ((i + 1) / n);
         if (p.axis === 'x') {
-          const near = p.x + p.d / 2 - (p.d - depth);
-          box(out, near - depth / 2, p.y, p.z, depth, p.w, p.h * t, col, o);
+          box(out, p.x + p.d / 2 - (i + 0.5) * sd, p.y, p.z, sd, p.w, rise, col, o);
         } else {
-          const near = p.y + p.d / 2 - (p.d - depth);
-          box(out, p.x, near - depth / 2, p.z, p.w, depth, p.h * t, col, o);
+          box(out, p.x, p.y + p.d / 2 - (i + 0.5) * sd, p.z, p.w, sd, rise, col, o);
         }
       }
     },

@@ -53,6 +53,8 @@ export class Studio {
     this.moveMode = 'xy';    // 'xy' por el suelo, 'z' en vertical (con el dedo)
     this.pointers = new Map(); // dedos o punteros que hay ahora mismo encima
     this.pinch = null;
+    this.baked = null;       // el horneado exacto de la vista, cuando está quieta
+    this.resCap = 3;         // techo de resolución del horneado, según lo rápido que vaya
     this.bind();
   }
 
@@ -160,6 +162,7 @@ export class Studio {
 
   close() {
     this.persist(true);
+    clearTimeout(this.bakeTimer);
     el('studio').classList.add('hidden');
     el('main-menu').classList.remove('hidden');
   }
@@ -885,7 +888,7 @@ export class Studio {
   spin(x, y) {
     if (!this.viewYaw) return [x, y];
     const a = (this.viewYaw * Math.PI) / 2;
-    const c = Math.cos(a), s = Math.sin(a), m = (this.design?.size || 2) / 2;
+    const c = Math.cos(a), s = Math.sin(a), m = renderSize(this.design || { size: 2 }) / 2;
     return [m + (x - m) * c - (y - m) * s, m + (x - m) * s + (y - m) * c];
   }
 
@@ -960,12 +963,16 @@ export class Studio {
 
     // Triángulos de todas las piezas, proyectados y ordenados de lejos a cerca:
     // el algoritmo del pintor. Con unos miles de caras va sobrado y responde al
-    // arrastre sin pensárselo.
+    // arrastre sin pensárselo. Se calculan siempre, se pinten o no, porque son
+    // también con lo que se sabe qué pieza hay bajo el dedo.
     const groups = designParts(this.design, this.colorIdx, 2, true);
     const list = [];
     for (const g of groups) {
       const gi = this.design.parts.indexOf(g.part);
-      if (this.viewYaw) rotZ(g.tris, (this.viewYaw * Math.PI) / 2, this.design.size / 2, this.design.size / 2);
+      if (this.viewYaw) {
+        const m = renderSize(this.design) / 2;
+        rotZ(g.tris, (this.viewYaw * Math.PI) / 2, m, m);
+      }
       for (const t of g.tris) {
         list.push({
           gi,
@@ -988,20 +995,30 @@ export class Studio {
       this.anchors.push({ gi: i, x: ax, y: ay });
     });
 
-    for (const it of list) {
-      const l = it.light;
-      ctx.fillStyle = `rgb(${Math.min(255, it.c[0] * l) | 0},${Math.min(255, it.c[1] * l) | 0},${Math.min(255, it.c[2] * l) | 0})`;
-      ctx.beginPath();
-      ctx.moveTo(it.pts[0][0], it.pts[0][1]);
-      ctx.lineTo(it.pts[1][0], it.pts[1][1]);
-      ctx.lineTo(it.pts[2][0], it.pts[2][1]);
-      ctx.closePath();
-      ctx.fill();
-      // Un pelo de trazo del mismo color tapa la costura entre triángulos que
-      // deja el suavizado del navegador.
-      ctx.strokeStyle = ctx.fillStyle;
-      ctx.lineWidth = 0.6;
-      ctx.stroke();
+    const sprite = this.settledSprite();
+    if (sprite) {
+      // Quieta la vista, se enseña el sprite horneado: exactamente el mismo
+      // dibujo que saldrá en la partida, sombra y contorno incluidos.
+      ctx.imageSmoothingEnabled = false;
+      drawSprite(ctx, sprite, this.ox, this.oy, this.zoom);
+      ctx.imageSmoothingEnabled = true;
+    } else {
+      for (const it of list) {
+        const l = it.light;
+        ctx.fillStyle = `rgb(${Math.min(255, it.c[0] * l) | 0},${Math.min(255, it.c[1] * l) | 0},${Math.min(255, it.c[2] * l) | 0})`;
+        ctx.beginPath();
+        ctx.moveTo(it.pts[0][0], it.pts[0][1]);
+        ctx.lineTo(it.pts[1][0], it.pts[1][1]);
+        ctx.lineTo(it.pts[2][0], it.pts[2][1]);
+        ctx.closePath();
+        ctx.fill();
+        // Un pelo de trazo del mismo color tapa la costura entre triángulos que
+        // deja el suavizado del navegador.
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+      }
+      this.scheduleBake();
     }
 
     if (this.ref && this.ref.front) this.drawRef(ctx);
@@ -1010,9 +1027,81 @@ export class Studio {
     this.updatePad();
   }
 
+  /*
+   * Dos dibujos para lo mismo, y cada uno donde sirve.
+   *
+   * El juego no dibuja triángulos: hornea el modelo con un rasterizador propio
+   * que decide píxel a píxel qué cara queda delante (búfer de profundidad). El
+   * taller, mientras se arrastra una pieza, no puede pagar eso —hornear un
+   * edificio mediano cuesta decenas de milisegundos— y pinta las caras
+   * ordenadas de lejos a cerca. Ese orden es una aproximación: cuando dos
+   * cuerpos se cruzan o uno se mete dentro de otro no hay orden posible que
+   * salga bien, y ahí es donde el taller enseñaba costuras y piezas
+   * atravesadas que en la partida no están.
+   *
+   * De modo que se pinta rápido mientras hay dedo encima y, en cuanto la vista
+   * se queda quieta, se hornea el modelo de verdad y se enseña ese sprite. Lo
+   * que se ve al soltar es, píxel a píxel, lo que se verá en la partida.
+   */
+
+  /** La resolución del horneado: tanta como aumento tenga la vista, con tope. */
+  bakeRes() {
+    return Math.max(1, Math.min(this.resCap, Math.round(this.zoom * 2) / 2));
+  }
+
+  /** Todo lo que cambia el sprite. Mover o encuadrar la vista no está: no lo cambia. */
+  bakeKey() {
+    return JSON.stringify([
+      this.design.id, this.design.size, this.design.replaces || '',
+      this.design.palette, this.design.parts,
+      this.viewYaw, this.colorIdx, this.bakeRes(),
+    ]);
+  }
+
+  /** El horneado de la vista, si el que hay sigue valiendo para lo que se ve ahora. */
+  settledSprite() {
+    return this.baked && this.baked.key === this.bakeKey() ? this.baked.sprite : null;
+  }
+
+  /**
+   * Hornea en cuanto la vista lleva un momento quieta. Cualquier redibujado
+   * mientras tanto vuelve a aplazarlo, así que arrastrar no hornea ni una vez.
+   */
+  scheduleBake() {
+    clearTimeout(this.bakeTimer);
+    this.bakeTimer = setTimeout(() => this.bakeView(), 180);
+  }
+
+  bakeView() {
+    if (!this.design || !this.isOpen()) return;
+    const res = this.bakeRes();
+    let sprite = null, ms = 0;
+    try {
+      const mesh = designMesh(this.design, this.colorIdx, 2, true);
+      if (this.viewYaw) {
+        const m = renderSize(this.design) / 2;
+        rotZ(mesh, (this.viewYaw * Math.PI) / 2, m, m);
+      }
+      const t0 = performance.now();
+      sprite = bake(mesh, { res });
+      ms = performance.now() - t0;
+    } catch {
+      // Un diseño imposible no deja el taller sin visor: se sigue con el pintor.
+      return;
+    }
+    // Si al aparato le cuesta, se le pide menos la próxima vez: más vale un
+    // horneado algo basto que una vista que se queda pillada al soltar. Y si
+    // va sobrado se le vuelve a subir, que un tirón suelto no tiene por qué
+    // dejar el taller borroso para siempre.
+    if (ms > 110 && res > 1) this.resCap = Math.max(1, res - 0.5);
+    else if (ms < 40) this.resCap = Math.min(3, this.resCap + 0.5);
+    this.baked = { key: this.bakeKey(), sprite };
+    this.redraw();
+  }
+
   /** La huella del edificio: las casillas que ocupará en el mapa. */
   drawGround(ctx) {
-    const s = this.design.size;
+    const s = renderSize(this.design);
     const corner = (x, y) => {
       const [rx, ry] = this.spin(x, y);
       return this.toScreen([rx, ry, 0]);
