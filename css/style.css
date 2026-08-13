@@ -419,6 +419,18 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .studio-pop.right { left: auto; right: 0; }
 .studio-pop .cat-field { gap: 12px; }
 .studio-menu-item { text-align: left; padding: 8px 10px; font-size: 13px; }
+/* El botón de elegir fichero es una etiqueta: el <input type=file> de verdad va
+   escondido dentro, que no hay forma de darle este aspecto. */
+.studio-file {
+  position: relative; overflow: hidden; cursor: pointer; display: block;
+  border-radius: 7px; border: 1px solid #6b5334;
+  background: linear-gradient(180deg, #57422a, #33261a);
+  color: var(--parch);
+}
+.studio-file:hover { filter: brightness(1.22); }
+.studio-file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.studio-range { gap: 10px; }
+.studio-range input[type="range"] { width: 130px; flex: none; accent-color: var(--gold); }
 .cat-field select {
   background: #1b140d; color: var(--parch);
   border: 1px solid #6b5334; border-radius: 5px;
