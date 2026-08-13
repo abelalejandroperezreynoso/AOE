@@ -192,10 +192,13 @@ Para colocar:
   vista: siempre empujan hacia donde apuntan en la pantalla.
 - Con **teclado**: flechas para mover (con **Alt**, arriba y abajo), **Mayús**
   para ir de cuatro en cuatro, **Supr** borra y **Ctrl+Z** deshace.
-- Lo que se ve mientras se modela usa **la misma proyección y la misma luz** que
-  el horneado, y debajo están las **tres etapas de obra ya horneadas** a tamaño
-  de partida: cimientos, en obra y terminado. Las de en medio salen solas, no
-  hay que modelarlas.
+- Mientras se arrastra, la mesa pinta las caras ordenadas de lejos a cerca, que
+  es rápido y responde al dedo al instante; **en cuanto se suelta, hornea el
+  modelo de verdad** y enseña ese sprite. Lo que se ve con la vista quieta es,
+  píxel a píxel, lo que se verá en la partida —sombra y contorno incluidos—, así
+  que no hay sorpresas al construirlo. Debajo están además las **tres etapas de
+  obra horneadas** a tamaño de partida: cimientos, en obra y terminado. Las de
+  en medio salen solas, no hay que modelarlas.
 - En **Edificio** se elige qué es. O bien **el aspecto de un edificio que ya
   existe** —la casa, el molino, el cuartel...—, y entonces el modelo se ajusta
   solo a la huella de ese edificio y lo que cuesta y lo que hace lo sigue
