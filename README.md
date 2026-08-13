@@ -179,7 +179,13 @@ Para colocar:
 - Para **subir y bajar arrastrando**, el botón **Mover / Altura** (o mantener
   **Mayús**) cambia lo que hace el arrastre.
 - **Girar vista** enseña el modelo desde otro lado sin tocar el edificio, que
-  para eso la cámara del juego es fija. Las flechas y la cruceta giran con la
+  para eso la cámara del juego es fija.
+- **Guía** pone una imagen de referencia —una foto, un dibujo, un boceto con
+  transparencia— debajo del modelo para calcarla encima: se le regula la
+  opacidad y el tamaño, se puede pasar delante para comparar siluetas, y se
+  coloca arrastrándola (con la rueda se agranda). Mientras esté puesta en modo
+  de colocar, el arrastre es suyo y no toca las piezas. Se queda guardada en
+  ese navegador, achicada, hasta que se quite. Las flechas y la cruceta giran con la
   vista: siempre empujan hacia donde apuntan en la pantalla.
 - Con **teclado**: flechas para mover (con **Alt**, arriba y abajo), **Mayús**
   para ir de cuatro en cuatro, **Supr** borra y **Ctrl+Z** deshace.
