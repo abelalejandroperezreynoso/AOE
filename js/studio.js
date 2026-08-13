@@ -15,7 +15,7 @@ import { PLAYER_COLORS, AGES, UNITS, BUILDINGS, RESOURCES, RES_NAME } from './co
 import { project, depth, faceLight, rotZ, bake, HW, HH, VZ } from './gfx3d/engine.js';
 import {
   PARTS, PART_KEYS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
-  DEFAULT_PALETTE, designParts, designMesh,
+  DEFAULT_PALETTE, designParts, designMesh, renderSize,
 } from './gfx3d/parts.js';
 import {
   myDesigns, getDesign, saveDesign, deleteDesign, duplicateDesign, canAddDesign,
@@ -28,6 +28,10 @@ import { captureBuilding, captureBuildingLook, forgetBuilding, reset } from './d
 const el = (id) => document.getElementById(id);
 
 const STAGE_NAMES = ['Cimientos', 'En obra', 'Terminado'];
+/** Dónde se guarda la imagen de guía, aparte de los diseños. */
+const REF_KEY = 'aor-studio-ref';
+/** Lado máximo con el que se guarda la guía: es para calcar, no para enmarcar. */
+const REF_MAX = 640;
 const SNAPS = [
   [0.05, 'fino (0,05)'], [0.1, 'medio (0,1)'], [0.25, 'cuarto (0,25)'], [0.5, 'media casilla'],
 ];
@@ -140,6 +144,7 @@ export class Studio {
     el('main-menu').classList.add('hidden');
     el('studio').classList.remove('hidden');
     this.renderTools();
+    this.restoreRef();
     this.renderList();
     /*
      * Se vuelve al que se estaba tocando y, si es la primera vez, al primero
@@ -548,6 +553,9 @@ export class Studio {
       }));
     }));
 
+    // La imagen de guía: cargar una foto o un dibujo y calcarlo.
+    view.appendChild(this.dropdown('▨ Guía', 'Poner una imagen de referencia debajo del modelo para calcarla', (pop) => this.refMenu(pop)));
+
     bar.appendChild(view);
 
     // La vista previa horneada se pliega: en un móvil son sesenta píxeles de
@@ -603,6 +611,160 @@ export class Studio {
     b.title = title;
     b.onclick = () => { closeMenus(); fn(); };
     return b;
+  }
+
+  /**
+   * El menú de la imagen de guía. Se monta al abrir, así que refleja si hay
+   * imagen puesta y con qué ajustes.
+   */
+  refMenu(pop) {
+    const file = document.createElement('label');
+    file.className = 'studio-menu-item studio-file';
+    file.textContent = this.ref ? '▨ Cambiar la imagen...' : '▨ Poner una imagen...';
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = () => {
+      if (input.files && input.files[0]) this.loadRef(input.files[0]);
+      closeMenus();
+    };
+    file.appendChild(input);
+    pop.appendChild(file);
+
+    if (!this.ref) {
+      const hint = document.createElement('p');
+      hint.className = 'studio-hint-text';
+      hint.textContent = 'Se dibuja detrás del modelo para calcarla encima. Las imágenes con transparencia se ven tal cual.';
+      hint.style.margin = '0';
+      pop.appendChild(hint);
+      return;
+    }
+
+    pop.appendChild(rangeRow('Opacidad', this.ref.alpha, 0.05, 1, 0.05, (v) => {
+      this.ref.alpha = v;
+      this.redraw();
+      this.saveRef();
+    }));
+    pop.appendChild(rangeRow('Tamaño', this.ref.scale, 0.05, 6, 0.05, (v) => {
+      this.ref.scale = v;
+      this.redraw();
+      this.saveRef();
+    }));
+    pop.appendChild(checkRow('Delante del modelo', this.ref.front, (on) => {
+      this.ref.front = on;
+      this.redraw();
+      this.saveRef();
+    }));
+    /*
+     * Mientras se coloca, el arrastre mueve la imagen en vez de las piezas: es
+     * la única forma de que con el dedo se pueda ajustar sin descolocar el
+     * modelo, y con ratón evita tener que inventarse una tecla.
+     */
+    pop.appendChild(checkRow('Mover la imagen al arrastrar', !!this.ref.adjust, (on) => {
+      this.ref.adjust = on;
+      this.redraw();
+    }));
+    pop.appendChild(this.menuButton('⤢ Encajarla en el lienzo', 'Vuelve a centrarla y a ajustar su tamaño.', () => {
+      this.fitRef();
+      this.redraw();
+      this.saveRef();
+    }));
+    pop.appendChild(this.menuButton('✕ Quitar la imagen', 'La guía se va; el modelo no se toca.', () => {
+      this.ref = null;
+      this.saveRef();
+      this.redraw();
+    }));
+  }
+
+  /**
+   * Carga la imagen y la deja lista para calcar. Se guarda achicada: es una
+   * guía, no un cuadro, y así cabe en el navegador y vuelve al día siguiente.
+   */
+  loadRef(file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        this.ref = {
+          img, src: shrinkImage(img), px: 0, py: 0, scale: 1, alpha: 0.5,
+          front: false, adjust: true,
+        };
+        this.fitRef();
+        this.saveRef();
+        this.redraw();
+        this.status('Guía puesta. Arrastra para colocarla; en «Guía» se ajusta y se quita.');
+      };
+      img.onerror = () => this.status('No se ha podido leer esa imagen.');
+      img.src = reader.result;
+    };
+    reader.onerror = () => this.status('No se ha podido leer el fichero.');
+    reader.readAsDataURL(file);
+  }
+
+  /**
+   * Pone la guía encima del edificio y a su tamaño, que es lo que se quiere
+   * para calcar. Su sitio y su tamaño van en el mismo espacio que el modelo,
+   * así que se queda pegada a él al acercar, alejar o mover la vista.
+   */
+  fitRef() {
+    if (!this.ref) return;
+    const { img } = this.ref;
+    const { x0, y0, x1, y1 } = this.modelBounds();
+    const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
+    this.ref.scale = Math.min(w / img.width, h / img.height) * 1.15;
+    this.ref.px = (x0 + x1) / 2 - (img.width * this.ref.scale) / 2;
+    this.ref.py = (y0 + y1) / 2 - (img.height * this.ref.scale) / 2;
+  }
+
+  drawRef(ctx) {
+    const r = this.ref;
+    if (!r || !r.img) return;
+    ctx.save();
+    ctx.globalAlpha = r.alpha;
+    ctx.drawImage(r.img,
+      this.ox + r.px * this.zoom, this.oy + r.py * this.zoom,
+      r.img.width * r.scale * this.zoom, r.img.height * r.scale * this.zoom);
+    ctx.restore();
+  }
+
+  /** Guarda la guía en el navegador, con su sitio y sus ajustes. */
+  saveRef() {
+    clearTimeout(this.refTimer);
+    this.refTimer = setTimeout(() => {
+      try {
+        if (!this.ref) localStorage.removeItem(REF_KEY);
+        else {
+          const { src, px, py, scale, alpha, front } = this.ref;
+          localStorage.setItem(REF_KEY, JSON.stringify({ src, px, py, scale, alpha, front }));
+        }
+      } catch {
+        // Sin sitio en el navegador: la guía sigue puesta hasta recargar.
+      }
+    }, 400);
+  }
+
+  /** Recupera la guía de la última vez, si la hubiera. */
+  restoreRef() {
+    if (this.ref || this.refTried) return;
+    this.refTried = true;
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(REF_KEY) || 'null'); } catch { saved = null; }
+    if (!saved || typeof saved.src !== 'string' || !saved.src.startsWith('data:image/')) return;
+    const img = new Image();
+    img.onload = () => {
+      this.ref = {
+        img,
+        src: saved.src,
+        px: Number(saved.px) || 0,
+        py: Number(saved.py) || 0,
+        scale: Math.min(6, Math.max(0.05, Number(saved.scale) || 1)),
+        alpha: Math.min(1, Math.max(0.05, Number(saved.alpha) || 0.5)),
+        front: !!saved.front,
+        adjust: false,
+      };
+      this.redraw();
+    };
+    img.src = saved.src;
   }
 
   /** Pliega o despliega la vista previa horneada. */
@@ -709,12 +871,12 @@ export class Studio {
     return [m + (x - m) * c - (y - m) * s, m + (x - m) * s + (y - m) * c];
   }
 
-  /** Ajusta zoom y encuadre para que quepa todo el edificio. */
-  fit() {
-    const c = el('studio-view');
-    const box = c.getBoundingClientRect();
-    const W = Math.max(120, box.width), H = Math.max(120, box.height);
-    const s = this.design?.size || 2;
+  /**
+   * La caja que ocupa el edificio proyectado —con su huella—, sin zoom ni
+   * encuadre. La usan el encaje de la vista y el de la imagen de guía.
+   */
+  modelBounds() {
+    const s = renderSize(this.design || { size: 2 });
     const pts = [];
     for (const [x, y] of [[0, 0], [s, 0], [s, s], [0, s]]) {
       const [rx, ry] = this.spin(x, y);
@@ -735,6 +897,14 @@ export class Studio {
       if (px < x0) x0 = px; if (px > x1) x1 = px;
       if (py < y0) y0 = py; if (py > y1) y1 = py;
     }
+    return { x0, y0, x1, y1 };
+  }
+
+  /** Ajusta zoom y encuadre para que quepa todo el edificio. */
+  fit() {
+    const box = el('studio-view').getBoundingClientRect();
+    const W = Math.max(120, box.width), H = Math.max(120, box.height);
+    const { x0, y0, x1, y1 } = this.modelBounds();
     // Arriba está la cinta de datos y abajo la cruceta: el modelo se encaja en
     // lo que queda entre las dos, para que no lo tapen.
     const pad = 18, top = 24, bottom = 44;
@@ -766,6 +936,9 @@ export class Studio {
     if (!this.design) return;
 
     this.drawGround(ctx);
+    // Detrás del modelo, que es como se calca; delante si se pide, para
+    // comparar la silueta.
+    if (this.ref && !this.ref.front) this.drawRef(ctx);
 
     // Triángulos de todas las piezas, proyectados y ordenados de lejos a cerca:
     // el algoritmo del pintor. Con unos miles de caras va sobrado y responde al
@@ -813,6 +986,7 @@ export class Studio {
       ctx.stroke();
     }
 
+    if (this.ref && this.ref.front) this.drawRef(ctx);
     this.drawSelection(ctx);
     this.drawLegend(ctx, W);
     this.updatePad();
@@ -909,10 +1083,12 @@ export class Studio {
     const pos = part && part.x !== undefined
       ? `(${part.x.toFixed(2)}, ${part.y.toFixed(2)}, ${(part.z || 0).toFixed(2)})`
       : 'Nada elegido';
-    const how = this.moveMode === 'z'
-      ? 'arrastrar sube y baja'
-      : 'arrastra para mover · dos dedos o rueda para el zoom';
-    ctx.fillText(W < 420 ? pos : `${pos} · ${how}`, 10, 15);
+    const how = this.ref && this.ref.adjust
+      ? 'colocando la guía: arrastra para moverla'
+      : (this.moveMode === 'z'
+        ? 'arrastrar sube y baja'
+        : 'arrastra para mover · dos dedos o rueda para el zoom');
+    ctx.fillText(W < 420 && !(this.ref && this.ref.adjust) ? pos : `${pos} · ${how}`, 10, 15);
   }
 
   // --- Ratón y dedos ----------------------------------------------------------
@@ -952,6 +1128,12 @@ export class Studio {
     el('studio-view').setPointerCapture(e.pointerId);
     if (this.pointers.size >= 2) { this.startPinch(); return; }
 
+    // Con la guía en modo de colocar, el arrastre es suyo: mueve la imagen y no
+    // toca ni las piezas ni la vista.
+    if (this.ref && this.ref.adjust && e.button !== 2) {
+      this.drag = { mode: 'ref', px, py, moved: false, start: { px: this.ref.px, py: this.ref.py } };
+      return;
+    }
     const hit = e.button === 2 ? -1 : this.pick(px, py, this.slackFor(e));
     if (hit >= 0 && this.design.parts[hit]) {
       if (hit !== this.selected) { this.selected = hit; this.renderPanel(); }
@@ -1013,6 +1195,13 @@ export class Studio {
     const dsx = px - this.drag.px, dsy = py - this.drag.py;
     if (Math.abs(dsx) > 3 || Math.abs(dsy) > 3) this.drag.moved = true;
 
+    if (this.drag.mode === 'ref') {
+      this.ref.px = this.drag.start.px + dsx / this.zoom;
+      this.ref.py = this.drag.start.py + dsy / this.zoom;
+      this.redraw();
+      return;
+    }
+
     if (this.drag.mode === 'pan') {
       this.ox = this.drag.ox + dsx;
       this.oy = this.drag.oy + dsy;
@@ -1062,6 +1251,11 @@ export class Studio {
       return;
     }
     if (!this.drag) return;
+    if (this.drag.mode === 'ref') {
+      this.drag = null;
+      this.saveRef();
+      return;
+    }
     const wasPan = this.drag.mode === 'pan';
     const moved = this.drag.moved;
     this.drag = null;
@@ -1083,6 +1277,18 @@ export class Studio {
     e.preventDefault();
     const [px, py] = this.pointerAt(e);
     const k = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    // Colocando la guía, la rueda la agranda o la achica a ella.
+    if (this.ref && this.ref.adjust) {
+      const next = Math.max(0.05, Math.min(6, this.ref.scale * k));
+      const { img } = this.ref;
+      // Se agranda desde el puntero, para no perder de vista lo que se mira.
+      this.ref.px = (px - this.ox) / this.zoom - ((px - this.ox) / this.zoom - this.ref.px) * (next / this.ref.scale);
+      this.ref.py = (py - this.oy) / this.zoom - ((py - this.oy) / this.zoom - this.ref.py) * (next / this.ref.scale);
+      this.ref.scale = next;
+      this.redraw();
+      this.saveRef();
+      return;
+    }
     const next = Math.max(1.5, Math.min(16, this.zoom * k));
     // Se amplía sobre el puntero, que es donde está mirando quien modela.
     this.ox = px - ((px - this.ox) * next) / this.zoom;
@@ -1589,6 +1795,41 @@ function pointInTri(px, py, [a, b, c]) {
 }
 
 const snapTo = (v, step) => (step ? Math.round(v / step) * step : v);
+
+/**
+ * La imagen, achicada a un tamaño razonable y en PNG (que conserva la
+ * transparencia). Una foto de móvil son varios megas y el navegador no guarda
+ * tanto; para calcar sobran seiscientos píxeles.
+ */
+function shrinkImage(img) {
+  const k = Math.min(1, REF_MAX / Math.max(img.width, img.height));
+  if (k === 1) return img.src;
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(img.width * k));
+  c.height = Math.max(1, Math.round(img.height * k));
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+  try {
+    return c.toDataURL('image/png');
+  } catch {
+    return img.src;
+  }
+}
+
+/** Fila con un deslizador: para lo que se ajusta a ojo, como la opacidad. */
+function rangeRow(label, value, min, max, step, onChange) {
+  const row = document.createElement('label');
+  row.className = 'cat-field studio-range';
+  const name = document.createElement('span');
+  name.className = 'cat-label';
+  name.textContent = label;
+  const input = document.createElement('input');
+  input.type = 'range';
+  input.min = min; input.max = max; input.step = step;
+  input.value = value;
+  input.oninput = () => onChange(Number(input.value));
+  row.append(name, input);
+  return row;
+}
 
 /**
  * Un número con sus botones de menos y más. Escribir a mano sigue valiendo,

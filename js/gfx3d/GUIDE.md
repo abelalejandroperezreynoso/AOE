@@ -106,7 +106,9 @@ horneado sea repetible).
 
 Para los edificios hay además el **taller** del propio juego (menú principal →
 Taller de edificios): coloca piezas con el ratón sobre la huella, con la vista
-en vivo a la izquierda y las tres etapas horneadas debajo. El visor de modelos
+en vivo a la izquierda y las tres etapas horneadas debajo. Tiene la misma idea
+de la imagen de referencia que el visor, en el menú **Guía**: se pone debajo
+del modelo, con su opacidad y su tamaño, y se calca encima. El visor de modelos
 también los enseña, porque `BUILD_ORDER` los incluye en cuanto se dan de alta.
 
 ## Reglas de oro
