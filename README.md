@@ -181,11 +181,14 @@ Para colocar:
 - **Girar vista** enseña el modelo desde otro lado sin tocar el edificio, que
   para eso la cámara del juego es fija.
 - **Guía** pone una imagen de referencia —una foto, un dibujo, un boceto con
-  transparencia— debajo del modelo para calcarla encima: se le regula la
-  opacidad y el tamaño, se puede pasar delante para comparar siluetas, y se
-  coloca arrastrándola (con la rueda se agranda). Mientras esté puesta en modo
-  de colocar, el arrastre es suyo y no toca las piezas. Se queda guardada en
-  ese navegador, achicada, hasta que se quite. Las flechas y la cruceta giran con la
+  transparencia— para copiarla: aparece **de pie sobre la huella**, al ancho de
+  las casillas del edificio, y por delante del modelo a media opacidad, para
+  que no la tapen las piezas. Se le regula la opacidad y el tamaño, se puede
+  mandar detrás para calcar encima, y se coloca arrastrándola (con la rueda se
+  agranda). Mientras está suelta el arrastre es suyo y no toca las piezas;
+  cuando esté en su sitio, **Bloquear la imagen** la deja fija y se vuelve a
+  modelar con normalidad. Se guarda en ese navegador, achicada, hasta que se
+  quite. Las flechas y la cruceta giran con la
   vista: siempre empujan hacia donde apuntan en la pantalla.
 - Con **teclado**: flechas para mover (con **Alt**, arriba y abajo), **Mayús**
   para ir de cuatro en cuatro, **Supr** borra y **Ctrl+Z** deshace.

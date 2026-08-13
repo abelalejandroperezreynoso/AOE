@@ -656,15 +656,18 @@ export class Studio {
       this.saveRef();
     }));
     /*
-     * Mientras se coloca, el arrastre mueve la imagen en vez de las piezas: es
-     * la única forma de que con el dedo se pueda ajustar sin descolocar el
-     * modelo, y con ratón evita tener que inventarse una tecla.
+     * Con la guía suelta, el arrastre es suyo: mueve la imagen en vez de las
+     * piezas, que es la única forma de ajustarla con el dedo sin descolocar el
+     * modelo. Bloqueada, deja de estorbar y se vuelve a modelar con normalidad
+     * sin miedo a moverla de un roce.
      */
-    pop.appendChild(checkRow('Mover la imagen al arrastrar', !!this.ref.adjust, (on) => {
-      this.ref.adjust = on;
+    pop.appendChild(checkRow('Bloquear la imagen', !!this.ref.locked, (on) => {
+      this.ref.locked = on;
+      this.status(on ? 'Guía bloqueada: ya no se mueve.' : 'Guía suelta: arrastra para colocarla.');
       this.redraw();
+      this.saveRef();
     }));
-    pop.appendChild(this.menuButton('⤢ Encajarla en el lienzo', 'Vuelve a centrarla y a ajustar su tamaño.', () => {
+    pop.appendChild(this.menuButton('⤢ Ponerla sobre la huella', 'La deja de pie en el centro de las casillas del edificio.', () => {
       this.fitRef();
       this.redraw();
       this.saveRef();
@@ -686,8 +689,10 @@ export class Studio {
       const img = new Image();
       img.onload = () => {
         this.ref = {
-          img, src: shrinkImage(img), px: 0, py: 0, scale: 1, alpha: 0.5,
-          front: false, adjust: true,
+          img, src: shrinkImage(img), px: 0, py: 0, scale: 1, alpha: 0.45,
+          // Delante de partida: detrás la tapan las piezas en cuanto hay dos, y
+          // una guía que no se ve no guía. Detrás sigue estando a un toque.
+          front: true, locked: false,
         };
         this.fitRef();
         this.saveRef();
@@ -702,18 +707,29 @@ export class Studio {
   }
 
   /**
-   * Pone la guía encima del edificio y a su tamaño, que es lo que se quiere
-   * para calcar. Su sitio y su tamaño van en el mismo espacio que el modelo,
-   * así que se queda pegada a él al acercar, alejar o mover la vista.
+   * Deja la guía **de pie sobre la huella**: al ancho de las casillas que ocupa
+   * el edificio y apoyada en el borde de abajo del rombo, que es justo como se
+   * dibuja un edificio isométrico. Es un punto de partida que no depende de lo
+   * que haya modelado todavía —encajarla sobre el bulto del modelo la dejaba
+   * en un sitio distinto cada vez que se añadía una pieza— y su sitio va en el
+   * mismo espacio que el modelo, así que se queda pegada a él al acercar,
+   * alejar o mover la vista.
    */
   fitRef() {
     if (!this.ref) return;
     const { img } = this.ref;
-    const { x0, y0, x1, y1 } = this.modelBounds();
-    const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
-    this.ref.scale = Math.min(w / img.width, h / img.height) * 1.15;
+    const s = renderSize(this.design || { size: 2 });
+    let x0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const [x, y] of [[0, 0], [s, 0], [s, s], [0, s]]) {
+      const [rx, ry] = this.spin(x, y);
+      const [px, py] = project([rx, ry, 0]);
+      if (px < x0) x0 = px;
+      if (px > x1) x1 = px;
+      if (py > y1) y1 = py;
+    }
+    this.ref.scale = Math.max(0.05, (x1 - x0) / img.width);
     this.ref.px = (x0 + x1) / 2 - (img.width * this.ref.scale) / 2;
-    this.ref.py = (y0 + y1) / 2 - (img.height * this.ref.scale) / 2;
+    this.ref.py = y1 - img.height * this.ref.scale;
   }
 
   drawRef(ctx) {
@@ -734,8 +750,8 @@ export class Studio {
       try {
         if (!this.ref) localStorage.removeItem(REF_KEY);
         else {
-          const { src, px, py, scale, alpha, front } = this.ref;
-          localStorage.setItem(REF_KEY, JSON.stringify({ src, px, py, scale, alpha, front }));
+          const { src, px, py, scale, alpha, front, locked } = this.ref;
+          localStorage.setItem(REF_KEY, JSON.stringify({ src, px, py, scale, alpha, front, locked }));
         }
       } catch {
         // Sin sitio en el navegador: la guía sigue puesta hasta recargar.
@@ -759,8 +775,10 @@ export class Studio {
         py: Number(saved.py) || 0,
         scale: Math.min(6, Math.max(0.05, Number(saved.scale) || 1)),
         alpha: Math.min(1, Math.max(0.05, Number(saved.alpha) || 0.5)),
-        front: !!saved.front,
-        adjust: false,
+        front: saved.front !== false,
+        // Al volver del almacenamiento se recupera bloqueada salvo que se
+        // dejara suelta: nadie quiere descolocar de un roce lo que ya colocó.
+        locked: saved.locked !== false,
       };
       this.redraw();
     };
@@ -1083,12 +1101,13 @@ export class Studio {
     const pos = part && part.x !== undefined
       ? `(${part.x.toFixed(2)}, ${part.y.toFixed(2)}, ${(part.z || 0).toFixed(2)})`
       : 'Nada elegido';
-    const how = this.ref && this.ref.adjust
-      ? 'colocando la guía: arrastra para moverla'
+    const placing = this.ref && !this.ref.locked;
+    const how = placing
+      ? 'colocando la guía: arrastra para moverla · bloquéala al terminar'
       : (this.moveMode === 'z'
         ? 'arrastrar sube y baja'
         : 'arrastra para mover · dos dedos o rueda para el zoom');
-    ctx.fillText(W < 420 && !(this.ref && this.ref.adjust) ? pos : `${pos} · ${how}`, 10, 15);
+    ctx.fillText(W < 420 && !placing ? pos : `${pos} · ${how}`, 10, 15);
   }
 
   // --- Ratón y dedos ----------------------------------------------------------
@@ -1130,7 +1149,7 @@ export class Studio {
 
     // Con la guía en modo de colocar, el arrastre es suyo: mueve la imagen y no
     // toca ni las piezas ni la vista.
-    if (this.ref && this.ref.adjust && e.button !== 2) {
+    if (this.ref && !this.ref.locked && e.button !== 2) {
       this.drag = { mode: 'ref', px, py, moved: false, start: { px: this.ref.px, py: this.ref.py } };
       return;
     }
@@ -1278,7 +1297,7 @@ export class Studio {
     const [px, py] = this.pointerAt(e);
     const k = e.deltaY < 0 ? 1.15 : 1 / 1.15;
     // Colocando la guía, la rueda la agranda o la achica a ella.
-    if (this.ref && this.ref.adjust) {
+    if (this.ref && !this.ref.locked) {
       const next = Math.max(0.05, Math.min(6, this.ref.scale * k));
       const { img } = this.ref;
       // Se agranda desde el puntero, para no perder de vista lo que se mira.
