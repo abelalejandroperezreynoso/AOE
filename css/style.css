@@ -29,6 +29,20 @@
   --bottom-min: var(--bottom-h);
 
   --prod-h: 46px; /* alto total de la tira de producción, con bordes y relleno */
+
+  /*
+   * Lo que mide de verdad lo que se ve. En un móvil no coincide con la ventana
+   * contra la que se maqueta —la de `inset: 0` y `height: 100%`—, y de esa
+   * diferencia salía la franja muerta de abajo. watchViewport() lo reescribe
+   * con lo que dice `visualViewport`; esto es sólo el valor de partida, para
+   * que la primera pintada ya salga bien sin esperar al guión.
+   */
+  --app-h: 100vh;
+}
+@supports (height: 100dvh) {
+  /* `dvh` ya descuenta las barras del navegador: mejor punto de partida que
+     `vh` en todo lo moderno, y vale aunque el guión tarde o no llegue. */
+  :root { --app-h: 100dvh; }
 }
 
 * { box-sizing: border-box; }
@@ -65,7 +79,8 @@ html, body {
  * la tarjeta empieza arriba y se desplaza entera.
  */
 .overlay {
-  position: fixed; inset: 0;
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--app-h);
   display: flex; align-items: flex-start; justify-content: center;
   background: radial-gradient(circle at 50% 30%, rgba(60,44,26,.55), rgba(8,6,4,.94));
   z-index: 50;
@@ -428,7 +443,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   display: flex; flex-direction: column; gap: 6px;
   /* Diecisiete piezas en una columna no caben en ninguna pantalla: el menú se
      queda a lo alto de lo que hay y se desplaza por dentro. */
-  max-height: 62vh; overflow: auto;
+  max-height: calc(var(--app-h) * .62); overflow: auto;
 }
 /* Si no cabe hacia la derecha, se descuelga por el otro lado. */
 .studio-pop.right { left: auto; right: 0; }
@@ -590,7 +605,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   .studio-card { height: 100%; padding: 12px 12px calc(12px + var(--sa-bottom)); }
   .studio-body { flex-wrap: wrap; overflow: auto; align-items: flex-start; }
   .studio-main { flex: 0 0 100%; order: -1; }
-  .studio-stage { flex: none; height: 40vh; min-height: 200px; }
+  .studio-stage { flex: none; height: calc(var(--app-h) * .40); min-height: 200px; }
   .studio-side { width: 42%; flex: none; }
   .studio-side .catalog-list { flex: none; max-height: 210px; }
   .studio-props { width: calc(58% - 14px); flex: none; }
@@ -659,8 +674,8 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
   /* `flex: none` a propósito: con el `flex: 1` de base el alto declarado no
      valdría nada y la hoja se quedaría en un hilo. */
-  .studio-panel { flex: none; height: 32vh; overflow: auto; padding: 10px 12px; }
-  .studio-list-panel { max-height: 20vh; }
+  .studio-panel { flex: none; height: calc(var(--app-h) * .32); overflow: auto; padding: 10px 12px; }
+  .studio-list-panel { max-height: calc(var(--app-h) * .20); }
   .studio-stage { min-height: 150px; }
 }
 
@@ -681,7 +696,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   .studio-stage { flex: 1; height: auto; min-height: 90px; }
   .studio-panel { flex: 1; height: auto; overflow: auto; }
   .studio-shot canvas { max-height: 46px; }
-  .studio-list-panel { max-height: 30vh; }
+  .studio-list-panel { max-height: calc(var(--app-h) * .30); }
   /* Plegada, la hoja se queda en su tira de pestañas y el modelo se lo lleva todo. */
   .studio-card[data-sheet="off"] .studio-props { width: auto; }
   .studio-card[data-sheet="off"] .studio-panel { display: none; }
@@ -842,7 +857,9 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 /* ---------- Juego ---------- */
 
-#app { position: fixed; inset: 0; }
+/* Contra lo que se ve, no contra la ventana de maquetar: `inset: 0` daba de sí
+   más o menos que la pantalla según el navegador, y de ahí salía la franja. */
+#app { position: fixed; top: 0; left: 0; right: 0; height: var(--app-h); }
 
 #game {
   position: absolute;
@@ -1235,7 +1252,7 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   width: min(620px, 94vw);
-  max-height: 78vh;
+  max-height: calc(var(--app-h) * .78);
   overflow-y: auto;
   background: var(--panel);
   border: 2px solid var(--panel-edge);

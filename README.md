@@ -349,6 +349,41 @@ mentiría—. **Se cambia a mano** al desplegar algo que deba llegar sí o sí, 
 añadir un módulo nuevo hay que añadirlo también al mapa (si se olvida, ese
 fichero se queda sin refrescar, no se rompe nada).
 
+### Cuánto mide "toda la pantalla"
+
+En un móvil no hay un solo número. El navegador **maqueta** contra una ventana
+—la de `position: fixed; inset: 0` y `height: 100%`— y **enseña** otra, la que
+queda libre entre sus barras. Las dos se separan en los dos sentidos y las dos
+se notan: si la de maquetar es la más alta, la barra de abajo del juego cae por
+debajo del filo visible y se queda cortada; si es la más baja, sobra una franja
+del color del fondo entre el juego y el borde de la pantalla, y el mapa se
+recorta justo donde empieza.
+
+Así que no se maqueta contra ninguna de las dos a ciegas. `js/viewport.js`
+pregunta por la ventana visual (`visualViewport`, lo que el jugador tiene
+delante) y publica su alto en **`--app-h`**, de donde cuelgan la partida
+(`#app`) y las superposiciones (`.overlay`), además de los paneles del taller
+que antes iban en `vh`. Como valor de partida el CSS pone `100dvh` —que ya
+descuenta las barras del navegador—, de modo que la primera pintada sale bien
+aunque el guión tarde.
+
+Dos cosas se dejan fuera a propósito:
+
+- **El teclado.** Al abrirse encoge la ventana visual hasta la mitad, y encoger
+  la maquetación entera para escribir un nombre en la sala no arregla nada. Con
+  un campo enfocado no se remide; al salir de él, sí.
+- **El pellizco para acercar.** También encoge la ventana visual, pero ahí lo
+  que cambia es la lupa, no la pantalla: con la lupa puesta (`scale > 1`) la
+  medida buena vuelve a ser la de la raíz.
+
+Al girar y al entrar o salir de pantalla completa hay navegadores que durante
+la animación contestan con las medidas de antes, así que se remide un par de
+veces más después; son dos lecturas y sólo escriben si de verdad cambia.
+
+Tocando la versión se ve el número que ha salido (`app ...`) junto al de cada
+unidad (`vh`, `dvh`, `svh`, `lvh`), que es lo que dice de un vistazo si sobra o
+falta franja abajo.
+
 En partida, la franja de abajo la lleva la barra de selección, que aparece y se
 retira con lo que haya elegido. Al retirarse se vuelve a medir a mano, sin
 esperar al observador de tamaño: un elemento que pasa a `display: none` deja de
