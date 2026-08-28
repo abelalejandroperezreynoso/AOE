@@ -47,6 +47,11 @@ html, body {
 
 .hidden { display: none !important; }
 
+/* La versión, en la letra pequeña del menú: dice de un vistazo qué build se
+   está ejecutando de verdad, que en un móvil con la página guardada en caché
+   no hay otra forma de saberlo. */
+.version { opacity: .55; white-space: nowrap; }
+
 /* ---------- Superposiciones ---------- */
 
 /*
