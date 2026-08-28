@@ -324,12 +324,13 @@ iOS se queda con estas etiquetas la primera vez que se añade el icono, así que
 si ya lo tenías puesto hay que **quitarlo y volver a añadirlo** para que el
 cambio se note.
 
-Abajo la zona segura no la reserva la superposición, sino cada tarjeta por
-dentro. El relleno de un contenedor con desplazamiento se queda siempre al
+Abajo la superposición no reserva nada en un móvil: la tarjeta llega al borde y
+la zona segura la lleva ella por dentro. El relleno de un contenedor con desplazamiento se queda siempre al
 final: reservarla ahí dejaba una franja muerta entre la tarjeta y el borde de
 la pantalla. Puesta dentro, el fondo de la tarjeta llega al borde —como llega
 el de arriba— y lo que se aparta de la barra de inicio es sólo lo que hay
-escrito.
+escrito. En pantallas estrechas la tarjeta pierde además el borde y las
+esquinas de abajo, que es lo que hace cualquier hoja que toca el filo.
 
 ### Saber qué versión se está ejecutando
 

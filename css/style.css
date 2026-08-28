@@ -606,7 +606,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   #studio {
     padding:
       calc(6px + var(--sa-top)) calc(6px + var(--sa-right))
-      6px calc(6px + var(--sa-left));
+      0 calc(6px + var(--sa-left));
   }
   .studio-card { padding: 7px 8px calc(5px + var(--sa-bottom)); }
   /* La cabecera, en una sola línea: el título, el aviso recortado y el botón.
@@ -1259,12 +1259,22 @@ button.cmd, button.qitem, button.prod { margin: 0; }
  * desplazando. Los desplegables van en dos columnas mientras haya sitio.
  */
 @media (max-width: 480px) {
+  /*
+   * En un móvil la tarjeta llega hasta abajo del todo: sin relleno inferior en
+   * la superposición, lo que quede por debajo es sólo lo que se reserve el
+   * sistema, no algo que ponga el juego. La separación de la barra de inicio
+   * sigue estando dentro de la tarjeta, así que lo escrito no se acerca al
+   * borde; lo que lo toca es el fondo, que es lo que se quiere.
+   */
   .overlay {
     padding:
       calc(10px + var(--sa-top)) calc(10px + var(--sa-right))
-      10px calc(10px + var(--sa-left));
+      0 calc(10px + var(--sa-left));
   }
-  .menu-card { padding: 16px 14px calc(18px + var(--sa-bottom)); border-radius: 10px; }
+  .menu-card {
+    padding: 16px 14px calc(18px + var(--sa-bottom));
+    border-radius: 10px 10px 0 0; border-bottom: 0;
+  }
   .menu-card h1 { font-size: clamp(24px, 8.5vw, 40px); letter-spacing: 1px; margin-bottom: 2px; }
   .menu-card h2 { font-size: clamp(20px, 6.5vw, 28px); margin-bottom: 10px; }
   .subtitle { font-size: 12px; margin-bottom: 14px; line-height: 1.4; }
