@@ -67,7 +67,6 @@ export class Studio {
     this.pointers = new Map(); // dedos o punteros que hay ahora mismo encima
     this.pinch = null;
     this.baked = null;       // el horneado exacto de la vista, cuando está quieta
-    this.thumbs = new Map(); // miniaturas ya horneadas de la lista de edificios
     this.resCap = 3;         // techo de resolución del horneado, según lo rápido que vaya
     this.bind();
   }
@@ -159,8 +158,6 @@ export class Studio {
     el('studio').classList.remove('hidden');
     this.renderTools();
     this.restoreRef();
-    // El catálogo ha podido recolorear edificios con el taller cerrado.
-    this.thumbs.clear();
     this.renderList();
     // Se vuelve al edificio que se estaba tocando; la primera vez, al primero
     // de la barra de obra.
@@ -168,14 +165,14 @@ export class Studio {
     // Al abrir se mira qué hay en la nube: puede haber cambiado desde otro
     // dispositivo, o haberse quedado algo mío por enviar la última vez.
     this.showCloud(pendingCount() ? `sin enviar (${pendingCount()})` : 'comprobando...');
-    this.cloudSync(true, true);
+    this.cloudSync(true);
   }
 
   close() {
     this.flush();
     // Lo que quedara por mandar sale ahora: aquí ya no hay nada que dibujar y
     // la partida no espera por esto.
-    this.cloudSync(true, true);
+    this.cloudSync(true);
     clearTimeout(this.bakeTimer);
     el('studio').classList.add('hidden');
     el('main-menu').classList.remove('hidden');
@@ -268,14 +265,14 @@ export class Studio {
    * navegador: escribir en local es gratis, ir a la red no. Al cerrar el taller
    * y al cambiar de edificio se manda ya, sin esperar.
    */
-  cloudSync(now = false, pull = false) {
+  cloudSync(now = false) {
     if (!cloudEnabled()) return;
     clearTimeout(this.cloudTimer);
     this.cloudTimer = 0;
     const go = () => {
       this.cloudTimer = 0;
       this.showCloud('...');
-      syncDesigns(pull).then((r) => {
+      syncDesigns().then((r) => {
         if (r.state === 'error') {
           // Lo hecho no se pierde: está guardado aquí y sale en cuanto se pueda.
           // Decir *por qué* no ha podido ser ahorra media tarde: no es lo mismo
@@ -309,16 +306,12 @@ export class Studio {
     else this.cloudTimer = setTimeout(go, 1200);
   }
 
-  /**
-   * El estado de la nube, en la cinta de arriba del taller. El «Taller
-   * compartido:» va en su propia etiqueta porque en un móvil estorba y el CSS
-   * lo esconde: ahí sólo cabe el estado.
-   */
+  /** El estado de la nube, en la cinta de arriba del taller. */
   showCloud(text, title = '') {
     const box = el('studio-cloud');
     if (!box) return;
     box.classList.toggle('hidden', !cloudEnabled());
-    box.querySelector('.studio-cloud-state').textContent = cloudEnabled() ? text : '';
+    box.textContent = cloudEnabled() ? `Taller compartido: ${text}` : '';
     box.title = title;
   }
 
@@ -456,33 +449,15 @@ export class Studio {
     return wrap;
   }
 
-  /**
-   * Miniatura horneada de un edificio, con la cara que tenga, en su hueco.
-   *
-   * Se guarda el horneado, que es lo caro. La lista se rehace entera cada vez
-   * que se guarda —y guardar es cada vez que se empuja una pieza—, pero de sus
-   * quince edificios sólo cambia el que se está tocando: los otros catorce
-   * salen de aquí sin volver a hornearse.
-   */
+  /** Miniatura horneada de un edificio, con la cara que tenga, en su hueco. */
   thumb(type, size) {
     const c = document.createElement('canvas');
     c.width = size; c.height = size;
     const ctx = c.getContext('2d');
     try {
-      const mine = type === this.type;
-      const d = mine ? this.design : getDesign(type);
-      // La firma es de qué se dibuja: el modelo entero (con su paleta) y el
-      // color del jugador. Compararla cuesta microsegundos; hornear, decenas
-      // de milisegundos.
-      const key = `${type}|${this.colorIdx}|${d ? JSON.stringify(d) : 'serie'}`;
-      let s = this.thumbs.get(key);
-      if (!s) {
-        s = bake(d ? designMesh(d, this.colorIdx, 2, mine) : buildingMesh(type, this.colorIdx, 2));
-        // Arrastrar una pieza deja una firma nueva por fotograma guardado, así
-        // que la caché se vacía al crecer en vez de acumular el arrastre entero.
-        if (this.thumbs.size > 40) this.thumbs.clear();
-        this.thumbs.set(key, s);
-      }
+      const d = type === this.type ? this.design : getDesign(type);
+      const s = bake(d ? designMesh(d, this.colorIdx, 2, type === this.type)
+        : buildingMesh(type, this.colorIdx, 2));
       const sc = Math.min((size - 4) / s.w, (size - 4) / s.h);
       ctx.imageSmoothingEnabled = false;
       drawSprite(ctx, s, size / 2 - (s.w / 2 - s.ox) * sc, size - 2 - (s.h - s.oy) * sc, sc);
@@ -1626,11 +1601,7 @@ export class Studio {
 
   schedulePreview() {
     clearTimeout(this.previewTimer);
-    // Más holgado que el horneado de la mesa: son tres etapas y es el panel
-    // secundario. Empujando una pieza a golpes de flecha, así se hornea una vez
-    // al terminar en vez de una por golpe, y la mesa —que sí se mira— no se
-    // resiente.
-    this.previewTimer = setTimeout(() => this.renderPreview(), 400);
+    this.previewTimer = setTimeout(() => this.renderPreview(), 220);
   }
 
   /**

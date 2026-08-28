@@ -317,16 +317,16 @@ let syncing = null;
  * No se llama con una partida en marcha: cambiar los modelos a mitad de partida
  * dejaría edificios que se dibujan de otra forma de un fotograma al siguiente.
  */
-export function syncDesigns(pull = true) {
+export function syncDesigns() {
   if (!cloudEnabled() || adopted) {
     return Promise.resolve({ state: 'off', changed: [], pending: 0, reason: null });
   }
   if (syncing) return syncing;
-  syncing = doSync(pull).finally(() => { syncing = null; });
+  syncing = doSync().finally(() => { syncing = null; });
   return syncing;
 }
 
-async function doSync(pull) {
+async function doSync() {
   let failed = null, why = null;
   // Lo mío primero: si sale, deja de ser mío y pasa a ser de todos.
   for (const target of [...pending]) {
@@ -334,17 +334,6 @@ async function doSync(pull) {
     const { ok, error, reason } = mine ? await pushModel(mine) : await removeModel(target);
     if (ok) pending.delete(target);
     else { failed = error; why = reason; }
-  }
-
-  // Mandar no exige traerse nada: mientras se modela, cada empujón de una pieza
-  // acaba en un envío, y pedir además la lista entera sería tráfico y trabajo
-  // por algo que ya se sabe. Lo de fuera se recoge al abrir y al cerrar.
-  if (!pull) {
-    save();
-    return {
-      state: failed ? 'error' : 'ok', changed: [], pending: pending.size,
-      error: failed, reason: why,
-    };
   }
 
   const { models, error, reason } = await pullModels();
