@@ -312,38 +312,41 @@ let syncing = null;
  *   state    'off' sin proyecto · 'ok' al día · 'error' no se ha podido
  *   changed  qué edificios han cambiado de cara (hay que rehacer sus colores)
  *   pending  cuántos cambios míos siguen esperando
+ *   reason   si falló: 'table' falta la tabla · 'auth' la clave · 'net' la red
  *
  * No se llama con una partida en marcha: cambiar los modelos a mitad de partida
  * dejaría edificios que se dibujan de otra forma de un fotograma al siguiente.
  */
 export function syncDesigns() {
-  if (!cloudEnabled() || adopted) return Promise.resolve({ state: 'off', changed: [], pending: 0 });
+  if (!cloudEnabled() || adopted) {
+    return Promise.resolve({ state: 'off', changed: [], pending: 0, reason: null });
+  }
   if (syncing) return syncing;
   syncing = doSync().finally(() => { syncing = null; });
   return syncing;
 }
 
 async function doSync() {
-  let failed = null;
+  let failed = null, why = null;
   // Lo mío primero: si sale, deja de ser mío y pasa a ser de todos.
   for (const target of [...pending]) {
     const mine = designs.get(target);
-    const { ok, error } = mine ? await pushModel(mine) : await removeModel(target);
+    const { ok, error, reason } = mine ? await pushModel(mine) : await removeModel(target);
     if (ok) pending.delete(target);
-    else failed = error;
+    else { failed = error; why = reason; }
   }
 
-  const rows = await pullModels();
-  if (!rows) {
+  const { models, error, reason } = await pullModels();
+  if (!models) {
     save();
     return {
       state: 'error', changed: [], pending: pending.size,
-      error: failed || 'la nube no contesta',
+      error: failed || error, reason: why || reason,
     };
   }
 
   const next = new Map();
-  for (const row of rows) {
+  for (const row of models) {
     const d = cleanDesign(row);
     if (d && !next.has(d.target)) next.set(d.target, d);
   }
@@ -370,6 +373,7 @@ async function doSync() {
     changed,
     pending: pending.size,
     error: failed || null,
+    reason: why,
   };
 }
 

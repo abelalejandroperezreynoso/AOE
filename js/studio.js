@@ -275,11 +275,18 @@ export class Studio {
       syncDesigns().then((r) => {
         if (r.state === 'error') {
           // Lo hecho no se pierde: está guardado aquí y sale en cuanto se pueda.
+          // Decir *por qué* no ha podido ser ahorra media tarde: no es lo mismo
+          // que falte la tabla en el proyecto que que no haya cobertura.
+          const porQue = {
+            table: ['falta la tabla', 'El proyecto no tiene la tabla de los modelos: falta aplicar la migración de supabase/migrations/.'],
+            auth: ['clave rechazada', 'El proyecto no acepta la clave, o sus políticas no dejan pasar. Se revisa en js/data/cloud-config.js.'],
+          }[r.reason];
+          const guardado = r.pending
+            ? ` Lo tuyo (${r.pending}) está guardado en este navegador y sale en cuanto se pueda.`
+            : '';
           this.showCloud(
-            r.pending ? `sin enviar (${r.pending})` : 'sin conexión',
-            r.pending
-              ? 'Lo tuyo está guardado en este navegador y sale en cuanto haya conexión; se reintenta al abrir el taller.'
-              : 'No se ha podido hablar con la nube. Se sigue trabajando aquí con normalidad.',
+            porQue ? porQue[0] : (r.pending ? `sin enviar (${r.pending})` : 'sin conexión'),
+            (porQue ? porQue[1] : 'No se ha podido hablar con la nube. Se sigue trabajando aquí con normalidad.') + guardado,
           );
           return;
         }

@@ -20,10 +20,15 @@ siendo de cada quien.
    supabase db push
    ```
 
-2. **Apunta el juego al proyecto.** En `js/data/cloud-config.js` van los dos
-   valores que salen del panel, en *Settings → API*: la dirección del proyecto y
-   la clave **anon public**. Con los dos en blanco el juego funciona igual que
-   siempre, guardando sólo en el navegador.
+2. **Apunta el juego al proyecto.** Ya está hecho: en `js/data/cloud-config.js`
+   están la dirección del proyecto y su clave **anon public**, los dos valores
+   que salen del panel en *Settings → API*. Si algún día se cambia de proyecto,
+   se sustituyen ahí; con los dos en blanco el juego funciona igual que siempre,
+   guardando sólo en el navegador.
+
+Mientras la tabla no exista, el taller lo dice en su cinta de arriba («falta la
+tabla») y se sigue trabajando contra el navegador, sin perder nada: lo hecho
+queda apuntado y sube en cuanto la tabla esté.
 
 La clave *anon* es pública a propósito: viaja al navegador de quien juega y no
 hay forma de esconderla. Quien manda de verdad son las políticas de la tabla.

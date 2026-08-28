@@ -33,12 +33,26 @@ function project() {
 export function cloudEnabled() { return !!project(); }
 
 /**
- * Una llamada a la tabla. Devuelve `{ data }` si salió bien y `{ error }` si no;
- * nunca lanza, porque ninguna de estas llamadas es imprescindible para jugar.
+ * Por qué no se ha podido: lo justo para decírselo a quien juega en una línea.
+ *   'table'  la tabla no está: falta aplicar la migración en el proyecto
+ *   'auth'   la clave no vale, o las políticas no dejan pasar
+ *   'net'    no hay red, o la nube no contesta a tiempo
+ */
+function reasonFor(status, detail) {
+  // PostgREST contesta 404 con el código de PostgreSQL cuando la tabla no existe.
+  if (status === 404 || /42P01/.test(detail)) return 'table';
+  if (status === 401 || status === 403) return 'auth';
+  return 'net';
+}
+
+/**
+ * Una llamada a la tabla. Devuelve `{ data }` si salió bien y `{ error, reason }`
+ * si no; nunca lanza, porque ninguna de estas llamadas es imprescindible para
+ * jugar.
  */
 async function call(path, opts = {}) {
   const p = project();
-  if (!p) return { error: 'sin proyecto' };
+  if (!p) return { error: 'sin proyecto', reason: 'net' };
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
   try {
@@ -56,26 +70,29 @@ async function call(path, opts = {}) {
       // El cuerpo de PostgREST dice qué restricción se ha saltado: se recorta
       // porque acaba en un aviso de una línea, no en la consola de nadie.
       const detail = (await res.text().catch(() => '')).slice(0, 200);
-      return { error: `${res.status} ${detail}`.trim() };
+      return { error: `${res.status} ${detail}`.trim(), reason: reasonFor(res.status, detail) };
     }
     const text = await res.text();
     return { data: text ? JSON.parse(text) : null };
   } catch (err) {
-    return { error: err?.name === 'AbortError' ? 'la nube no contesta' : String(err?.message || err) };
+    return {
+      error: err?.name === 'AbortError' ? 'la nube no contesta' : String(err?.message || err),
+      reason: 'net',
+    };
   } finally {
     clearTimeout(timer);
   }
 }
 
 /**
- * Todos los modelos guardados. Devuelve la lista, o null si no se ha podido
- * preguntar: no es lo mismo «no hay ninguno» que «no me he enterado», y quien
- * llama tiene que poder distinguirlo para no borrar lo que tenía.
+ * Todos los modelos guardados, en `models`. Si no se ha podido preguntar viene
+ * sin `models` y con el motivo: no es lo mismo «no hay ninguno» que «no me he
+ * enterado», y quien llama tiene que distinguirlo para no borrar lo que tenía.
  */
 export async function pullModels() {
-  const { data, error } = await call(`${TABLE}?select=target,model`);
-  if (error || !Array.isArray(data)) return null;
-  return data.map((row) => row?.model).filter((m) => m && typeof m === 'object');
+  const { data, error, reason } = await call(`${TABLE}?select=target,model`);
+  if (error || !Array.isArray(data)) return { error: error || 'respuesta rara', reason: reason || 'net' };
+  return { models: data.map((row) => row?.model).filter((m) => m && typeof m === 'object') };
 }
 
 /**
@@ -84,19 +101,19 @@ export async function pullModels() {
  * fila y sólo una.
  */
 export async function pushModel(model) {
-  const { error } = await call(`${TABLE}?on_conflict=target`, {
+  const { error, reason } = await call(`${TABLE}?on_conflict=target`, {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
     body: JSON.stringify([{ target: model.target, model }]),
   });
-  return { ok: !error, error };
+  return { ok: !error, error, reason };
 }
 
 /** Quita la cara de un edificio: vuelve a dibujarse como venga en el código. */
 export async function removeModel(target) {
-  const { error } = await call(`${TABLE}?target=eq.${encodeURIComponent(target)}`, {
+  const { error, reason } = await call(`${TABLE}?target=eq.${encodeURIComponent(target)}`, {
     method: 'DELETE',
     headers: { Prefer: 'return=minimal' },
   });
-  return { ok: !error, error };
+  return { ok: !error, error, reason };
 }

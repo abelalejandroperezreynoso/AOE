@@ -16,5 +16,5 @@
 //
 // y para volver a lo de aquí, `localStorage.removeItem('aor-cloud')`.
 
-export const CLOUD_URL = '';
-export const CLOUD_KEY = '';
+export const CLOUD_URL = 'https://fylzlwhxqaaehwrwuynt.supabase.co';
+export const CLOUD_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ5bHpsd2h4cWFhZWh3cnd1eW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4NjgxNzAsImV4cCI6MjEwMzQ0NDE3MH0.7xFgeySnw4xjVNI1YGDGyuWOrxShi_2bSMkJspZ1PqQ';
