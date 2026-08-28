@@ -359,30 +359,43 @@ debajo del filo visible y se queda cortada; si es la más baja, sobra una franja
 del color del fondo entre el juego y el borde de la pantalla, y el mapa se
 recorta justo donde empieza.
 
+Y no se separan sólo de alto: también de **dónde empiezan**. Hay navegadores
+—Safari en iOS— que ponen su barra de direcciones *encima* de la ventana de
+maquetar en vez de por fuera. Ahí un `top: 0` cae por debajo del filo visible:
+la interfaz se dibuja tapada por la barra del navegador y, como lo que sobra
+sale por el otro lado, parece que todo se haya subido para esquivar el hueco de
+arriba, con la franja vacía abajo.
+
 Así que no se maqueta contra ninguna de las dos a ciegas. `js/viewport.js`
 pregunta por la ventana visual (`visualViewport`, lo que el jugador tiene
-delante) y publica su alto en **`--app-h`**, de donde cuelgan la partida
-(`#app`) y las superposiciones (`.overlay`), además de los paneles del taller
-que antes iban en `vh`. Como valor de partida el CSS pone `100dvh` —que ya
-descuenta las barras del navegador—, de modo que la primera pintada sale bien
-aunque el guión tarde.
+delante) y publica las dos cosas: dónde empieza en **`--app-t`** y cuánto mide
+en **`--app-h`**. De ellas cuelgan la partida (`#app`) y las superposiciones
+(`.overlay`), además de los paneles del taller que antes iban en `vh`. Como
+valor de partida el CSS pone `--app-t: 0` y `100dvh` —que ya descuenta las
+barras del navegador—, de modo que la primera pintada sale bien aunque el guión
+tarde. En los navegadores que dejan su barra por fuera, `--app-t` vale cero y
+no cambia nada.
 
 Dos cosas se dejan fuera a propósito:
 
 - **El teclado.** Al abrirse encoge la ventana visual hasta la mitad, y encoger
   la maquetación entera para escribir un nombre en la sala no arregla nada. Con
   un campo enfocado no se remide; al salir de él, sí.
-- **El pellizco para acercar.** También encoge la ventana visual, pero ahí lo
-  que cambia es la lupa, no la pantalla: con la lupa puesta (`scale > 1`) la
-  medida buena vuelve a ser la de la raíz.
+- **El pellizco para acercar.** También encoge y desplaza la ventana visual,
+  pero ahí lo que cambia es la lupa, no la pantalla: con la lupa puesta
+  (`scale > 1`) la medida buena vuelve a ser la de la raíz empezando en cero.
 
 Al girar y al entrar o salir de pantalla completa hay navegadores que durante
 la animación contestan con las medidas de antes, así que se remide un par de
 veces más después; son dos lecturas y sólo escriben si de verdad cambia.
 
-Tocando la versión se ve el número que ha salido (`app ...`) junto al de cada
-unidad (`vh`, `dvh`, `svh`, `lvh`), que es lo que dice de un vistazo si sobra o
-falta franja abajo.
+Tocando la versión se ven los números que han salido junto a los de cada unidad
+(`vh`, `dvh`, `svh`, `lvh`): `visual N desde M` es lo que dice el navegador,
+`app M+N` con qué se ha maquetado, y `app`, `topbar` y `bottombar` dónde ha
+acabado cada capa de verdad. Si `#app` no empieza y acaba donde la ventana
+visual, ahí está la franja. **La versión está también en el menú de pausa**,
+porque el desajuste se ve en partida y hasta ahora había que salirse para
+leerlo.
 
 En partida, la franja de abajo la lleva la barra de selección, que aparece y se
 retira con lo que haya elegido. Al retirarse se vuelve a medir a mano, sin

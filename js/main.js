@@ -178,16 +178,12 @@ window.addEventListener('keydown', (e) => {
 });
 
 /*
- * Tocando la versión, el juego dice cómo está midiendo la pantalla: alto de la
- * página, alto del aparato, zonas seguras y qué consultas de medios se aplican.
- * En un móvil no hay consola a la que asomarse, y sin estos números no hay
- * forma de saber por qué algo se ve distinto ahí y bien en todas las pruebas.
+ * Cómo está midiendo la pantalla este navegador. En un móvil no hay consola a
+ * la que asomarse, y sin estos números no hay forma de saber por qué algo se ve
+ * distinto ahí y bien en todas las pruebas. Se enseña tocando la versión —en el
+ * menú y también en la pausa, porque el desajuste se ve en partida, no antes—.
  */
-el('build').onclick = (e) => {
-  const box = e.currentTarget;
-  if (box.dataset.open) { box.textContent = box.dataset.was; delete box.dataset.open; return; }
-  box.dataset.was = box.textContent;
-  box.dataset.open = '1';
+function medidas() {
   // Las zonas seguras no se pueden leer de una variable: `env()` sólo se
   // resuelve al aplicarse. Se miden poniéndolas de relleno en una caja aparte.
   const probe = document.createElement('div');
@@ -213,19 +209,47 @@ el('build').onclick = (e) => {
     return Math.round(caja.getBoundingClientRect().height) || '—';
   };
   const unidades = `vh ${alto('100vh')} · dvh ${alto('100dvh')} · svh ${alto('100svh')}`
-    + ` · lvh ${alto('100lvh')} · fill ${alto('-webkit-fill-available')}`
-    // Y con cuál se está maquetando de verdad: es la que decide si sobra o
-    // falta franja abajo.
-    + ` · app ${alto('var(--app-h)')}`;
+    + ` · lvh ${alto('100lvh')} · fill ${alto('-webkit-fill-available')}`;
   caja.remove();
-  const anchos = [480, 620, 900].filter((n) => matchMedia(`(max-width:${n}px)`).matches).join(',') || 'ninguna';
-  box.textContent = `${box.dataset.was} · página ${innerWidth}×${innerHeight}`
+  const vv = window.visualViewport;
+  /*
+   * Dónde acaba de verdad cada capa. Es lo que hay que comparar con lo que se
+   * ve: si `#app` no empieza en 0 o no termina donde la ventana visual, ahí
+   * está la franja. La barra de abajo sólo tiene caja si hay algo elegido.
+   */
+  const caja2 = (id) => {
+    const e = el(id);
+    const r = e && e.getBoundingClientRect();
+    // Sin caja no hay nada que decir: o está retirado, o cuelga de algo que lo
+    // está —la barra de arriba dentro de `#app`, con el menú delante—.
+    if (!r || (!r.width && !r.height)) return `${id} —`;
+    return `${id} ${Math.round(r.top)}→${Math.round(r.bottom)}`;
+  };
+  const cs = getComputedStyle(document.documentElement);
+  return `página ${innerWidth}×${innerHeight}`
     + ` · raíz ${document.documentElement.clientHeight}`
-    + ` · visual ${Math.round(window.visualViewport?.height || 0)}`
+    + ` · visual ${Math.round(vv?.height || 0)} desde ${Math.round(vv?.offsetTop || 0)}`
+    + ` lupa ${(vv?.scale || 1).toFixed(2)} · desliz ${Math.round(scrollY)}`
     + ` · pantalla ${screen.width}×${screen.height} · zonas ${sa}`
     + ` · ${unidades}`
-    + ` · medios ≤${anchos} · standalone ${!!navigator.standalone}`;
-};
+    + ` · app ${cs.getPropertyValue('--app-t').trim()}+${cs.getPropertyValue('--app-h').trim()}`
+    + ` · ${caja2('app')} · ${caja2('topbar')} · ${caja2('bottombar')}`
+    + ` · standalone ${!!navigator.standalone}`;
+}
+
+/** Deja un elemento que, al tocarlo, cambia entre su texto y las medidas. */
+function diagnostico(id) {
+  const box = el(id);
+  if (!box) return;
+  box.onclick = () => {
+    if (box.dataset.open) { box.textContent = box.dataset.was; delete box.dataset.open; return; }
+    box.dataset.was = box.textContent;
+    box.dataset.open = '1';
+    box.textContent = `${box.dataset.was} · ${medidas()}`;
+  };
+}
+diagnostico('build');
+diagnostico('build-pause');
 
 window.__lobbyUi = lobbyUi; // útil para depurar la conexión desde la consola
 window.__studio = studio;   // y el taller, para trastear con un diseño a mano
