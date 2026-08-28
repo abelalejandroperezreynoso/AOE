@@ -29,59 +29,6 @@
   --bottom-min: var(--bottom-h);
 
   --prod-h: 46px; /* alto total de la tira de producción, con bordes y relleno */
-
-  /*
-   * Lo que mide de verdad lo que se ve, de una vez y para todo: la partida, las
-   * superposiciones y los paneles del taller.
-   *
-   * `vh` no vale en un móvil: es la ventana grande, la de cuando el navegador
-   * ha recogido sus barras. Con las barras puestas el juego se sale por abajo y
-   * lo que queda fuera está cortado; con `inset: 0` y `height: 100%` pasa lo
-   * mismo, que es de donde salía la franja.
-   */
-  --app-h: 100vh;
-}
-@supports (height: 100dvh) {
-  /*
-   * `dvh` es exactamente eso: lo que se ve ahora mismo, con las barras que
-   * haya puestas en este momento, y el navegador lo reajusta solo al recoger o
-   * sacar las suyas. Y —lo importante— el teclado no lo toca: al abrirse
-   * encoge la ventana visual, no ésta, así que la maquetación ni se entera.
-   *
-   * Se midió a mano con `visualViewport` y fue peor: esa sí encoge con el
-   * teclado, había que ignorarla mientras se escribiera, y en iOS el teclado se
-   * cierra sin soltar el campo. La medida se quedaba clavada en el alto de
-   * cuando estaba puesto y dejaba media pantalla en negro. Aquí no hay nada
-   * guardado que se pueda quedar viejo.
-   */
-  :root { --app-h: 100dvh; }
-}
-
-/*
- * Y la excepción, que es de donde venía la franja.
- *
- * Instalado en la pantalla de inicio no hay barras de navegador que aparezcan y
- * desaparezcan, así que `dvh` no tiene nada que descontar y debería dar la
- * pantalla entera. En iOS no la da: descuenta la franja de la hora **pero
- * empieza a pintar arriba del todo, debajo de ella**, así que sobra por abajo
- * justo lo que ha quitado por arriba. Ésa es la franja muerta, y `100%`,
- * `inset: 0` e `innerHeight` valen lo mismo, con lo que ninguno servía.
- *
- * `vh` sí da la pantalla entera. Medido en un iPhone de 375×812 con el juego
- * instalado: `vh` y `lvh` 812; `dvh`, `svh`, `innerHeight` e `inset: 0` los
- * tres 762, que son 812 menos los 50 de la zona segura de arriba. Los 50 que
- * faltaban.
- *
- * Aquí `vh` no tiene el inconveniente de siempre —ser la ventana grande, la de
- * cuando el navegador ha recogido sus barras—, porque en modo aplicación no hay
- * barras que recoger: es la pantalla y punto. Y donde iOS no falla, `vh` y
- * `dvh` valen lo mismo, así que esto no cambia nada.
- *
- * De la franja de la hora y de la barra de inicio siguen apartando las zonas
- * seguras, que ya las llevaban las barras del HUD.
- */
-@media (display-mode: standalone), (display-mode: fullscreen) {
-  :root { --app-h: 100vh; }
 }
 
 * { box-sizing: border-box; }
@@ -100,16 +47,6 @@ html, body {
 
 .hidden { display: none !important; }
 
-/* La versión, en la letra pequeña del menú: dice de un vistazo qué build se
-   está ejecutando de verdad, que en un móvil con la página guardada en caché
-   no hay otra forma de saberlo. */
-.version { opacity: .55; }
-/* El enlace al diagnóstico va con la misma letra pequeña que la versión. */
-a.version { color: inherit; margin-left: 8px; }
-/* Desplegada con las medidas de la pantalla es una línea larga: que parta en
-   varios renglones en vez de salirse por el lado y quedarse a medias. */
-.version[data-open] { display: block; margin-top: 4px; overflow-wrap: anywhere; }
-
 /* ---------- Superposiciones ---------- */
 
 /*
@@ -120,22 +57,13 @@ a.version { color: inherit; margin-left: 8px; }
  * la tarjeta empieza arriba y se desplaza entera.
  */
 .overlay {
-  position: fixed; top: 0; left: 0; right: 0;
-  height: var(--app-h);
+  position: fixed; inset: 0;
   display: flex; align-items: flex-start; justify-content: center;
   background: radial-gradient(circle at 50% 30%, rgba(60,44,26,.55), rgba(8,6,4,.94));
   z-index: 50;
-  /*
-   * Arriba y a los lados, la zona segura aparta el contenido de la muesca. Abajo
-   * no: el relleno de un contenedor con desplazamiento se queda siempre al final,
-   * así que reservarla ahí dejaba una franja muerta entre la tarjeta y el borde
-   * de la pantalla —muy visible en un móvil, donde la tarjeta ocupa todo—. La
-   * separación de la barra de inicio va dentro de cada tarjeta, de modo que su
-   * fondo llega al borde y lo que se aparta es sólo lo que hay escrito.
-   */
   padding:
     calc(16px + var(--sa-top)) calc(16px + var(--sa-right))
-    16px calc(16px + var(--sa-left));
+    calc(16px + var(--sa-bottom)) calc(16px + var(--sa-left));
   overflow: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -156,7 +84,7 @@ a.version { color: inherit; margin-left: 8px; }
   border: 2px solid var(--panel-edge);
   border-radius: 12px;
   box-shadow: 0 18px 60px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,225,170,.15);
-  padding: 26px 30px calc(30px + var(--sa-bottom));
+  padding: 26px 30px 30px;
   text-align: center;
 }
 
@@ -281,7 +209,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   border: 2px solid var(--panel-edge);
   border-radius: 12px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, .7);
-  padding: 18px 20px calc(12px + var(--sa-bottom));
+  padding: 18px 20px 12px;
 }
 
 .catalog-top {
@@ -393,7 +321,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .catalog-foot { margin: 10px 0 0; font-size: 11.5px; color: #8e7c5c; text-align: center; }
 
 @media (max-width: 780px) {
-  .catalog-card { height: 100%; padding: 12px 12px calc(12px + var(--sa-bottom)); }
+  .catalog-card { height: 100%; padding: 12px; }
   .catalog-body { flex-direction: column; }
   /* En columna, la lista se lleva una fracción del alto y la ficha el resto.
      Sin `min-height: 0` la ficha no puede encogerse por debajo de su contenido
@@ -404,7 +332,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 }
 
 @media (max-width: 480px) {
-  .catalog-card { padding: 9px 10px calc(8px + var(--sa-bottom)); }
+  .catalog-card { padding: 9px 10px 8px; }
   .catalog-top { gap: 8px; margin-bottom: 8px; }
   .catalog-top h2 { font-size: 19px; }
   .catalog-top-right button { padding: 6px 10px; font-size: 12.5px; }
@@ -431,7 +359,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   border: 2px solid var(--panel-edge);
   border-radius: 12px;
   box-shadow: 0 18px 60px rgba(0, 0, 0, .7);
-  padding: 18px 20px calc(12px + var(--sa-bottom));
+  padding: 18px 20px 12px;
 }
 
 .studio-body { flex: 1; display: flex; gap: 14px; min-height: 0; margin-top: 12px; }
@@ -484,7 +412,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   display: flex; flex-direction: column; gap: 6px;
   /* Diecisiete piezas en una columna no caben en ninguna pantalla: el menú se
      queda a lo alto de lo que hay y se desplaza por dentro. */
-  max-height: calc(var(--app-h) * .62); overflow: auto;
+  max-height: 62vh; overflow: auto;
 }
 /* Si no cabe hacia la derecha, se descuelga por el otro lado. */
 .studio-pop.right { left: auto; right: 0; }
@@ -630,11 +558,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .studio-cloud {
   font-size: 12px; color: #a8926a; white-space: nowrap;
   border: 1px solid rgba(168, 146, 106, .35); border-radius: 4px; padding: 3px 8px;
-  /* Que ceda antes que el título: en una cabecera estrecha lo que sobra es
-     esto, no saber en qué edificio estás. */
-  min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
-.studio-cloud-pre { font-weight: normal; }
 .studio-more summary { cursor: pointer; font-size: 12.5px; color: #cbb68c; margin: 10px 0 6px; }
 
 /* En pantallas estrechas la mesa manda y se pone arriba; la lista y las
@@ -643,10 +567,10 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
    repartiéndose un alto fijo, la mesa se quedaría sin sitio y se saldría por
    encima de lo de abajo. */
 @media (max-width: 1040px) {
-  .studio-card { height: 100%; padding: 12px 12px calc(12px + var(--sa-bottom)); }
+  .studio-card { height: 100%; padding: 12px; }
   .studio-body { flex-wrap: wrap; overflow: auto; align-items: flex-start; }
   .studio-main { flex: 0 0 100%; order: -1; }
-  .studio-stage { flex: none; height: calc(var(--app-h) * .40); min-height: 200px; }
+  .studio-stage { flex: none; height: 40vh; min-height: 200px; }
   .studio-side { width: 42%; flex: none; }
   .studio-side .catalog-list { flex: none; max-height: 210px; }
   .studio-props { width: calc(58% - 14px); flex: none; }
@@ -665,25 +589,14 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   #studio {
     padding:
       calc(6px + var(--sa-top)) calc(6px + var(--sa-right))
-      0 calc(6px + var(--sa-left));
+      calc(6px + var(--sa-bottom)) calc(6px + var(--sa-left));
   }
-  .studio-card { padding: 7px 8px calc(5px + var(--sa-bottom)); }
+  .studio-card { padding: 7px 8px 5px; }
   /* La cabecera, en una sola línea: el título, el aviso recortado y el botón.
      Cada renglón que se ahorra aquí es lienzo. */
   .studio-card .catalog-top { flex-wrap: nowrap; margin-bottom: 5px; gap: 6px; }
-  /*
-   * El título cede antes de desbordar. Sin `min-width: 0` un elemento flexible
-   * no encoge por debajo de su contenido, y como el grupo de la derecha se
-   * alinea al final, lo que no cabía se salía por la izquierda y se pintaba
-   * encima del título.
-   */
-  .studio-card .catalog-top h2 {
-    font-size: 15px; flex: 0 1 auto;
-    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
-  .studio-card .catalog-top-right { flex: 0 1 auto; min-width: 0; flex-wrap: nowrap; justify-content: flex-end; gap: 6px; }
-  /* En un móvil el rótulo sobra: con «al día» o «sin enviar» se entiende. */
-  .studio-cloud-pre { display: none; }
+  .studio-card .catalog-top h2 { font-size: 15px; flex: none; }
+  .studio-card .catalog-top-right { flex: 1; min-width: 0; flex-wrap: nowrap; justify-content: flex-end; gap: 6px; }
   #studio-status {
     font-size: 11px; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -715,8 +628,8 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
   /* `flex: none` a propósito: con el `flex: 1` de base el alto declarado no
      valdría nada y la hoja se quedaría en un hilo. */
-  .studio-panel { flex: none; height: calc(var(--app-h) * .32); overflow: auto; padding: 10px 12px; }
-  .studio-list-panel { max-height: calc(var(--app-h) * .20); }
+  .studio-panel { flex: none; height: 32vh; overflow: auto; padding: 10px 12px; }
+  .studio-list-panel { max-height: 20vh; }
   .studio-stage { min-height: 150px; }
 }
 
@@ -725,7 +638,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * del lienzo en vez de debajo.
  */
 @media (max-height: 520px) and (max-width: 1040px) {
-  .studio-card { height: 100%; padding: 8px 10px calc(6px + var(--sa-bottom)); }
+  .studio-card { height: 100%; padding: 8px 10px 6px; }
   .studio-card .catalog-foot { display: none; }
   .studio-body {
     flex-direction: row; flex-wrap: nowrap; align-items: stretch;
@@ -737,7 +650,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   .studio-stage { flex: 1; height: auto; min-height: 90px; }
   .studio-panel { flex: 1; height: auto; overflow: auto; }
   .studio-shot canvas { max-height: 46px; }
-  .studio-list-panel { max-height: calc(var(--app-h) * .30); }
+  .studio-list-panel { max-height: 30vh; }
   /* Plegada, la hoja se queda en su tira de pestañas y el modelo se lo lleva todo. */
   .studio-card[data-sheet="off"] .studio-props { width: auto; }
   .studio-card[data-sheet="off"] .studio-panel { display: none; }
@@ -898,9 +811,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 /* ---------- Juego ---------- */
 
-/* Contra lo que se ve, no contra la ventana de maquetar: `inset: 0` daba de sí
-   más o menos que la pantalla según el navegador, y de ahí salía la franja. */
-#app { position: fixed; top: 0; left: 0; right: 0; height: var(--app-h); }
+#app { position: fixed; inset: 0; }
 
 #game {
   position: absolute;
@@ -1293,7 +1204,7 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   width: min(620px, 94vw);
-  max-height: calc(var(--app-h) * .78);
+  max-height: 78vh;
   overflow-y: auto;
   background: var(--panel);
   border: 2px solid var(--panel-edge);
@@ -1320,22 +1231,12 @@ button.cmd, button.qitem, button.prod { margin: 0; }
  * desplazando. Los desplegables van en dos columnas mientras haya sitio.
  */
 @media (max-width: 480px) {
-  /*
-   * En un móvil la tarjeta llega hasta abajo del todo: sin relleno inferior en
-   * la superposición, lo que quede por debajo es sólo lo que se reserve el
-   * sistema, no algo que ponga el juego. La separación de la barra de inicio
-   * sigue estando dentro de la tarjeta, así que lo escrito no se acerca al
-   * borde; lo que lo toca es el fondo, que es lo que se quiere.
-   */
   .overlay {
     padding:
       calc(10px + var(--sa-top)) calc(10px + var(--sa-right))
-      0 calc(10px + var(--sa-left));
+      calc(10px + var(--sa-bottom)) calc(10px + var(--sa-left));
   }
-  .menu-card {
-    padding: 16px 14px calc(18px + var(--sa-bottom));
-    border-radius: 10px 10px 0 0; border-bottom: 0;
-  }
+  .menu-card { padding: 16px 14px 18px; border-radius: 10px; }
   .menu-card h1 { font-size: clamp(24px, 8.5vw, 40px); letter-spacing: 1px; margin-bottom: 2px; }
   .menu-card h2 { font-size: clamp(20px, 6.5vw, 28px); margin-bottom: 10px; }
   .subtitle { font-size: 12px; margin-bottom: 14px; line-height: 1.4; }
@@ -1356,7 +1257,7 @@ button.cmd, button.qitem, button.prod { margin: 0; }
 
 /* Apaisado: sobra ancho y falta alto, así que se recorta el alto de todo. */
 @media (max-height: 520px) {
-  .menu-card { padding: 14px 18px calc(16px + var(--sa-bottom)); }
+  .menu-card { padding: 14px 18px 16px; }
   .menu-card h1 { font-size: clamp(22px, 5vw, 34px); }
   .subtitle { margin-bottom: 10px; }
   .options { margin-bottom: 10px; }
