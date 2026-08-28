@@ -305,6 +305,25 @@ Detalles a tener en cuenta:
   nunca a mitad de partida: un edificio no puede cambiar de dibujo de un
   fotograma al siguiente.
 
+## Instalarlo en el móvil
+
+El juego se puede **añadir a la pantalla de inicio** y se abre como una
+aplicación: sin barra de navegador y a pantalla completa, con el contenido
+llegando hasta los bordes. Lo declaran `manifest.webmanifest` y las etiquetas
+`apple-mobile-web-app-*` de `index.html`; el icono es un SVG dibujado por
+código, como el resto del arte.
+
+En iOS, la clave es `apple-mobile-web-app-status-bar-style` en
+`black-translucent`: sin ella el sistema se reserva la franja de la hora y la
+batería, y la página empieza por debajo. Con ella el contenido llega al borde y
+son las zonas seguras del CSS (`env(safe-area-inset-*)`, que ya usaban las
+barras del HUD) las que apartan la interfaz de la muesca y de la barra de
+inicio.
+
+iOS se queda con estas etiquetas la primera vez que se añade el icono, así que
+si ya lo tenías puesto hay que **quitarlo y volver a añadirlo** para que el
+cambio se note.
+
 ## Cómo se juega
 
 | Acción | Control |
