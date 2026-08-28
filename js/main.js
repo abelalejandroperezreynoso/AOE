@@ -15,9 +15,9 @@ import { clearSpriteCaches } from './sprites.js';
 
 const el = (id) => document.getElementById(id);
 
-// Primero los edificios que haya hecho el jugador en el taller: se dan de alta
-// como edificios más del juego, y a partir de ahí el catálogo puede tocarlos y
-// sus valores guardados se aplican encima igual que a los de serie.
+// Primero las caras que el jugador les haya hecho a los edificios en el taller,
+// porque fijan los colores de partida de los que vista; encima de eso se
+// aplican los valores y los retoques guardados en el catálogo.
 loadDesigns();
 loadOverrides();
 const catalog = new Catalog();
@@ -86,8 +86,8 @@ const lobbyUi = new LobbyUI((s) => {
   audio.ensure();
   // En multijugador mandan los valores del anfitrión: si un invitado tiene
   // otros, se adoptan los del anfitrión mientras dure la partida. Lo mismo con
-  // los edificios del taller: se juega con los suyos, que son los que él va a
-  // simular, y los propios vuelven al recargar la página.
+  // los modelos del taller: se ven los suyos, y los propios vuelven al recargar
+  // la página.
   if (s.role === 'guest') {
     if (s.designs) { adoptDesigns(s.designs); clearSpriteCaches(); }
     if (s.overrides) adoptOverrides(s.overrides);

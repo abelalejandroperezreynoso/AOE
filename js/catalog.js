@@ -303,7 +303,6 @@ export class Catalog {
     if (def.dropoff) add('Almacena', def.dropoff.map((r) => RES_NAME[r]).join(', '));
     if (def.req) add('Necesita', BUILDINGS[def.req].name);
     if (def.pierce) add('Tipo de daño', 'Proyectil');
-    if (def.custom) add('Origen', 'Hecho en el taller de edificios');
     return wrap;
   }
 
