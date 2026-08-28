@@ -331,6 +331,19 @@ la pantalla. Puesta dentro, el fondo de la tarjeta llega al borde —como llega
 el de arriba— y lo que se aparta de la barra de inicio es sólo lo que hay
 escrito.
 
+### Saber qué versión se está ejecutando
+
+Abajo del todo del menú, en la letra pequeña, va la versión (`v2026.08.28-2`).
+Sin compilación, los ficheros se sirven tal cual y un móvil con la página
+guardada puede seguir con una copia vieja durante un rato; esa línea dice de un
+vistazo qué build hay delante, que es lo primero que hay que saber cuando algo
+"sigue igual" después de un despliegue.
+
+La misma versión va en la dirección de la hoja de estilos y del módulo de
+arranque (`css/style.css?v=...`), para que un cambio de CSS llegue aunque el
+navegador tuviera guardada la hoja anterior. **Se cambia a mano** al tocar el
+CSS o al desplegar algo que deba llegar sí o sí.
+
 ## Cómo se juega
 
 | Acción | Control |
