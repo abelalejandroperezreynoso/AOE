@@ -10,15 +10,25 @@ siendo de cada quien.
 
 ## Poner el proyecto en marcha
 
-1. **Aplica la migración.** Si el proyecto está conectado a este repositorio en
-   Supabase (Integrations → GitHub), se aplica sola al llegar a la rama que
-   tenga vigilada. Si no, se pega el contenido de `migrations/` en el SQL Editor
-   del panel y se ejecuta, o se aplica con la CLI:
+1. **Aplica la migración.** Por cualquiera de estos tres caminos:
 
-   ```bash
-   supabase link --project-ref <ref-del-proyecto>
-   supabase db push
-   ```
+   - **Fusionando a la rama que vigila la integración.** Si el proyecto está
+     conectado a este repositorio (panel de Supabase → Integrations → GitHub),
+     aplica las migraciones de esta carpeta al llegar algo a su *production
+     branch*. Para que funcione tienen que cuadrar tres cosas en esa pantalla:
+     el repositorio conectado, que la rama vigilada sea a la que fusionas
+     (normalmente `main`) y que el directorio apuntado sea `supabase`.
+   - **Pegando el SQL a mano.** El contenido de `migrations/` en el SQL Editor
+     del panel, y ejecutar. Es lo más corto y no depende de nada.
+   - **Con la CLI**, si la tienes enlazada:
+
+     ```bash
+     supabase link --project-ref fylzlwhxqaaehwrwuynt
+     supabase db push
+     ```
+
+   La migración está escrita para poder aplicarse dos veces sin romper nada, así
+   que da igual pegarla a mano y luego fusionar.
 
 2. **Apunta el juego al proyecto.** Ya está hecho: en `js/data/cloud-config.js`
    están la dirección del proyecto y su clave **anon public**, los dos valores
@@ -35,9 +45,10 @@ hay forma de esconderla. Quien manda de verdad son las políticas de la tabla.
 La clave *service_role* no pinta nada en este juego y no debe acabar nunca en
 el repositorio.
 
-Si la integración de GitHub pide un `config.toml`, sale de `supabase init` +
-`supabase link`; no se ha metido aquí porque lleva dentro la referencia del
-proyecto.
+El `config.toml` de al lado es lo que marca esta carpeta como un proyecto de
+Supabase, que es lo que la CLI y la integración buscan. Va al mínimo a
+propósito: aquí no se levanta Supabase en local, así que los cientos de ajustes
+de desarrollo que genera `supabase init` sólo serían ruido.
 
 ## Qué hay en la tabla
 
