@@ -363,6 +363,32 @@ barras que haya puestas en este momento, y el navegador lo reajusta solo al
 recogerlas o sacarlas. Con `@supports` queda `100vh` para lo muy viejo, que es
 lo que se hacía antes.
 
+**Menos instalado en la pantalla de inicio, que es de donde venía la franja.**
+Ahí no hay barras de navegador que aparezcan y desaparezcan, así que `dvh` no
+tiene nada que descontar y debería dar la pantalla entera. En iOS no la da:
+descuenta la franja de la hora *pero empieza a pintar arriba del todo, debajo
+de ella*, con lo que sobra por abajo justo lo que ha quitado por arriba. Medido
+en un iPhone de 375×812 con el juego instalado:
+
+| Unidad | Mide | |
+| --- | --- | --- |
+| `vh`, `lvh` | **812** | la pantalla entera |
+| `dvh`, `svh`, `innerHeight`, `inset: 0`, `height: 100%` | **762** | 812 − 50 de zona segura de arriba |
+
+Los 50 que faltaban. Así que en modo aplicación se usa `vh`, que ahí no tiene el
+inconveniente de siempre —ser la ventana grande, la de cuando el navegador ha
+recogido sus barras—, porque no hay barras que recoger: es la pantalla y punto.
+Donde iOS no falla, `vh` y `dvh` valen lo mismo y esto no cambia nada.
+
+```css
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root { --app-h: 100vh; }
+}
+```
+
+De la franja de la hora y de la barra de inicio siguen apartando las zonas
+seguras, que ya las llevaban las barras del HUD.
+
 **Y el teclado no lo toca.** Al abrirse encoge la ventana visual, no ésta, así
 que la maquetación ni se entera. Eso es lo que hace que ésta sea la forma buena
 y no una más:

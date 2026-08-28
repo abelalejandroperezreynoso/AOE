@@ -28,8 +28,10 @@
   #lleno { position: fixed; inset: 0; background: #00d46a; }
 
   /* Cada forma de decir "toda la pantalla", con su raya y su nombre al filo. */
-  .marca { position: fixed; left: 0; right: 0; height: 0; border-top: 2px dashed rgba(0,0,0,.75); pointer-events: none; }
-  .marca span { position: absolute; right: 4px; top: -17px; font-size: 11px; font-weight: bold;
+  /* El borde va ABAJO: así la raya cae justo en el alto que mide cada unidad.
+     Con `border-top` todas salían apiladas en el cero y no decían nada. */
+  .marca { position: fixed; top: 0; left: 0; right: 0; border-bottom: 2px dashed rgba(0,0,0,.75); pointer-events: none; }
+  .marca span { position: absolute; right: 4px; bottom: 2px; font-size: 11px; font-weight: bold;
                 background: rgba(255,255,255,.85); padding: 0 4px; border-radius: 3px; }
   #m-vh  { height: 100vh; }
   #m-dvh { height: 100dvh; }
@@ -153,11 +155,17 @@
 
   function pinta() {
     const s = apunta('—', false);
+    // El veredicto: la unidad más alta es lo que de verdad se puede llenar, y
+    // lo que le falte a `inset: 0` para llegar ahí es la franja, en píxeles.
+    const tope = Math.max(s.vh, s.dvh, s.svh, s.lvh, s.vv, s.inner);
+    const falta = tope - s.lleno;
     $('ahora').textContent =
       `modo ${modo} · pantalla ${s.pantalla} · dpr ${s.dpr} · zonas ${s.sa}\n`
       + `inner ${s.inner} · raiz ${s.raiz} · inset:0 ${s.lleno}\n`
       + `vh ${s.vh} · dvh ${s.dvh} · svh ${s.svh} · lvh ${s.lvh}\n`
-      + `visual ${s.vv} desde ${s.vvTop} · lupa ${s.lupa} · scroll ${s.scroll}`;
+      + `visual ${s.vv} desde ${s.vvTop} · lupa ${s.lupa} · scroll ${s.scroll}\n`
+      + (falta > 0 ? `► FRANJA de ${falta}px: inset:0 llega a ${s.lleno} y se puede llegar a ${tope}`
+                   : '► sin franja: inset:0 llega hasta el tope');
     // La raya roja: hasta dónde dice el aparato que se ve ahora mismo.
     $('m-vv').style.height = `${s.vv}px`;
   }
