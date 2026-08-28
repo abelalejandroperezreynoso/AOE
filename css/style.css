@@ -36,7 +36,12 @@
    * diferencia salía la franja muerta de abajo. watchViewport() lo reescribe
    * con lo que dice `visualViewport`; esto es sólo el valor de partida, para
    * que la primera pintada ya salga bien sin esperar al guión.
+   *
+   * Y `--app-t`, dónde empieza: hay navegadores que ponen su barra de
+   * direcciones encima de la ventana de maquetar, y ahí un `top: 0` cae
+   * tapado. Vale cero en los que la dejan por fuera, que son casi todos.
    */
+  --app-t: 0px;
   --app-h: 100vh;
 }
 @supports (height: 100dvh) {
@@ -79,7 +84,7 @@ html, body {
  * la tarjeta empieza arriba y se desplaza entera.
  */
 .overlay {
-  position: fixed; top: 0; left: 0; right: 0;
+  position: fixed; top: var(--app-t); left: 0; right: 0;
   height: var(--app-h);
   display: flex; align-items: flex-start; justify-content: center;
   background: radial-gradient(circle at 50% 30%, rgba(60,44,26,.55), rgba(8,6,4,.94));
@@ -859,7 +864,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 /* Contra lo que se ve, no contra la ventana de maquetar: `inset: 0` daba de sí
    más o menos que la pantalla según el navegador, y de ahí salía la franja. */
-#app { position: fixed; top: 0; left: 0; right: 0; height: var(--app-h); }
+#app { position: fixed; top: var(--app-t); left: 0; right: 0; height: var(--app-h); }
 
 #game {
   position: absolute;
