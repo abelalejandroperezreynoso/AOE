@@ -168,6 +168,27 @@ export function captureBuildingLook(type) {
   if (l) defaults.buildingLook[type] = { ...l };
 }
 
+/**
+ * Los edificios a los que el taller les acaba de cambiar la cara: sus colores
+ * de fábrica pasan a ser los del modelo nuevo y se retiran los retoques que el
+ * catálogo tuviera puestos sobre ellos, que eran para la cara anterior. Sus
+ * cifras no se tocan, ni las suyas ni las del resto del juego.
+ *
+ * De paso deja los sprites por rehacer, así que quien llame no tiene que
+ * acordarse de vaciar la caché.
+ */
+export function rebaseBuildingLooks(types) {
+  if (!types || !types.length) return;
+  capture();
+  for (const type of types) {
+    captureBuildingLook(type);
+    delete overrides.buildingLook[type];
+  }
+  restoreDefaults();
+  applyAll();
+  save();
+}
+
 export function defaultValue(kind, type, key) {
   capture();
   if (kind === 'rate') return defaults.rate[type];

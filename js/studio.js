@@ -27,9 +27,10 @@ import { buildingMesh } from './gfx3d/buildings.js';
 import {
   getDesign, isCustom, isBuiltin, saveDesign, resetBuilding,
   designFromTemplate, TEMPLATES, STOCK_BUILDINGS, MAX_PARTS,
+  cloudEnabled, syncDesigns, pendingCount,
 } from './data/designs.js';
-import { clearSpriteCaches, drawSprite } from './sprites.js';
-import { captureBuildingLook, reset } from './data/overrides.js';
+import { drawSprite } from './sprites.js';
+import { rebaseBuildingLooks } from './data/overrides.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -161,10 +162,17 @@ export class Studio {
     // Se vuelve al edificio que se estaba tocando; la primera vez, al primero
     // de la barra de obra.
     this.load(BUILDINGS[this.lastType] ? this.lastType : BUILDING_ORDER[0]);
+    // Al abrir se mira qué hay en la nube: puede haber cambiado desde otro
+    // dispositivo, o haberse quedado algo mío por enviar la última vez.
+    this.showCloud(pendingCount() ? `sin enviar (${pendingCount()})` : 'comprobando...');
+    this.cloudSync(true);
   }
 
   close() {
     this.flush();
+    // Lo que quedara por mandar sale ahora: aquí ya no hay nada que dibujar y
+    // la partida no espera por esto.
+    this.cloudSync(true);
     clearTimeout(this.bakeTimer);
     el('studio').classList.add('hidden');
     el('main-menu').classList.remove('hidden');
@@ -186,6 +194,7 @@ export class Studio {
   load(type) {
     if (!BUILDINGS[type]) return;
     this.flush();
+    if (this.cloudTimer) this.cloudSync(true);
     this.type = type;
     this.lastType = type;
     const base = getDesign(type);
@@ -231,11 +240,10 @@ export class Studio {
     this.saveTimer = 0;
     const type = this.type;
     resetBuilding(type);
-    // El aspecto vuelve a ser el de fábrica, así que los retoques de color que
-    // el catálogo tuviera sobre el modelo propio ya no significan nada.
-    captureBuildingLook(type);
-    reset('buildingLook', type);
-    clearSpriteCaches();
+    // El aspecto vuelve a ser el de antes, así que los retoques de color que el
+    // catálogo tuviera sobre el modelo que había ya no significan nada.
+    rebaseBuildingLooks([type]);
+    this.cloudSync();
     this.load(type);
     this.status(isBuiltin(type)
       ? `${BUILDINGS[type].name} vuelve al modelo que trae el juego.`
@@ -250,6 +258,54 @@ export class Studio {
       b.textContent = 'Restablecer';
       b.classList.remove('confirming');
     }
+  }
+
+  /**
+   * Manda a la nube lo que se haya tocado, más espaciado que el guardado en el
+   * navegador: escribir en local es gratis, ir a la red no. Al cerrar el taller
+   * y al cambiar de edificio se manda ya, sin esperar.
+   */
+  cloudSync(now = false) {
+    if (!cloudEnabled()) return;
+    clearTimeout(this.cloudTimer);
+    this.cloudTimer = 0;
+    const go = () => {
+      this.cloudTimer = 0;
+      this.showCloud('...');
+      syncDesigns().then((r) => {
+        if (r.state === 'error') {
+          // Lo hecho no se pierde: está guardado aquí y sale en cuanto se pueda.
+          this.showCloud(
+            r.pending ? `sin enviar (${r.pending})` : 'sin conexión',
+            r.pending
+              ? 'Lo tuyo está guardado en este navegador y sale en cuanto haya conexión; se reintenta al abrir el taller.'
+              : 'No se ha podido hablar con la nube. Se sigue trabajando aquí con normalidad.',
+          );
+          return;
+        }
+        if (r.changed.length) {
+          rebaseBuildingLooks(r.changed);
+          // Lo que ha llegado de fuera puede ser el edificio que hay en la mesa.
+          // Si el taller ya está cerrado no hay nada que repintar: los sprites
+          // los ha tirado `rebaseBuildingLooks` y la partida los rehará.
+          if (!this.isOpen()) { /* nada que enseñar */ }
+          else if (r.changed.includes(this.type)) this.load(this.type);
+          else { this.renderList(); this.schedulePreview(); }
+        }
+        this.showCloud('al día', 'Lo que hay aquí es lo que ve todo el mundo.');
+      });
+    };
+    if (now) go();
+    else this.cloudTimer = setTimeout(go, 1200);
+  }
+
+  /** El estado de la nube, en la cinta de arriba del taller. */
+  showCloud(text, title = '') {
+    const box = el('studio-cloud');
+    if (!box) return;
+    box.classList.toggle('hidden', !cloudEnabled());
+    box.textContent = cloudEnabled() ? `Taller compartido: ${text}` : '';
+    box.title = title;
   }
 
   /**
@@ -285,9 +341,8 @@ export class Studio {
    * las del juego, con lo que el catálogo diga— ni las del resto del juego.
    */
   afterSave() {
-    captureBuildingLook(this.type);
-    reset('buildingLook', this.type);
-    clearSpriteCaches();
+    rebaseBuildingLooks([this.type]);
+    this.cloudSync();
   }
 
   pushUndo() {
@@ -349,7 +404,9 @@ export class Studio {
       n.textContent = def.name;
       const sub = document.createElement('div');
       sub.className = 'cat-sub';
-      const look = isCustom(type) ? 'Modelo tuyo' : (isBuiltin(type) ? 'Modelo del juego' : 'Aspecto original');
+      const look = isCustom(type)
+        ? 'Rehecho en el taller'
+        : (isBuiltin(type) ? 'Modelo del juego' : 'Aspecto original');
       sub.textContent = `${look} · ${def.size}×${def.size} · ${AGES[def.age].short}`;
       text.append(n, sub);
       li.append(thumb, text);

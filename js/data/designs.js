@@ -7,6 +7,11 @@
 // juego (y el catálogo, si se retocan allí). Así el taller no puede desequilibrar
 // una partida, sólo darle otro aire.
 //
+// Con un proyecto de Supabase configurado (`cloud-config.js`) los modelos dejan
+// de ser de un navegador: se guardan en una tabla y los ve todo el mundo, en
+// cualquier dispositivo. El navegador se queda de copia, para que el juego
+// arranque al instante y funcione igual sin cobertura.
+//
 // Todo lo que entra pasa por el validador, venga del almacenamiento del
 // navegador o del otro jugador por la red: un modelo corrupto o malicioso se
 // queda en un edificio soso, nunca en una partida rota.
@@ -15,8 +20,16 @@ import { BUILDINGS } from '../config.js';
 import { LOOK } from './appearance.js';
 import { PARTS, FIELDS, MATERIAL_KEYS, DEFAULT_PALETTE } from '../gfx3d/parts.js';
 import { BUILTIN_DESIGNS } from './builtin-designs.js';
+import { cloudEnabled, pullModels, pushModel, removeModel } from './cloud.js';
 
 const STORAGE_KEY = 'aor-designs-v2';
+/*
+ * Qué edificios he tocado yo y todavía no han llegado a la nube. Sin esto, un
+ * cambio hecho sin cobertura se perdería en cuanto la nube contestara con lo
+ * que ella tiene: así se manda en cuanto se puede y, mientras tanto, lo mío
+ * manda sobre lo suyo.
+ */
+const PENDING_KEY = 'aor-designs-pending-v1';
 
 /**
  * Los edificios del juego: los únicos a los que se les puede cambiar la cara.
@@ -189,10 +202,31 @@ function resizeDesign(design, size, fromSize = null) {
 
 // --- Guardar y cargar --------------------------------------------------------
 
+/** Edificios que he tocado y que la nube todavía no sabe. */
+let pending = new Set();
+/** Se juega con los modelos de otro (multijugador): nada de esto es mío. */
+let adopted = false;
+
 function save() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(myDesigns()));
+    /*
+     * La lista de pendientes sólo significa algo con taller compartido. Sin él
+     * no se escribe, y esa ausencia es justo lo que hace falta: el día que se
+     * conecte un proyecto, lo que ya hubiera guardado aquí se da por mío y sin
+     * enviar —y sube— en vez de darse por borrado por no estar en la nube.
+     */
+    if (cloudEnabled()) localStorage.setItem(PENDING_KEY, JSON.stringify([...pending]));
   } catch { /* sin espacio o modo privado: se sigue jugando con lo que hay */ }
+}
+
+/**
+ * Apunta que este edificio lo he cambiado yo. Sin proyecto configurado no hay
+ * nada que apuntar: lo del navegador ya es lo definitivo.
+ */
+function markPending(target) {
+  if (!cloudEnabled()) return;
+  pending.add(target);
 }
 
 /** Carga los del juego y los guardados, y los pone en vigor. Se llama al arrancar. */
@@ -214,6 +248,19 @@ export function loadDesigns() {
       if (d && !designs.has(d.target)) designs.set(d.target, d);
     }
   }
+  let rawPending = null;
+  try { rawPending = JSON.parse(localStorage.getItem(PENDING_KEY) || 'null'); } catch { rawPending = null; }
+  if (Array.isArray(rawPending)) {
+    pending = new Set(rawPending.filter((t) => STOCK_BUILDINGS.includes(t)));
+  } else {
+    /*
+     * La primera vez que este navegador ve un taller compartido —o si la lista
+     * de pendientes se ha estropeado— lo que hay guardado aquí se da por mío y
+     * sin enviar. Si no, la primera sincronización lo borraría por no estar en
+     * la nube, y son los modelos que se hicieron antes de conectarla.
+     */
+    pending = new Set(designs.keys());
+  }
   applyRegistry();
   return allDesigns();
 }
@@ -226,6 +273,7 @@ export function saveDesign(raw, to = null) {
   const d = cleanDesign(raw, to);
   if (!d) return null;
   designs.set(d.target, d);
+  markPending(d.target);
   applyRegistry();
   save();
   return d;
@@ -235,9 +283,94 @@ export function saveDesign(raw, to = null) {
 export function resetBuilding(type) {
   if (!designs.has(type)) return false;
   designs.delete(type);
+  markPending(type);
   applyRegistry();
   save();
   return true;
+}
+
+// --- El taller compartido ----------------------------------------------------
+
+/** ¿Hay proyecto detrás? El taller lo dice, para no prometer lo que no hay. */
+export { cloudEnabled };
+
+/** Cuántos cambios míos están esperando a salir. */
+export function pendingCount() { return pending.size; }
+
+/*
+ * Que no se solapen dos sincronizaciones: la segunda se engancha a la primera.
+ * Pasa en cuanto se guarda dos veces seguidas, que es lo normal modelando.
+ */
+let syncing = null;
+
+/**
+ * Pone de acuerdo el taller de este navegador con el de la nube: primero manda
+ * lo mío que aún no había salido y luego se trae lo que haya, que puede venir
+ * de otro dispositivo o de otra persona.
+ *
+ * Nunca lanza. Devuelve en qué ha quedado la cosa:
+ *   state    'off' sin proyecto · 'ok' al día · 'error' no se ha podido
+ *   changed  qué edificios han cambiado de cara (hay que rehacer sus colores)
+ *   pending  cuántos cambios míos siguen esperando
+ *
+ * No se llama con una partida en marcha: cambiar los modelos a mitad de partida
+ * dejaría edificios que se dibujan de otra forma de un fotograma al siguiente.
+ */
+export function syncDesigns() {
+  if (!cloudEnabled() || adopted) return Promise.resolve({ state: 'off', changed: [], pending: 0 });
+  if (syncing) return syncing;
+  syncing = doSync().finally(() => { syncing = null; });
+  return syncing;
+}
+
+async function doSync() {
+  let failed = null;
+  // Lo mío primero: si sale, deja de ser mío y pasa a ser de todos.
+  for (const target of [...pending]) {
+    const mine = designs.get(target);
+    const { ok, error } = mine ? await pushModel(mine) : await removeModel(target);
+    if (ok) pending.delete(target);
+    else failed = error;
+  }
+
+  const rows = await pullModels();
+  if (!rows) {
+    save();
+    return {
+      state: 'error', changed: [], pending: pending.size,
+      error: failed || 'la nube no contesta',
+    };
+  }
+
+  const next = new Map();
+  for (const row of rows) {
+    const d = cleanDesign(row);
+    if (d && !next.has(d.target)) next.set(d.target, d);
+  }
+  // Lo que yo he tocado y aún no ha salido manda sobre lo que diga la nube: es
+  // más nuevo que lo que ella tiene, y si no se perdería al recibir.
+  for (const target of pending) {
+    if (designs.has(target)) next.set(target, designs.get(target));
+    else next.delete(target);
+  }
+
+  // Qué edificios se dibujan distinto a partir de ahora: quien llame tiene que
+  // rehacerles los colores y los sprites, y sólo a ésos.
+  const changed = [];
+  for (const target of new Set([...designs.keys(), ...next.keys()])) {
+    const before = designs.get(target);
+    const after = next.get(target);
+    if (JSON.stringify(before ?? null) !== JSON.stringify(after ?? null)) changed.push(target);
+  }
+  designs = next;
+  applyRegistry();
+  save();
+  return {
+    state: failed ? 'error' : 'ok',
+    changed,
+    pending: pending.size,
+    error: failed || null,
+  };
 }
 
 // --- Multijugador ------------------------------------------------------------
@@ -276,6 +409,10 @@ export function shareableDesigns() {
  * mueve y esto no puede descuadrar una instantánea.
  */
 export function adoptDesigns(incoming) {
+  // Lo adoptado es prestado y no sale de esta partida: se cierra la puerta a la
+  // nube para que no acabe guardado como si fuera de aquí. Lo propio sigue en el
+  // navegador y vuelve al recargar la página, que es como se sale de una partida.
+  adopted = true;
   builtin = new Map();
   designs = new Map();
   if (Array.isArray(incoming)) {

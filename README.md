@@ -244,6 +244,31 @@ Lo que se hace aquí se guarda **en ese navegador** y se ve al momento en la
 partida y en el catálogo, que además deja retocarle los colores a cualquier
 edificio. Un modelo puede llegar a 200 piezas.
 
+### El taller compartido
+
+Con un proyecto de **Supabase** detrás, los modelos dejan de ser de un navegador:
+se guardan en una tabla y **los ve todo el mundo**, en cualquier dispositivo.
+Rehaces el molino en el móvil y sale rehecho en el ordenador y en el juego de
+quien entre. En la cinta de arriba del taller se ve en qué anda («al día», «sin
+enviar», «sin conexión»).
+
+Sigue habiendo copia en el navegador, así que el juego arranca al instante y se
+puede modelar sin cobertura: lo que hagas se guarda aquí y sale en cuanto haya
+conexión. Los modelos que trae el código (`builtin-designs.js`) son el suelo:
+por debajo de lo que diga la nube, y por encima el aspecto original.
+
+Se configura en dos pasos, y están explicados en
+[`supabase/README.md`](supabase/README.md): aplicar la migración de
+`supabase/migrations/` (si el proyecto está conectado a este repositorio, se
+aplica sola) y poner la dirección del proyecto y la clave *anon public* en
+`js/data/cloud-config.js`. **Con esos dos valores en blanco el juego funciona
+exactamente como siempre**, guardando sólo en el navegador.
+
+Tal y como está montado, cualquiera que abra el juego puede rehacer o
+restablecer cualquier edificio: no hay cuentas ni clave de edición. La tabla sí
+impide que entre basura (edificio conocido, tope de piezas y de tamaño), y el
+juego valida pieza a pieza al leer.
+
 ### Compartir el modelo de un edificio
 
 Un modelo es sólo datos, así que cabe en una línea de texto y viaja por donde
@@ -275,7 +300,10 @@ Detalles a tener en cuenta:
 - En **multijugador manda quien invita**: las caras de sus edificios viajan a los
   demás al empezar la partida y todos ven lo mismo en el mapa —también las que
   trae el juego, por si los dos lados no van con la misma versión—. Las propias
-  vuelven al recargar la página.
+  vuelven al recargar la página, y nada de lo adoptado se sube a la nube.
+- La nube se consulta **con el menú delante**, al arrancar y al abrir el taller,
+  nunca a mitad de partida: un edificio no puede cambiar de dibujo de un
+  fotograma al siguiente.
 
 ## Cómo se juega
 
@@ -347,7 +375,8 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
 - **Catálogo** para consultar y editar todo el juego: sus valores y también el
   aspecto de cada objeto, con vista previa en vivo.
 - **Taller de edificios**: modelado 3D dentro del juego para rehacerle la cara a
-  cualquier edificio del juego, sin tocar lo que cuesta ni lo que hace.
+  cualquier edificio del juego, sin tocar lo que cuesta ni lo que hace. Con un
+  proyecto de Supabase detrás, lo que se hace ahí lo ve todo el mundo.
 
 ## Estructura del código
 
@@ -381,6 +410,9 @@ js/data/appearance.js Colores y tamaño con los que se dibuja cada objeto
 js/data/overrides.js  Valores editados: validación, guardado y aplicación
 js/data/designs.js  Modelos del taller: validación, guardado y aplicación
 js/data/builtin-designs.js  Modelos de edificio que vienen con el juego
+js/data/cloud.js    El taller compartido: los modelos, contra la API de Supabase
+js/data/cloud-config.js  A qué proyecto de Supabase se conecta (o a ninguno)
+supabase/migrations/  La tabla de los modelos y sus permisos
 js/lobby-ui.js      Pantalla de la sala de espera
 js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
 js/net/protocol.js  Codificación binaria del estado y de las órdenes
