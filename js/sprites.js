@@ -360,10 +360,10 @@ export function paintUnit(ctx, x, y, type, colorIdx, face, f) {
 }
 
 /**
- * Malla de un edificio. Los de serie los construye su código en buildings.js,
- * salvo que un diseño del taller les haya dado otro aspecto; los que ha hecho
- * el jugador salen siempre de su diseño. A partir de aquí el camino es el
- * mismo: mismo horneado, misma luz, mismo contorno.
+ * Malla de un edificio: la construye su código en buildings.js, salvo que en el
+ * taller le hayan hecho otro modelo. A partir de ahí el camino es el mismo:
+ * mismo horneado, misma luz, mismo contorno, así que en la partida no se
+ * distingue un edificio re-vestido de uno de serie.
  */
 function meshForBuilding(type, colorIdx, stage) {
   const design = modelForBuilding(type);

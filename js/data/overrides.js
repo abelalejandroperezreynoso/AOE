@@ -156,27 +156,11 @@ function capture() {
 }
 
 /**
- * Da de alta los valores de fábrica de un edificio que aparece con la partida
- * ya arrancada: los que hace el jugador en el taller. Sin esto el catálogo no
- * sabría con qué comparar ni qué restablecer.
- */
-export function captureBuilding(type) {
-  capture();
-  const def = BUILDINGS[type];
-  if (def) {
-    defaults.building[type] = {};
-    for (const f of fieldsFor('building', def)) defaults.building[type][f.key] = getPath(def, f.key);
-  }
-  const l = LOOK.building[type];
-  if (l) defaults.buildingLook[type] = { ...l };
-}
-
-/**
- * Sólo los colores de fábrica de un edificio. Es lo que hace falta cuando un
- * diseño del taller le cambia la cara a un edificio de serie: su modelo y su
- * paleta son otros, pero lo que cuesta y lo que aguanta sigue siendo lo suyo y
- * no hay que volver a tomarlo (si no, unos valores ya retocados en el catálogo
- * pasarían por ser los de fábrica).
+ * Vuelve a tomar los colores de fábrica de un edificio. Hace falta cuando el
+ * taller le cambia la cara: su modelo y su paleta pasan a ser otros, mientras
+ * que lo que cuesta y lo que aguanta sigue siendo lo suyo y no se vuelve a
+ * tomar (si no, unos valores ya retocados en el catálogo pasarían por ser los
+ * de fábrica).
  */
 export function captureBuildingLook(type) {
   capture();
@@ -184,12 +168,24 @@ export function captureBuildingLook(type) {
   if (l) defaults.buildingLook[type] = { ...l };
 }
 
-/** Olvida un edificio que ya no existe y tira los cambios que tuviera. */
-export function forgetBuilding(type) {
-  delete defaults.building[type];
-  delete defaults.buildingLook[type];
-  delete overrides.building[type];
-  delete overrides.buildingLook[type];
+/**
+ * Los edificios a los que el taller les acaba de cambiar la cara: sus colores
+ * de fábrica pasan a ser los del modelo nuevo y se retiran los retoques que el
+ * catálogo tuviera puestos sobre ellos, que eran para la cara anterior. Sus
+ * cifras no se tocan, ni las suyas ni las del resto del juego.
+ *
+ * De paso deja los sprites por rehacer, así que quien llame no tiene que
+ * acordarse de vaciar la caché.
+ */
+export function rebaseBuildingLooks(types) {
+  if (!types || !types.length) return;
+  capture();
+  for (const type of types) {
+    captureBuildingLook(type);
+    delete overrides.buildingLook[type];
+  }
+  restoreDefaults();
+  applyAll();
   save();
 }
 
@@ -284,9 +280,6 @@ function restoreDefaults() {
     for (const [key, value] of Object.entries(values)) setPath(UNITS[type], key, value);
   }
   for (const [type, values] of Object.entries(defaults.building)) {
-    // Un edificio del taller puede haberse borrado (o haber cedido el sitio a
-    // los del anfitrión en una partida en red) desde que se tomó la copia.
-    if (!BUILDINGS[type]) continue;
     for (const [key, value] of Object.entries(values)) setPath(BUILDINGS[type], key, value);
   }
   for (const [type, values] of Object.entries(defaults.node)) RESOURCE_NODES[type].amount = values.amount;
