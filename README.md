@@ -345,6 +345,12 @@ arranque (`css/style.css?v=...`), para que un cambio de CSS llegue aunque el
 navegador tuviera guardada la hoja anterior. **Se cambia a mano** al tocar el
 CSS o al desplegar algo que deba llegar sí o sí.
 
+En partida, la franja de abajo la lleva la barra de selección, que aparece y se
+retira con lo que haya elegido. Al retirarse se vuelve a medir a mano, sin
+esperar al observador de tamaño: un elemento que pasa a `display: none` deja de
+tener caja y hay navegadores que no avisan de ese cambio, con lo que el lienzo
+se quedaba con el alto de cuando la barra estaba puesta.
+
 ## Cómo se juega
 
 | Acción | Control |

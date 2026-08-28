@@ -235,6 +235,16 @@ export class UI {
       syncCanvas();
     };
 
+    /*
+     * Medir a mano, para cuando haga falta. La barra inferior aparece y se
+     * retira con la selección, y un elemento que pasa a `display: none` deja de
+     * tener caja: hay navegadores —Safari en iOS, sin ir más lejos— que no
+     * avisan al observador de ese cambio. Sin este aviso el lienzo se quedaba
+     * con el alto de cuando la barra estaba puesta y dejaba una franja muerta
+     * abajo durante el resto de la partida.
+     */
+    this.measureBars = apply;
+
     if (window.ResizeObserver) {
       // El lienzo también se observa: es quien manda sobre el búfer.
       const ro = new ResizeObserver(apply);
@@ -932,9 +942,11 @@ export class UI {
     /*
      * Sin nada seleccionado la barra entera se retira: lo único que enseñaba
      * era un recordatorio de cómo se juega, y a cambio se comía una franja de
-     * mapa en todo momento. watchBars() se entera sola y el lienzo crece.
+     * mapa en todo momento. Se vuelve a medir aquí mismo, sin esperar a que
+     * nadie avise: es al ocultarla cuando el lienzo tiene que crecer.
      */
     this.el.bottombar.classList.toggle('hidden', !sel.length);
+    this.measureBars?.();
     if (!sel.length) return;
     if (sel.length === 1 && isNode(sel[0])) {
       this.renderAnimalPanel(sel[0]);
