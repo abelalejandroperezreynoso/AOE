@@ -50,7 +50,10 @@ html, body {
 /* La versión, en la letra pequeña del menú: dice de un vistazo qué build se
    está ejecutando de verdad, que en un móvil con la página guardada en caché
    no hay otra forma de saberlo. */
-.version { opacity: .55; white-space: nowrap; }
+.version { opacity: .55; }
+/* Desplegada con las medidas de la pantalla es una línea larga: que parta en
+   varios renglones en vez de salirse por el lado y quedarse a medias. */
+.version[data-open] { display: block; margin-top: 4px; overflow-wrap: anywhere; }
 
 /* ---------- Superposiciones ---------- */
 
