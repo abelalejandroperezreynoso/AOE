@@ -169,6 +169,34 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && !el('main-menu').classList.contains('hidden')) el('btn-start').click();
 });
 
+/*
+ * Tocando la versión, el juego dice cómo está midiendo la pantalla: alto de la
+ * página, alto del aparato, zonas seguras y qué consultas de medios se aplican.
+ * En un móvil no hay consola a la que asomarse, y sin estos números no hay
+ * forma de saber por qué algo se ve distinto ahí y bien en todas las pruebas.
+ */
+el('build').onclick = (e) => {
+  const box = e.currentTarget;
+  if (box.dataset.open) { box.textContent = box.dataset.was; delete box.dataset.open; return; }
+  box.dataset.was = box.textContent;
+  box.dataset.open = '1';
+  // Las zonas seguras no se pueden leer de una variable: `env()` sólo se
+  // resuelve al aplicarse. Se miden poniéndolas de relleno en una caja aparte.
+  const probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:-9999px;top:0;'
+    + 'padding:env(safe-area-inset-top) env(safe-area-inset-right)'
+    + ' env(safe-area-inset-bottom) env(safe-area-inset-left)';
+  document.body.appendChild(probe);
+  const p = getComputedStyle(probe);
+  const sa = [p.paddingTop, p.paddingRight, p.paddingBottom, p.paddingLeft]
+    .map((v) => Math.round(parseFloat(v) || 0)).join('/');
+  probe.remove();
+  const anchos = [480, 620, 900].filter((n) => matchMedia(`(max-width:${n}px)`).matches).join(',') || 'ninguna';
+  box.textContent = `${box.dataset.was} · página ${innerWidth}×${innerHeight}`
+    + ` · pantalla ${screen.width}×${screen.height} · zonas ${sa}`
+    + ` · medios ≤${anchos} · standalone ${!!navigator.standalone}`;
+};
+
 window.__lobbyUi = lobbyUi; // útil para depurar la conexión desde la consola
 window.__studio = studio;   // y el taller, para trastear con un diseño a mano
 
