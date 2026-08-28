@@ -381,6 +381,35 @@ Tocando la versión se ven los números de cada unidad (`vh`, `dvh`, `svh`,
 está la franja. **La versión está también en el menú de pausa**, porque el
 desajuste se ve en partida y si no hay que salirse para leerlo.
 
+### La página de diagnóstico (`/diag.html`)
+
+Instalado en el móvil no hay barra de direcciones a la que asomarse, ni consola,
+ni forma de abrir otra dirección: por eso hay un enlace **Diagnóstico** en la
+letra pequeña del menú. La página va aparte y a propósito casi vacía —el juego
+tiene mil reglas de estilo y cualquiera podría ser la culpable; allí no hay
+ninguna—, y lleva las mismas etiquetas de `viewport` y de aplicación que
+`index.html`, de modo que el aparato la trata igual.
+
+Se lee por el color, sin entender un número:
+
+| Lo que se ve abajo | Quién deja la franja |
+| --- | --- |
+| **Verde** hasta el filo | Nadie: la pantalla está entera |
+| **Magenta** | `inset: 0` se queda corto, y el fondo de la página asoma |
+| **Negro** | Ni una ni otra llegan: la franja la pone el sistema, y no hay CSS que la quite |
+
+Encima van las rayas de cada unidad (`vh`, `dvh`, `svh`, `lvh`) y, en rojo,
+hasta dónde dice el aparato que se ve ahora mismo. Debajo, un campo para abrir
+el teclado y un **registro** que apunta cada aviso (`resize`, `focusin`,
+`focusout`, los de `visualViewport`) con todas las medidas del momento, más un
+vistazo cada cuarto de segundo por si hay cambios de los que nadie avisa. Con
+«Copiar todo» sale el registro entero, que es lo que hay que mirar para saber
+qué pasa de verdad al cerrarse el teclado.
+
+Los botones prueban los remedios de siempre —`scrollTo(0,0)`, forzar un reflujo,
+soltar el campo— sobre la franja ya puesta: el que la quite dice cuál es el
+arreglo, sin tener que adivinarlo.
+
 En partida, la franja de abajo la lleva la barra de selección, que aparece y se
 retira con lo que haya elegido. Al retirarse se vuelve a medir a mano, sin
 esperar al observador de tamaño: un elemento que pasa a `display: none` deja de
