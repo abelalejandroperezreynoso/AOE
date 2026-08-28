@@ -1,0 +1,17 @@
+<!-- El mismo torreón, con aire de sobra alrededor.
+     Android recorta el icono con la forma que tenga el sistema (círculo,
+     cuadrado redondeado, gota...), así que el dibujo se queda en el centro y lo
+     que se pierda al recortar sea sólo fondo. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-64 -64 640 640" width="512" height="512">
+  <rect x="-64" y="-64" width="640" height="640" fill="#1a1410"/>
+  <path d="M120 214h72v212h-72z" fill="#9a9a94"/>
+  <path d="M320 214h72v212h-72z" fill="#8b8b86"/>
+  <path d="M120 214v-34h18v20h18v-20h18v20h18v-20h18v34z" fill="#b4b4ad"/>
+  <path d="M320 214v-34h18v20h18v-20h18v20h18v-20h18v34z" fill="#b4b4ad"/>
+  <path d="M192 262h128v164H192z" fill="#d8cba6"/>
+  <path d="M256 150l86 96H170z" fill="#a8452f"/>
+  <path d="M228 426v-72a28 28 0 0 1 56 0v72z" fill="#3b2a17"/>
+  <path d="M256 150V96" stroke="#7a5f36" stroke-width="9" stroke-linecap="round"/>
+  <path d="M260 100h54l-16 20 16 20h-54z" fill="#c9553f"/>
+  <path d="M96 426h320v22H96z" fill="#6b5334"/>
+</svg>
