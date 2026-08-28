@@ -1,132 +1,84 @@
-// Los edificios que hace el jugador en el taller.
+// Los modelos con los que el jugador re-viste los edificios del juego.
 //
-// Un diseño es un objeto de datos: su ficha (nombre, coste, resistencia, qué
-// hace) y la lista de piezas de su modelo 3D. Aquí se guardan, se validan y se
-// **dan de alta como edificios de verdad**: al registrarse entran en la misma
-// tabla `BUILDINGS` que la casa o el castillo, así que el juego los construye,
-// los dibuja, los ataca y los cuenta sin saber que los hizo alguien.
+// El taller no fabrica edificios nuevos: **cambia la cara de los que ya hay**.
+// Un modelo es un objeto de datos —a qué edificio viste y con qué piezas se
+// arma— y lo único que cambia es cómo se dibuja ese edificio: lo que cuesta,
+// lo que aguanta, lo que entrena y las casillas que ocupa los sigue poniendo el
+// juego (y el catálogo, si se retocan allí). Así el taller no puede desequilibrar
+// una partida, sólo darle otro aire.
+//
+// Con un proyecto de Supabase configurado (`cloud-config.js`) los modelos dejan
+// de ser de un navegador: se guardan en una tabla y los ve todo el mundo, en
+// cualquier dispositivo. El navegador se queda de copia, para que el juego
+// arranque al instante y funcione igual sin cobertura.
 //
 // Todo lo que entra pasa por el validador, venga del almacenamiento del
-// navegador o del otro jugador por la red: un diseño corrupto o malicioso se
+// navegador o del otro jugador por la red: un modelo corrupto o malicioso se
 // queda en un edificio soso, nunca en una partida rota.
 
-import { BUILDINGS, BUILD_ORDER, UNITS, RESOURCES, AGES } from '../config.js';
+import { BUILDINGS } from '../config.js';
 import { LOOK } from './appearance.js';
 import { PARTS, FIELDS, MATERIAL_KEYS, DEFAULT_PALETTE } from '../gfx3d/parts.js';
 import { BUILTIN_DESIGNS } from './builtin-designs.js';
+import { cloudEnabled, pullModels, pushModel, removeModel } from './cloud.js';
 
-const STORAGE_KEY = 'aor-designs-v1';
-
+const STORAGE_KEY = 'aor-designs-v2';
 /*
- * Los edificios de serie, tal y como están antes de que se dé de alta ningún
- * diseño: son los que un diseño puede re-vestir. Se toma la lista aquí, en la
- * carga del módulo, justo por eso: después se le añaden los del taller y ya no
- * serviría.
+ * Qué edificios he tocado yo y todavía no han llegado a la nube. Sin esto, un
+ * cambio hecho sin cobertura se perdería en cuanto la nube contestara con lo
+ * que ella tiene: así se manda en cuanto se puede y, mientras tanto, lo mío
+ * manda sobre lo suyo.
+ */
+const PENDING_KEY = 'aor-designs-pending-v1';
+
+/**
+ * Los edificios del juego: los únicos a los que se les puede cambiar la cara.
+ * La lista es fija —el taller no da de alta ninguno nuevo—, así que la tabla de
+ * edificios es la misma en cualquier dispositivo y en cualquier momento, que es
+ * justo lo que necesita el protocolo de red.
  */
 export const STOCK_BUILDINGS = Object.keys(BUILDINGS);
 
-/** Topes: un diseño desmedido no puede reventar ni la memoria ni la red. */
-export const MAX_DESIGNS = 24;
+/** Tope de piezas: un modelo desmedido no puede reventar ni la memoria ni la red. */
 export const MAX_PARTS = 200;
-const MAX_NAME = 28;
-const MAX_DESC = 120;
-
-/** Qué hace el edificio en la partida, además de ocupar sitio. */
-export const ROLES = {
-  decor: {
-    label: 'Sin función', short: 'Decorativo',
-    hint: 'Sólo adorna la aldea y estorba al enemigo. Se puede reparar y derribar como cualquier otro.',
-  },
-  house: {
-    label: 'Da población', short: 'Población',
-    hint: 'Sube el límite de población, como una casa.',
-  },
-  store: {
-    label: 'Almacén', short: 'Almacén',
-    hint: 'Los aldeanos descargan aquí los recursos que elijas, sin volver al centro urbano.',
-  },
-  defense: {
-    label: 'Defensa', short: 'Defensa',
-    hint: 'Dispara flechas a los enemigos que se acerquen, como una torre.',
-  },
-  train: {
-    label: 'Entrena unidades', short: 'Militar',
-    hint: 'Fabrica las unidades que elijas y tiene punto de reunión, como un cuartel.',
-  },
-};
-
-/** Campos de la ficha, con sus topes. El estudio monta sus controles con esto. */
-export const STAT_FIELDS = [
-  { key: 'time', label: 'Tiempo de construcción', min: 1, max: 600, step: 1, unit: 's' },
-  { key: 'hp', label: 'Puntos de vida', min: 1, max: 20000, step: 10 },
-  { key: 'armor', label: 'Armadura', min: 0, max: 100, step: 1 },
-  { key: 'pArmor', label: 'Armadura antiproyectiles', min: 0, max: 100, step: 1 },
-  { key: 'los', label: 'Visión', min: 1, max: 30, step: 0.5, unit: 'casillas' },
-];
-
-export const ROLE_FIELDS = {
-  house: [{ key: 'pop', label: 'Población que da', min: 1, max: 200, step: 1 }],
-  defense: [
-    { key: 'attack', label: 'Ataque', min: 1, max: 500, step: 1 },
-    { key: 'range', label: 'Alcance', min: 1, max: 25, step: 0.5, unit: 'casillas' },
-    { key: 'rof', label: 'Cadencia', min: 0.2, max: 20, step: 0.1, unit: 's' },
-    { key: 'arrows', label: 'Flechas por descarga', min: 1, max: 20, step: 1 },
-  ],
-};
 
 // --- Estado ------------------------------------------------------------------
 
 /*
- * Dos listas: los que vienen con el juego (builtin-designs.js, iguales en todos
- * los dispositivos) y los que ha hecho quien juega (guardados en su navegador).
- * Las dos se dan de alta igual, pero sólo las segundas salen en el taller: un
- * diseño que viene con el juego no es una cosa que esté en el taller, es la
- * cara de un edificio del juego, y de casa sólo hay una.
+ * Dos listas: los modelos que vienen con el juego (builtin-designs.js, iguales
+ * en todos los dispositivos) y los que ha hecho quien juega (guardados en su
+ * navegador). De cada edificio hay como mucho uno de cada, y el propio manda
+ * sobre el de fábrica mientras lo tenga.
  */
-let builtin = [];
-let designs = [];
-const registered = new Set();
-let version = 0;
+let builtin = new Map();
+let designs = new Map();
+
+/** Todos los modelos en vigor, uno por edificio. */
+function allDesigns() {
+  return STOCK_BUILDINGS.map((t) => designs.get(t) || builtin.get(t)).filter(Boolean);
+}
+
+/** Sólo los que ha hecho quien juega. */
+function myDesigns() { return STOCK_BUILDINGS.map((t) => designs.get(t)).filter(Boolean); }
+
+/** El modelo en vigor de un edificio, sea propio o de los que trae el juego. */
+export function getDesign(type) { return designs.get(type) || builtin.get(type) || null; }
+
+/** ¿Le ha hecho el jugador un modelo a este edificio? */
+export const isCustom = (type) => designs.has(type);
+
+/** ¿Trae el juego un modelo para este edificio? */
+export const isBuiltin = (type) => builtin.has(type);
 
 /**
- * Cambia cada vez que la lista de edificios personalizados se toca. El
- * protocolo de red la mira para rehacer su tabla de tipos: los índices que
- * viajan por el cable tienen que significar lo mismo en los dos lados.
+ * Con qué se dibuja un edificio. Sin modelo devuelve null y el juego usa el
+ * suyo de siempre, el que está escrito en `gfx3d/buildings.js`.
  */
-export function designsVersion() { return version; }
-
-/** Todos los diseños dados de alta: primero los del juego, luego los propios. */
-export function allDesigns() { return [...builtin, ...designs]; }
-
-/** Sólo los que ha hecho quien juega: son los que salen en el taller. */
-export function myDesigns() { return designs; }
-
-export function getDesign(id) { return allDesigns().find((d) => d.id === id) || null; }
-
-/** ¿Viene con el juego? Entonces no es de un navegador y no se toca desde aquí. */
-export const isBuiltin = (id) => typeof id === 'string' && id.startsWith('b_');
-
-/*
- * Los identificadores llevan prefijo para no chocar nunca con los edificios de
- * serie: `b_` los que trae el juego y `c_` los que hace cada quien. Como el
- * alta va en orden de identificador, además salen siempre en el mismo orden en
- * cualquier dispositivo, que es lo que necesita el protocolo de red.
- */
-const isDesignId = (id) => typeof id === 'string' && /^[bc]_[a-z0-9]{4,12}$/.test(id);
-
-function newId() {
-  let id;
-  do {
-    id = `c_${Math.random().toString(36).slice(2, 9)}`;
-  } while (!isDesignId(id) || getDesign(id) || BUILDINGS[id]);
-  return id;
-}
+export function modelForBuilding(type) { return getDesign(type); }
 
 // --- Validación --------------------------------------------------------------
 
 const isHexColor = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
-
-const clean = (v, max) => String(v ?? '').replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, max);
 
 function num(v, min, max, fallback, step) {
   const n = Number(v);
@@ -163,155 +115,62 @@ function cleanPart(raw) {
   return p;
 }
 
-/** Un diseño válido, con todos sus campos en su sitio. */
-export function cleanDesign(raw, keepId = true) {
+/**
+ * Un modelo válido para un edificio del juego. `target` manda: si el modelo se
+ * hizo sobre otra huella —uno traído de fuera, o el mismo modelo llevado a otro
+ * edificio— se estira o encoge hasta la del edificio que va a vestir, de modo
+ * que lo que se ve en el taller es lo que se verá en la partida.
+ *
+ * `to` fuerza el edificio destino; sin él manda el que traiga el propio modelo.
+ * Se acepta `replaces` como nombre antiguo de `target`: los modelos que se
+ * compartieron antes siguen entrando.
+ */
+function cleanDesign(raw, to = null) {
   if (!raw || typeof raw !== 'object') return null;
-  const role = ROLES[raw.role] ? raw.role : 'decor';
-  const d = {
-    id: keepId && isDesignId(raw.id) ? raw.id : newId(),
-    name: clean(raw.name, MAX_NAME) || 'Edificio sin nombre',
-    desc: clean(raw.desc, MAX_DESC) || 'Edificio hecho en el taller.',
-    size: num(raw.size, 1, 4, 2, 1),
-    age: num(raw.age, 0, AGES.length - 1, 0, 1),
-    role,
-    cost: {},
-    time: num(raw.time, 1, 600, 20, 1),
-    hp: num(raw.hp, 1, 20000, 400, 1),
-    armor: num(raw.armor, 0, 100, 0, 1),
-    pArmor: num(raw.pArmor, 0, 100, 3, 1),
-    los: num(raw.los, 1, 30, 4, 0.5),
-    palette: {},
-    parts: [],
-  };
-  // Un diseño puede ser un edificio nuevo o el aspecto de uno que ya existe.
-  // En el segundo caso su ficha no pinta nada: los valores los pone el
-  // edificio original, y de aquí sale sólo el modelo.
-  if (STOCK_BUILDINGS.includes(raw.replaces)) d.replaces = raw.replaces;
+  const target = STOCK_BUILDINGS.includes(to) ? to
+    : [raw.target, raw.replaces].find((t) => STOCK_BUILDINGS.includes(t));
+  if (!target) return null;
 
-  for (const r of RESOURCES) d.cost[r] = num(raw.cost?.[r], 0, 5000, 0, 1);
-  if (!RESOURCES.some((r) => d.cost[r] > 0)) d.cost.wood = 50;
-
-  if (role === 'house') d.pop = num(raw.pop, 1, 200, 5, 1);
-  if (role === 'store') {
-    const list = Array.isArray(raw.dropoff) ? raw.dropoff.filter((r) => RESOURCES.includes(r)) : [];
-    d.dropoff = [...new Set(list)];
-    if (!d.dropoff.length) d.dropoff = ['food'];
-  }
-  if (role === 'defense') {
-    d.attack = num(raw.attack, 1, 500, 6, 1);
-    d.range = num(raw.range, 1, 25, 7, 0.5);
-    d.rof = num(raw.rof, 0.2, 20, 2, 0.1);
-    d.arrows = num(raw.arrows, 1, 20, 1, 1);
-  }
-  if (role === 'train') {
-    const list = Array.isArray(raw.trains) ? raw.trains.filter((t) => UNITS[t]) : [];
-    d.trains = [...new Set(list)];
-    if (!d.trains.length) d.trains = ['militia'];
-  }
-
+  const d = { target, size: BUILDINGS[target].size, palette: {}, parts: [] };
   for (const [key, def] of Object.entries(DEFAULT_PALETTE)) {
     d.palette[key] = isHexColor(raw.palette?.[key]) ? raw.palette[key].toLowerCase() : def;
   }
-
   const parts = Array.isArray(raw.parts) ? raw.parts.slice(0, MAX_PARTS) : [];
   for (const p of parts) {
     const c = cleanPart(p);
     if (c) d.parts.push(c);
   }
-  return d;
+  const from = num(raw.size, 1, 8, d.size, 1);
+  return from === d.size ? d : resizeDesign(d, d.size, from);
 }
 
 // --- Alta en el juego --------------------------------------------------------
 
-/** La ficha de `BUILDINGS` que le corresponde a un diseño. */
-function definitionOf(d) {
-  const cost = {};
-  for (const r of RESOURCES) if (d.cost[r] > 0) cost[r] = d.cost[r];
-  const def = {
-    name: d.name, desc: d.desc, cost, time: d.time, hp: d.hp, size: d.size,
-    los: d.los, age: d.age, armor: d.armor, pArmor: d.pArmor, custom: true,
-  };
-  if (d.role === 'house') def.pop = d.pop;
-  if (d.role === 'store') def.dropoff = [...d.dropoff];
-  if (d.role === 'defense') {
-    def.attack = d.attack; def.range = d.range; def.rof = d.rof;
-    def.arrows = d.arrows; def.pierce = true;
-  }
-  if (d.role === 'train') def.trains = [...d.trains];
-  return def;
-}
+/** Los colores originales de los edificios vestidos, para poder devolverlos. */
+const stockLooks = new Map();
 
-/** Sólo los materiales que el diseño usa de verdad: el catálogo no pregunta de más. */
-function usedMaterials(d) {
-  const used = new Set();
-  for (const p of d.parts) if (p.m && DEFAULT_PALETTE[p.m] !== undefined) used.add(p.m);
+/** Sólo los materiales que el modelo usa de verdad: el catálogo no pregunta de más. */
+function paletteOf(d) {
+  const used = new Set(d.parts.map((p) => p.m).filter((m) => DEFAULT_PALETTE[m] !== undefined));
   // La madera sale en los marcos de puertas y ventanas y en el andamio de la
   // obra, aunque ninguna pieza la pida por su nombre.
   used.add('wood');
   used.add('stone');
-  return used;
-}
-
-/** El modelo con el que se dibuja cada edificio de serie re-vestido. */
-const models = new Map();
-
-/** Los colores originales de los que se han re-vestido, para poder devolverlos. */
-const stockLooks = new Map();
-
-/** El diseño con el que se dibuja un edificio, sea propio o re-vestido. */
-export function modelForBuilding(type) {
-  return models.get(type) || getDesign(type) || null;
+  const palette = {};
+  for (const m of used) palette[m] = d.palette[m];
+  return palette;
 }
 
 /**
- * Vuelve a dar de alta todos los diseños. Se hace de una vez y en orden de
- * identificador para que la tabla de edificios salga igual en cualquier
- * dispositivo: en multijugador los tipos viajan como un número de índice.
+ * Deja los edificios con la cara que les toca: la de su modelo, o la suya de
+ * fábrica si se acaba de quitar el que tenían.
  */
 function applyRegistry() {
-  for (const id of registered) {
-    delete BUILDINGS[id];
-    delete LOOK.building[id];
-    const i = BUILD_ORDER.indexOf(id);
-    if (i >= 0) BUILD_ORDER.splice(i, 1);
-  }
-  registered.clear();
-  // Los edificios re-vestidos recuperan sus colores de fábrica antes de volver
-  // a repartir: si se quita el diseño que vestía a la casa, la casa vuelve a
-  // ser la de siempre.
   for (const [type, look] of stockLooks) LOOK.building[type] = look;
-  models.clear();
-
-  /*
-   * Primero los que le dan la cara a un edificio que ya existe. De casa sólo
-   * hay una a la vez, así que aquí sólo puede quedar un modelo por edificio: se
-   * recorren en orden y manda el último, y como los del jugador van después de
-   * los del juego, el suyo gana sobre el que viniera de fábrica.
-   */
-  for (const d of [...builtin, ...designs]) {
-    if (!d.replaces) continue;
-    if (!stockLooks.has(d.replaces)) stockLooks.set(d.replaces, LOOK.building[d.replaces]);
-    models.set(d.replaces, d);
-    LOOK.building[d.replaces] = paletteOf(d);
+  for (const d of allDesigns()) {
+    if (!stockLooks.has(d.target)) stockLooks.set(d.target, LOOK.building[d.target]);
+    LOOK.building[d.target] = paletteOf(d);
   }
-
-  // Y luego los que sí son edificios nuevos, en orden de identificador para que
-  // la tabla salga igual en cualquier dispositivo.
-  for (const d of allDesigns().sort((a, b) => (a.id < b.id ? -1 : 1))) {
-    if (d.replaces) continue;
-    BUILDINGS[d.id] = definitionOf(d);
-    LOOK.building[d.id] = paletteOf(d);
-    BUILD_ORDER.push(d.id);
-    registered.add(d.id);
-  }
-  version++;
-}
-
-/** Los colores que el catálogo podrá retocar: sólo los materiales que se usan. */
-function paletteOf(d) {
-  const palette = {};
-  for (const m of usedMaterials(d)) palette[m] = d.palette[m];
-  return palette;
 }
 
 /*
@@ -321,14 +180,13 @@ function paletteOf(d) {
 const SCALED_FIELDS = ['x', 'y', 'z', 'w', 'd', 'h', 'r', 'r0', 'r1', 'rise', 'over', 'len', 'th'];
 
 /**
- * Lleva un diseño a otra huella, estirando o encogiendo el modelo entero. Es lo
- * que pasa al ponerle a un diseño el aspecto de un edificio que ya existe: la
- * huella la manda el edificio, no el diseño, así que el modelo se ajusta a ella
- * y lo que se ve en el taller es lo que se verá en la partida.
+ * Lleva un modelo a otra huella, estirando o encogiendo el modelo entero. Es lo
+ * que pasa al llevar un modelo a un edificio de otro tamaño: la huella la manda
+ * el edificio, nunca el modelo.
  */
-export function resizeDesign(design, size) {
-  const from = design.size || 2;
-  const to = Math.min(4, Math.max(1, Math.round(size)));
+function resizeDesign(design, size, fromSize = null) {
+  const from = fromSize || design.size || 2;
+  const to = Math.min(8, Math.max(1, Math.round(size)));
   if (to === from) return design;
   const k = to / from;
   const scaled = { ...design, size: to, parts: design.parts.map((p) => ({ ...p })) };
@@ -344,94 +202,201 @@ export function resizeDesign(design, size) {
 
 // --- Guardar y cargar --------------------------------------------------------
 
+/** Edificios que he tocado y que la nube todavía no sabe. */
+let pending = new Set();
+/** Se juega con los modelos de otro (multijugador): nada de esto es mío. */
+let adopted = false;
+
 function save() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(designs));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(myDesigns()));
+    /*
+     * La lista de pendientes sólo significa algo con taller compartido. Sin él
+     * no se escribe, y esa ausencia es justo lo que hace falta: el día que se
+     * conecte un proyecto, lo que ya hubiera guardado aquí se da por mío y sin
+     * enviar —y sube— en vez de darse por borrado por no estar en la nube.
+     */
+    if (cloudEnabled()) localStorage.setItem(PENDING_KEY, JSON.stringify([...pending]));
   } catch { /* sin espacio o modo privado: se sigue jugando con lo que hay */ }
 }
 
-/** Carga los del juego y los guardados, y los da de alta. Se llama al arrancar. */
+/**
+ * Apunta que este edificio lo he cambiado yo. Sin proyecto configurado no hay
+ * nada que apuntar: lo del navegador ya es lo definitivo.
+ */
+function markPending(target) {
+  if (!cloudEnabled()) return;
+  pending.add(target);
+}
+
+/** Carga los del juego y los guardados, y los pone en vigor. Se llama al arrancar. */
 export function loadDesigns() {
-  builtin = [];
+  builtin = new Map();
   for (const item of Array.isArray(BUILTIN_DESIGNS) ? BUILTIN_DESIGNS : []) {
     const d = cleanDesign(item);
     // Los del juego pasan por el mismo validador que todo lo demás: un fallo al
-    // pegar uno no puede tumbar el arranque de nadie.
-    if (d && isBuiltin(d.id) && !getDesign(d.id)) builtin.push(d);
+    // pegar uno no puede tumbar el arranque de nadie. Y de cada edificio hay
+    // uno solo: el primero que aparezca en la lista.
+    if (d && !builtin.has(d.target)) builtin.set(d.target, d);
   }
   let raw = null;
   try { raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch { raw = null; }
-  designs = [];
+  designs = new Map();
   if (Array.isArray(raw)) {
-    for (const item of raw.slice(0, MAX_DESIGNS)) {
+    for (const item of raw) {
       const d = cleanDesign(item);
-      if (d && !isBuiltin(d.id) && !getDesign(d.id)) designs.push(d);
+      if (d && !designs.has(d.target)) designs.set(d.target, d);
     }
+  }
+  let rawPending = null;
+  try { rawPending = JSON.parse(localStorage.getItem(PENDING_KEY) || 'null'); } catch { rawPending = null; }
+  if (Array.isArray(rawPending)) {
+    pending = new Set(rawPending.filter((t) => STOCK_BUILDINGS.includes(t)));
+  } else {
+    /*
+     * La primera vez que este navegador ve un taller compartido —o si la lista
+     * de pendientes se ha estropeado— lo que hay guardado aquí se da por mío y
+     * sin enviar. Si no, la primera sincronización lo borraría por no estar en
+     * la nube, y son los modelos que se hicieron antes de conectarla.
+     */
+    pending = new Set(designs.keys());
   }
   applyRegistry();
   return allDesigns();
 }
 
-/** Guarda un diseño (nuevo o editado) y lo deja listo para construir. */
-export function saveDesign(raw) {
-  const d = cleanDesign(raw);
-  if (!d || isBuiltin(d.id)) return null;
-  const i = designs.findIndex((x) => x.id === d.id);
-  if (i >= 0) designs[i] = d;
-  else {
-    if (designs.length >= MAX_DESIGNS) return null;
-    designs.push(d);
-  }
+/**
+ * Guarda el modelo de un edificio. Sustituye al que hubiera: de cada edificio
+ * hay una cara y sólo una.
+ */
+export function saveDesign(raw, to = null) {
+  const d = cleanDesign(raw, to);
+  if (!d) return null;
+  designs.set(d.target, d);
+  markPending(d.target);
   applyRegistry();
   save();
   return d;
 }
 
-export function deleteDesign(id) {
-  if (isBuiltin(id)) return false;
-  const i = designs.findIndex((d) => d.id === id);
-  if (i < 0) return false;
-  designs.splice(i, 1);
+/** Le devuelve a un edificio su aspecto anterior: el del juego, o el de fábrica. */
+export function resetBuilding(type) {
+  if (!designs.has(type)) return false;
+  designs.delete(type);
+  markPending(type);
   applyRegistry();
   save();
   return true;
 }
 
-/** Copia de un diseño con identificador nuevo: duplicar para probar variantes. */
-export function duplicateDesign(id) {
-  const d = getDesign(id);
-  if (!d || designs.length >= MAX_DESIGNS) return null;
-  return saveDesign({ ...structuredClone(d), id: null, name: `${d.name} (copia)`.slice(0, MAX_NAME) });
+// --- El taller compartido ----------------------------------------------------
+
+/** ¿Hay proyecto detrás? El taller lo dice, para no prometer lo que no hay. */
+export { cloudEnabled };
+
+/** Cuántos cambios míos están esperando a salir. */
+export function pendingCount() { return pending.size; }
+
+/*
+ * Que no se solapen dos sincronizaciones: la segunda se engancha a la primera.
+ * Pasa en cuanto se guarda dos veces seguidas, que es lo normal modelando.
+ */
+let syncing = null;
+
+/**
+ * Pone de acuerdo el taller de este navegador con el de la nube: primero manda
+ * lo mío que aún no había salido y luego se trae lo que haya, que puede venir
+ * de otro dispositivo o de otra persona.
+ *
+ * Nunca lanza. Devuelve en qué ha quedado la cosa:
+ *   state    'off' sin proyecto · 'ok' al día · 'error' no se ha podido
+ *   changed  qué edificios han cambiado de cara (hay que rehacer sus colores)
+ *   pending  cuántos cambios míos siguen esperando
+ *   reason   si falló: 'table' falta la tabla · 'auth' la clave · 'net' la red
+ *
+ * No se llama con una partida en marcha: cambiar los modelos a mitad de partida
+ * dejaría edificios que se dibujan de otra forma de un fotograma al siguiente.
+ */
+export function syncDesigns() {
+  if (!cloudEnabled() || adopted) {
+    return Promise.resolve({ state: 'off', changed: [], pending: 0, reason: null });
+  }
+  if (syncing) return syncing;
+  syncing = doSync().finally(() => { syncing = null; });
+  return syncing;
 }
 
-export function canAddDesign() { return designs.length < MAX_DESIGNS; }
+async function doSync() {
+  let failed = null, why = null;
+  // Lo mío primero: si sale, deja de ser mío y pasa a ser de todos.
+  for (const target of [...pending]) {
+    const mine = designs.get(target);
+    const { ok, error, reason } = mine ? await pushModel(mine) : await removeModel(target);
+    if (ok) pending.delete(target);
+    else { failed = error; why = reason; }
+  }
+
+  const { models, error, reason } = await pullModels();
+  if (!models) {
+    save();
+    return {
+      state: 'error', changed: [], pending: pending.size,
+      error: failed || error, reason: why || reason,
+    };
+  }
+
+  const next = new Map();
+  for (const row of models) {
+    const d = cleanDesign(row);
+    if (d && !next.has(d.target)) next.set(d.target, d);
+  }
+  // Lo que yo he tocado y aún no ha salido manda sobre lo que diga la nube: es
+  // más nuevo que lo que ella tiene, y si no se perdería al recibir.
+  for (const target of pending) {
+    if (designs.has(target)) next.set(target, designs.get(target));
+    else next.delete(target);
+  }
+
+  // Qué edificios se dibujan distinto a partir de ahora: quien llame tiene que
+  // rehacerles los colores y los sprites, y sólo a ésos.
+  const changed = [];
+  for (const target of new Set([...designs.keys(), ...next.keys()])) {
+    const before = designs.get(target);
+    const after = next.get(target);
+    if (JSON.stringify(before ?? null) !== JSON.stringify(after ?? null)) changed.push(target);
+  }
+  designs = next;
+  applyRegistry();
+  save();
+  return {
+    state: failed ? 'error' : 'ok',
+    changed,
+    pending: pending.size,
+    error: failed || null,
+    reason: why,
+  };
+}
 
 // --- Multijugador ------------------------------------------------------------
 
-/** Los diseños tal cual, para mandárselos a los demás jugadores. */
-export function exportDesigns() {
-  return JSON.parse(JSON.stringify(designs));
-}
-
 /*
- * Los edificios propios viajan al invitado por el canal de datos, en un solo
+ * Los modelos del anfitrión viajan al invitado por el canal de datos, en un solo
  * mensaje junto a la señal de empezar. Un canal WebRTC no es sitio para medio
  * megabyte, así que se manda lo que quepa en este presupuesto y el resto se
- * queda en casa: la partida arranca igual, sencillamente con menos edificios
- * raros. Con diseños de tamaño normal caben todos de sobra.
+ * queda en casa: la partida arranca igual, sencillamente con algún edificio con
+ * su cara de siempre. Con modelos de tamaño normal caben todos de sobra.
  */
 const SHARE_BUDGET = 48000;
 
 /**
- * Los diseños que caben en un mensaje de red, en orden de identificador. Van
- * también los que trae el juego: si el anfitrión tiene una versión con
- * edificios que el invitado no conoce, la tabla de tipos tiene que salir igual
- * en los dos lados o las instantáneas se leerían mal.
+ * Los modelos que caben en un mensaje de red. Van también los que trae el
+ * juego: si el anfitrión tiene una versión con edificios ya re-vestidos que el
+ * invitado no conoce, así los dos ven lo mismo en el mapa.
  */
 export function shareableDesigns() {
   const out = [];
   let size = 0;
-  for (const d of allDesigns().sort((a, b) => (a.id < b.id ? -1 : 1))) {
+  for (const d of allDesigns()) {
     const bytes = JSON.stringify(d).length;
     if (size + bytes > SHARE_BUDGET) break;
     size += bytes;
@@ -441,20 +406,23 @@ export function shareableDesigns() {
 }
 
 /**
- * Adopta los edificios del anfitrión durante una partida en red. Los propios se
- * quedan guardados en el navegador y vuelven al recargar la página: lo que se
- * cambia aquí es sólo qué hay dado de alta mientras dure la partida, porque los
- * dos lados tienen que tener exactamente la misma tabla de edificios.
+ * Adopta las caras de los edificios del anfitrión durante una partida en red.
+ * Los modelos propios se quedan guardados en el navegador y vuelven al recargar
+ * la página: lo que se cambia aquí es sólo lo que se ve mientras dure la
+ * partida. Como el taller no da de alta edificios, la tabla de tipos no se
+ * mueve y esto no puede descuadrar una instantánea.
  */
 export function adoptDesigns(incoming) {
-  builtin = [];
-  designs = [];
+  // Lo adoptado es prestado y no sale de esta partida: se cierra la puerta a la
+  // nube para que no acabe guardado como si fuera de aquí. Lo propio sigue en el
+  // navegador y vuelve al recargar la página, que es como se sale de una partida.
+  adopted = true;
+  builtin = new Map();
+  designs = new Map();
   if (Array.isArray(incoming)) {
-    for (const item of incoming.slice(0, MAX_DESIGNS * 2)) {
+    for (const item of incoming.slice(0, STOCK_BUILDINGS.length * 2)) {
       const d = cleanDesign(item);
-      if (!d || getDesign(d.id)) continue;
-      if (isBuiltin(d.id)) builtin.push(d);
-      else designs.push(d);
+      if (d && !designs.has(d.target)) designs.set(d.target, d);
     }
   }
   applyRegistry();
@@ -464,22 +432,22 @@ export function adoptDesigns(incoming) {
 // --- Plantillas --------------------------------------------------------------
 
 /*
- * Con qué empieza un edificio nuevo. Un lienzo en blanco delante de dieciséis
- * piezas asusta; media docena de puntos de partida enseñan cómo se monta uno y
- * se retocan enseguida.
+ * Con qué empieza un edificio al que se le va a cambiar la cara. Su modelo de
+ * serie está escrito en código, no en piezas, así que no se puede abrir y
+ * retocar: se empieza por una de estas y se lleva desde ahí a donde se quiera.
+ * Todas se ajustan solas a la huella del edificio que vayan a vestir.
  */
 export const TEMPLATES = [
   {
     key: 'empty', label: 'En blanco',
-    hint: 'Una huella vacía sobre la que empezar de cero.',
-    make: () => ({ name: 'Edificio nuevo', size: 2, parts: [] }),
+    hint: 'La huella vacía, para levantarlo pieza a pieza desde cero.',
+    make: () => ({ size: 2, parts: [] }),
   },
   {
     key: 'hut', label: 'Cabaña',
     hint: 'Zócalo, muros, tejado a dos aguas, puerta, ventana y chimenea.',
     make: () => ({
-      name: 'Cabaña', size: 2, role: 'house', pop: 5,
-      cost: { wood: 30 }, time: 14, hp: 350, los: 4,
+      size: 2,
       parts: [
         { k: 'box', x: 1, y: 1, z: 0, w: 1.7, d: 1.7, h: 0.15, yaw: 0, m: 'stone' },
         { k: 'box', x: 1, y: 1, z: 0.15, w: 1.6, d: 1.6, h: 0.7, yaw: 0, m: 'wall' },
@@ -494,9 +462,7 @@ export const TEMPLATES = [
     key: 'keep', label: 'Torreón',
     hint: 'Torre redonda con almenas, puerta y estandarte.',
     make: () => ({
-      name: 'Torreón', size: 2, role: 'defense',
-      attack: 6, range: 7, rof: 2, arrows: 1,
-      cost: { wood: 25, stone: 125 }, time: 25, hp: 850, los: 8, armor: 3, pArmor: 6,
+      size: 2,
       parts: [
         { k: 'tower', x: 1, y: 1, z: 0, r: 0.56, h: 1.6, m: 'stone' },
         { k: 'door', x: 1.6, y: 1, z: 0, w: 0.3, h: 0.4, face: 'x', m: 'door' },
@@ -508,8 +474,7 @@ export const TEMPLATES = [
     key: 'shed', label: 'Cobertizo',
     hint: 'Cuatro postes, techo de una agua y material apilado.',
     make: () => ({
-      name: 'Cobertizo', size: 2, role: 'store', dropoff: ['wood'],
-      cost: { wood: 80 }, time: 18, hp: 450, los: 5,
+      size: 2,
       parts: [
         { k: 'box', x: 1, y: 1, z: 0, w: 1.9, d: 1.9, h: 0.05, yaw: 0, m: 'soil', noshadow: true },
         { k: 'beam', x: 0.3, y: 0.3, z: 0, len: 0.75, yaw: 0, pitch: 90, th: 0.06, m: 'wood' },
@@ -524,10 +489,9 @@ export const TEMPLATES = [
   },
   {
     key: 'hall', label: 'Casa grande',
-    hint: 'Planta de tres casillas con entramado, porche y tejado a cuatro aguas.',
+    hint: 'Entramado de madera, porche y tejado a cuatro aguas.',
     make: () => ({
-      name: 'Casa grande', size: 3, role: 'house', pop: 10,
-      cost: { wood: 120 }, time: 28, hp: 700, los: 5,
+      size: 3,
       parts: [
         { k: 'box', x: 1.5, y: 1.5, z: 0, w: 2.7, d: 2.7, h: 0.2, yaw: 0, m: 'base' },
         { k: 'box', x: 1.5, y: 1.5, z: 0.2, w: 2.4, d: 2.4, h: 0.6, yaw: 0, m: 'stone' },
@@ -545,8 +509,8 @@ export const TEMPLATES = [
   },
 ];
 
-/** Un diseño nuevo a partir de una plantilla, ya validado y con identificador. */
-export function designFromTemplate(key) {
+/** Un modelo nuevo para un edificio a partir de una plantilla, ya validado. */
+export function designFromTemplate(key, target) {
   const t = TEMPLATES.find((x) => x.key === key) || TEMPLATES[0];
-  return cleanDesign({ ...t.make(), id: null }, false);
+  return cleanDesign(t.make(), target);
 }

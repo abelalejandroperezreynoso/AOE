@@ -9,17 +9,27 @@ import { LobbyUI } from './lobby-ui.js';
 import { NetSession } from './net/session.js';
 import { Catalog } from './catalog.js';
 import { Studio } from './studio.js';
-import { loadOverrides, adoptOverrides } from './data/overrides.js';
-import { loadDesigns, adoptDesigns } from './data/designs.js';
+import { loadOverrides, adoptOverrides, rebaseBuildingLooks } from './data/overrides.js';
+import { loadDesigns, adoptDesigns, syncDesigns } from './data/designs.js';
 import { clearSpriteCaches } from './sprites.js';
 
 const el = (id) => document.getElementById(id);
 
-// Primero los edificios que haya hecho el jugador en el taller: se dan de alta
-// como edificios más del juego, y a partir de ahí el catálogo puede tocarlos y
-// sus valores guardados se aplican encima igual que a los de serie.
+// Primero las caras que el jugador les haya hecho a los edificios en el taller,
+// porque fijan los colores de partida de los que vista; encima de eso se
+// aplican los valores y los retoques guardados en el catálogo.
 loadDesigns();
 loadOverrides();
+
+/*
+ * Y, si hay taller compartido, se pregunta qué hay en la nube. Va aparte y sin
+ * esperarla: el menú sale con lo que había guardado aquí —al instante y aunque
+ * no haya cobertura— y los edificios que hayan cambiado se repintan en cuanto
+ * llega la respuesta. Se hace sólo aquí, con el menú delante: cambiar los
+ * modelos a mitad de partida dejaría edificios que se dibujan de otra forma de
+ * un fotograma al siguiente.
+ */
+syncDesigns().then((r) => rebaseBuildingLooks(r.changed));
 const catalog = new Catalog();
 const studio = new Studio();
 
@@ -86,8 +96,8 @@ const lobbyUi = new LobbyUI((s) => {
   audio.ensure();
   // En multijugador mandan los valores del anfitrión: si un invitado tiene
   // otros, se adoptan los del anfitrión mientras dure la partida. Lo mismo con
-  // los edificios del taller: se juega con los suyos, que son los que él va a
-  // simular, y los propios vuelven al recargar la página.
+  // los modelos del taller: se ven los suyos, y los propios vuelven al recargar
+  // la página.
   if (s.role === 'guest') {
     if (s.designs) { adoptDesigns(s.designs); clearSpriteCaches(); }
     if (s.overrides) adoptOverrides(s.overrides);

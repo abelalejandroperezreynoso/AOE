@@ -1,0 +1,12 @@
+# Marca esta carpeta como un proyecto de Supabase.
+#
+# Aquí no se levanta Supabase en local (no hace falta: el juego son archivos
+# estáticos y lo único que guarda fuera del navegador es la cara de los
+# edificios), así que no están los cientos de ajustes de desarrollo que genera
+# `supabase init`. Con esto basta para que la CLI y la integración de GitHub
+# encuentren las migraciones de al lado y las apliquen.
+#
+# `project_id` es sólo un nombre para distinguir proyectos; se pone el del
+# proyecto de verdad para que no haya dudas de a cuál va esto. A qué proyecto
+# se aplica de verdad lo decide el panel de Supabase, no este fichero.
+project_id = "fylzlwhxqaaehwrwuynt"

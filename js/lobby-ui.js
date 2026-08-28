@@ -415,8 +415,8 @@ export class LobbyUI {
     }
     // La señal de arranque lleva a quién no se pudo esperar, para que todos
     // monten exactamente el mismo mundo.
-    // Los edificios que el anfitrión haya hecho en el taller viajan aquí: sus
-    // invitados los verán en el mapa y podrán construirlos ellos también.
+    // Las caras que el anfitrión les haya hecho a los edificios viajan aquí:
+    // sus invitados verán en el mapa los mismos edificios que él.
     const designs = shareableDesigns();
     for (const m of connected) m.peer.send(JSON.stringify({ t: 'start', absent, designs }));
 

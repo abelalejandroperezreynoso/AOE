@@ -370,10 +370,9 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   text-transform: uppercase; letter-spacing: 1px;
 }
 .studio-side .catalog-list { flex: 1; }
-.studio-side > button { margin: 0; width: 100%; padding: 8px 12px; font-size: 13.5px; }
 .studio-side-actions { display: flex; gap: 6px; }
 .studio-side-actions button { flex: 1; padding: 6px 8px; font-size: 12.5px; }
-#btn-studio-del.confirming {
+#btn-studio-reset.confirming {
   background: linear-gradient(180deg, #8d3229, #521c16);
   border-color: #c06a5e; color: #ffd9d3;
 }
@@ -552,6 +551,14 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .studio-template { display: block; width: 100%; text-align: left; margin-bottom: 6px; padding: 9px 12px; }
 .studio-template b { display: block; color: var(--gold-l); font-size: 14px; margin-bottom: 2px; }
 .studio-template small { color: #a8926a; font-size: 11.5px; line-height: 1.4; }
+/* Fila de sólo lectura: un dato que pone el juego y aquí no se toca. */
+.studio-info-row { align-items: baseline; }
+.studio-info-value { color: #e6d6ab; font-size: 12.5px; text-align: right; }
+/* Estado del taller compartido, en la cinta de arriba. */
+.studio-cloud {
+  font-size: 12px; color: #a8926a; white-space: nowrap;
+  border: 1px solid rgba(168, 146, 106, .35); border-radius: 4px; padding: 3px 8px;
+}
 .studio-more summary { cursor: pointer; font-size: 12.5px; color: #cbb68c; margin: 10px 0 6px; }
 
 /* En pantallas estrechas la mesa manda y se pone arriba; la lista y las

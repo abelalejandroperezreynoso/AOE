@@ -1,12 +1,12 @@
 // Piezas del taller de edificios: el vocabulario con el que se arma un modelo
 // 3D desde dentro del juego.
 //
-// Los edificios de serie (buildings.js) son código; los que hace el jugador son
-// **datos**: una lista de piezas con su sitio, su tamaño y su material. Aquí
-// vive la tabla de piezas —qué campos tiene cada una y qué triángulos genera—
-// y la función que convierte un diseño entero en malla, con sus tres etapas de
-// obra. Al ser datos, un diseño se guarda, se copia, se valida y se le manda al
-// otro jugador por la red.
+// Los modelos de serie (buildings.js) son código; los que hace el jugador para
+// re-vestir esos mismos edificios son **datos**: una lista de piezas con su
+// sitio, su tamaño y su material. Aquí vive la tabla de piezas —qué campos
+// tiene cada una y qué triángulos genera— y la función que convierte un modelo
+// entero en malla, con sus tres etapas de obra. Al ser datos, un modelo se
+// guarda, se copia, se valida y se le manda al otro jugador por la red.
 //
 // Las piezas se apoyan en las mismas primitivas del motor y en el mismo kit de
 // obra que usan los edificios de serie, así que un edificio hecho a mano se
@@ -28,7 +28,7 @@ import {
 /*
  * Cada pieza pinta con un material, no con un color suelto: así el catálogo
  * puede recolorear un edificio entero cambiando un valor, igual que hace con
- * los de serie, y el diseño no guarda el mismo color repetido cien veces.
+ * los de serie, y el modelo no guarda el mismo color repetido cien veces.
  */
 export const MATERIALS = [
   { key: 'wall', label: 'Muro', def: '#d8cba6' },
@@ -58,32 +58,29 @@ export const DEFAULT_PALETTE = Object.fromEntries(MATERIALS.map((m) => [m.key, m
 const UNLIT_MATS = new Set(['glow']);
 
 function paletteOf(design, live) {
-  // El catálogo puede haber recoloreado el edificio después de crearlo, así que
-  // manda lo que diga LOOK; la paleta del diseño es el punto de partida. En el
+  // El catálogo puede haber recoloreado el edificio después de vestirlo, así que
+  // manda lo que diga LOOK; la paleta del modelo es el punto de partida. En el
   // taller (`live`) manda la paleta que se está tocando ahora mismo, que aún no
-  // ha llegado a ninguna otra parte. Si el diseño viste a un edificio de serie,
-  // los colores editables son los de ese edificio, no los del diseño.
-  const key = design.replaces || design.id;
-  const saved = !live && key ? LOOK.building[key] : null;
+  // ha llegado a ninguna otra parte.
+  const saved = !live && design.target ? LOOK.building[design.target] : null;
   return { ...DEFAULT_PALETTE, ...(design.palette || {}), ...(saved || {}) };
 }
 
 /**
- * La huella sobre la que se dibuja. Cuando un diseño viste a un edificio de
- * serie, la manda el edificio: la casa mide dos casillas, se haya modelado
- * sobre las que se haya modelado.
+ * La huella sobre la que se dibuja: la manda el edificio vestido, no el modelo.
+ * La casa mide dos casillas, se haya modelado sobre las que se haya modelado.
  */
 export function renderSize(design) {
-  const stock = design.replaces && BUILDINGS[design.replaces];
+  const stock = design.target && BUILDINGS[design.target];
   return (stock && stock.size) || design.size || 2;
 }
 
 // --- Campos editables --------------------------------------------------------
 
 /*
- * Rangos y etiquetas de cada campo. El estudio construye sus controles con
+ * Rangos y etiquetas de cada campo. El taller construye sus controles con
  * esto y el validador recorta con esto mismo, de modo que no hay forma de
- * guardar un diseño con una viga de mil casillas.
+ * guardar un modelo con una viga de mil casillas.
  */
 export const FIELDS = {
   x: { label: 'Posición X', min: -3, max: 11, step: 0.05 },
@@ -150,7 +147,7 @@ function lifted(out, z, fn) {
 
 /*
  * `fields` es el orden en que salen los controles; `def` los valores con los que
- * nace la pieza (en casillas, sobre una huella de 2×2, que luego el estudio
+ * nace la pieza (en casillas, sobre una huella de 2×2, que luego el taller
  * centra donde haga falta).
  */
 export const PARTS = {
@@ -180,7 +177,7 @@ export const PARTS = {
     fields: ['x', 'y', 'z', 'r', 'flat', 'seg'],
     def: { x: 1, y: 1, z: 0, r: 0.4, flat: 1, seg: 8, m: 'wall' },
     build(out, p, c) {
-      // El estudio cuenta la z desde la base de la pieza, no desde su centro.
+      // El taller cuenta la z desde la base de la pieza, no desde su centro.
       sphere(out, p.x, p.y, p.z + p.r * p.flat, p.r, matColor(p, c),
         { ...matOpts(p), rings: 4, seg: p.seg, flat: p.flat });
     },
@@ -410,7 +407,7 @@ export const PARTS = {
 
 export const PART_KEYS = Object.keys(PARTS);
 
-// --- De diseño a malla -------------------------------------------------------
+// --- De modelo a malla -------------------------------------------------------
 
 function hash(str) {
   let h = 2166136261;
@@ -424,7 +421,7 @@ function hash(str) {
 /**
  * Recorta la obra a media altura: los triángulos que quedan del todo por encima
  * del corte se van y a los demás se les baja lo que sobresale. Es lo que
- * convierte cualquier diseño en una etapa "a medias" creíble sin que su autor
+ * convierte cualquier modelo en una etapa "a medias" creíble sin que su autor
  * tenga que modelarla.
  */
 function clampZ(tris, cut) {
@@ -445,7 +442,7 @@ function meshHeight(groups) {
 }
 
 /**
- * Malla de un diseño repartida por piezas: `[{ part, tris }]`. El estudio la
+ * Malla de un modelo repartida por piezas: `[{ part, tris }]`. El taller la
  * usa para saber qué pieza hay bajo el ratón y para resaltar la elegida; el
  * juego se queda sólo con los triángulos.
  */
@@ -455,11 +452,11 @@ export function designParts(design, colorIdx = 0, stage = 2, live = false) {
   const s = renderSize(design);
   // Si el modelo se hizo sobre otra huella (por ejemplo, uno de tres casillas
   // puesto a vestir la casa, que mide dos), se ajusta entero a la de verdad en
-  // vez de salirse de ella. El taller lo deja ya adaptado, pero un diseño que
-  // llegue de fuera puede no estarlo.
+  // vez de salirse de ella. El validador lo deja ya adaptado; esto es la red de
+  // seguridad para un modelo que se pase a mano desde la consola.
   const k = s / (design.size || s);
   const c = { M, C, s };
-  srand(hash(design.id || design.name || 'x') + stage * 7 + 1);
+  srand(hash(design.target || 'x') + stage * 7 + 1);
 
   if (stage === 0) {
     const tris = [];
@@ -493,7 +490,7 @@ export function designParts(design, colorIdx = 0, stage = 2, live = false) {
   return groups;
 }
 
-/** Malla completa de un diseño, lista para hornear. */
+/** Malla completa de un modelo, lista para hornear. */
 export function designMesh(design, colorIdx = 0, stage = 2, live = false) {
   const out = [];
   for (const g of designParts(design, colorIdx, stage, live)) {
@@ -502,7 +499,7 @@ export function designMesh(design, colorIdx = 0, stage = 2, live = false) {
   return out;
 }
 
-/** Cuántos triángulos gasta un diseño: el estudio lo enseña como presupuesto. */
+/** Cuántos triángulos gasta un modelo: el taller lo enseña como presupuesto. */
 export function triangleCount(design) {
   let n = 0;
   for (const g of designParts(design, 0, 2)) n += g.tris.length;

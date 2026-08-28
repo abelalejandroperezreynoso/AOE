@@ -75,7 +75,7 @@
         <li>Construye <b>casas</b> para subir el límite de población y <b>cuarteles</b> para crear ejército.</li>
         <li>Avanza de <b>edad</b> desde el Centro urbano para desbloquear unidades y mejoras.</li>
         <li>Gana destruyendo todo lo que tengan tus rivales.</li>
-        <li>En el <b>Taller de edificios</b> puedes modelar los tuyos propios y construirlos en la partida.</li>
+        <li>En el <b>Taller de edificios</b> puedes rehacerle el modelo a cualquier edificio del juego sin tocar lo que cuesta ni lo que hace.</li>
       </ul>
       <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios. Todo el arte se genera por código.</p>
     </div>
@@ -120,10 +120,13 @@
 
 <!-- ---------- Taller de edificios ---------- -->
 <div id="studio" class="overlay hidden">
-  <div class="studio-card" id="studio-card" data-mtab="part" data-sheet="on">
+  <div class="studio-card" id="studio-card" data-mtab="build" data-sheet="on">
     <header class="catalog-top">
       <h2>Taller de edificios</h2>
       <div class="catalog-top-right">
+        <!-- Sólo sale cuando hay un proyecto de Supabase detrás: dice si lo que
+             se ve aquí es ya lo que ve todo el mundo. -->
+        <span id="studio-cloud" class="studio-cloud hidden"></span>
         <span id="studio-status" class="catalog-changes"></span>
         <button id="btn-studio-close" class="primary">Volver al menú</button>
       </div>
@@ -131,16 +134,14 @@
 
     <div class="studio-body">
       <aside class="studio-side">
-        <h3>Tus edificios</h3>
+        <h3>Edificios del juego</h3>
         <ul id="studio-list" class="catalog-list"></ul>
-        <button id="btn-studio-new" class="secondary">Nuevo edificio</button>
-        <div class="studio-side-actions">
-          <button id="btn-studio-dup">Duplicar</button>
-          <button id="btn-studio-del" class="studio-del-btn">Borrar</button>
-        </div>
         <div class="studio-side-actions">
           <button id="btn-studio-share">Compartir</button>
           <button id="btn-studio-import">Importar</button>
+        </div>
+        <div class="studio-side-actions">
+          <button id="btn-studio-reset" class="studio-del studio-reset-btn">Restablecer</button>
         </div>
       </aside>
 
@@ -164,12 +165,12 @@
 
       <aside class="studio-props">
         <div id="studio-tabs" class="catalog-tabs">
-          <!-- "Míos" sólo sale en pantallas pequeñas: allí la lista de
+          <!-- "Edificios" sólo sale en pantallas pequeñas: allí la lista de
                edificios comparte esta hoja con los demás paneles. -->
-          <button data-tab="part" class="active">Pieza</button>
-          <button data-tab="build">Edificio</button>
+          <button data-tab="part">Pieza</button>
+          <button data-tab="build" class="active">Edificio</button>
           <button data-tab="color">Colores</button>
-          <button data-tab="list" class="studio-mtab">Míos</button>
+          <button data-tab="list" class="studio-mtab">Edificios</button>
           <button id="btn-studio-sheet" class="studio-sheet-toggle" title="Plegar el panel y ver el modelo entero">⌄</button>
         </div>
         <div id="studio-panel" class="studio-panel"></div>
@@ -177,15 +178,17 @@
     </div>
 
     <p class="catalog-foot">
-      Coloca piezas sobre la huella y ve el resultado horneado como saldrá en la
-      partida. Lo que hagas aquí se guarda solo en este navegador y aparece en la
-      barra de construcción de los aldeanos, con su coste y su función. En
-      multijugador se juega con los edificios de quien invita.
+      Elige un edificio del juego y hazle otro modelo: coloca piezas sobre su
+      huella y ve el resultado horneado como saldrá en la partida. Aquí sólo
+      cambia su aspecto —lo que cuesta y lo que hace se retoca en el catálogo— y
+      siempre se puede restablecer. Con el taller compartido, lo que hagas aquí
+      lo ve todo el mundo, en cualquier dispositivo. En multijugador se ven los
+      edificios de quien invita.
     </p>
   </div>
 </div>
 
-<!-- ---------- Compartir un edificio del taller ---------- -->
+<!-- ---------- Compartir el modelo de un edificio ---------- -->
 <div id="studio-share" class="overlay hidden">
   <div class="menu-card small">
     <h2 id="share-title">Compartir edificio</h2>
@@ -195,7 +198,7 @@
       <button id="btn-share-copy">Copiar</button>
       <button id="btn-share-file">Descargar</button>
       <button id="btn-share-paste">Pegar</button>
-      <button id="btn-share-apply" class="wide primary">Importar el edificio</button>
+      <button id="btn-share-apply" class="wide primary">Ponérselo a este edificio</button>
     </div>
     <p id="share-note" class="share-note"></p>
     <button id="btn-share-close" class="secondary">Cerrar</button>
