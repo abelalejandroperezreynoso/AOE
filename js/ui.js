@@ -102,6 +102,8 @@ export class UI {
   cacheDom() {
     const id = (x) => document.getElementById(x);
     this.el.canvas = id('game');
+    // Mide lo que se ve de verdad: lo estira watchViewport() con `--app-h`.
+    this.el.app = id('app');
     this.el.res = {};
     for (const r of RESOURCES) this.el.res[r] = id(`res-${r}`);
     this.el.pop = id('res-pop');
@@ -1310,7 +1312,13 @@ export class UI {
     // Preferencia: encima. Si no cabe, debajo; y siempre dentro de la pantalla.
     let top = anchor.top - th - 10;
     if (top < m) top = anchor.bottom + 10;
-    t.style.top = `${clamp(top, m, Math.max(m, window.innerHeight - th - m))}px`;
+    /*
+     * El suelo es el filo de lo que se ve, no `innerHeight`: en un móvil esa
+     * ventana da de sí más que la pantalla y la ficha se iba por debajo de la
+     * barra del navegador. `#app` ya mide lo visible, así que se pregunta a él.
+     */
+    const visible = this.el.app?.clientHeight || window.innerHeight;
+    t.style.top = `${clamp(top, m, Math.max(m, visible - th - m))}px`;
 
     // Red de seguridad: en táctil algunos navegadores se comen el «pointerup»
     // (al deslizar fuera del botón, al abrir un diálogo...) y la ficha se
