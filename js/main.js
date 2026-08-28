@@ -9,8 +9,8 @@ import { LobbyUI } from './lobby-ui.js';
 import { NetSession } from './net/session.js';
 import { Catalog } from './catalog.js';
 import { Studio } from './studio.js';
-import { loadOverrides, adoptOverrides } from './data/overrides.js';
-import { loadDesigns, adoptDesigns } from './data/designs.js';
+import { loadOverrides, adoptOverrides, rebaseBuildingLooks } from './data/overrides.js';
+import { loadDesigns, adoptDesigns, syncDesigns } from './data/designs.js';
 import { clearSpriteCaches } from './sprites.js';
 
 const el = (id) => document.getElementById(id);
@@ -20,6 +20,16 @@ const el = (id) => document.getElementById(id);
 // aplican los valores y los retoques guardados en el catálogo.
 loadDesigns();
 loadOverrides();
+
+/*
+ * Y, si hay taller compartido, se pregunta qué hay en la nube. Va aparte y sin
+ * esperarla: el menú sale con lo que había guardado aquí —al instante y aunque
+ * no haya cobertura— y los edificios que hayan cambiado se repintan en cuanto
+ * llega la respuesta. Se hace sólo aquí, con el menú delante: cambiar los
+ * modelos a mitad de partida dejaría edificios que se dibujan de otra forma de
+ * un fotograma al siguiente.
+ */
+syncDesigns().then((r) => rebaseBuildingLooks(r.changed));
 const catalog = new Catalog();
 const studio = new Studio();
 
