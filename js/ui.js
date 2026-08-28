@@ -102,7 +102,7 @@ export class UI {
   cacheDom() {
     const id = (x) => document.getElementById(x);
     this.el.canvas = id('game');
-    // Mide lo que se ve de verdad: lo estira watchViewport() con `--app-h`.
+    // Mide lo que se ve de verdad: lo estira `--app-h`, en la hoja de estilos.
     this.el.app = id('app');
     this.el.res = {};
     for (const r of RESOURCES) this.el.res[r] = id(`res-${r}`);

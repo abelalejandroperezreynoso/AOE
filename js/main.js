@@ -12,16 +12,8 @@ import { Studio } from './studio.js';
 import { loadOverrides, adoptOverrides, rebaseBuildingLooks } from './data/overrides.js';
 import { loadDesigns, adoptDesigns, syncDesigns } from './data/designs.js';
 import { clearSpriteCaches } from './sprites.js';
-import { watchViewport } from './viewport.js';
 
 const el = (id) => document.getElementById(id);
-
-/*
- * Lo primero de todo: cuánto mide lo que se ve. De ahí cuelgan la partida y
- * las superposiciones, así que si se mide tarde la primera pintada sale con la
- * franja muerta abajo y se corrige delante del jugador.
- */
-watchViewport();
 
 // Primero las caras que el jugador les haya hecho a los edificios en el taller,
 // porque fijan los colores de partida de los que vista; encima de eso se
@@ -209,7 +201,10 @@ function medidas() {
     return Math.round(caja.getBoundingClientRect().height) || '—';
   };
   const unidades = `vh ${alto('100vh')} · dvh ${alto('100dvh')} · svh ${alto('100svh')}`
-    + ` · lvh ${alto('100lvh')} · fill ${alto('-webkit-fill-available')}`;
+    + ` · lvh ${alto('100lvh')} · fill ${alto('-webkit-fill-available')}`
+    // Y con cuál se está maquetando de verdad, ya en píxeles: una variable se
+    // lee tal cual está escrita («100dvh»), y el número es lo que interesa.
+    + ` · app ${alto('var(--app-h)')}`;
   caja.remove();
   const vv = window.visualViewport;
   /*
@@ -225,14 +220,12 @@ function medidas() {
     if (!r || (!r.width && !r.height)) return `${id} —`;
     return `${id} ${Math.round(r.top)}→${Math.round(r.bottom)}`;
   };
-  const cs = getComputedStyle(document.documentElement);
   return `página ${innerWidth}×${innerHeight}`
     + ` · raíz ${document.documentElement.clientHeight}`
     + ` · visual ${Math.round(vv?.height || 0)} desde ${Math.round(vv?.offsetTop || 0)}`
     + ` lupa ${(vv?.scale || 1).toFixed(2)} · desliz ${Math.round(scrollY)}`
     + ` · pantalla ${screen.width}×${screen.height} · zonas ${sa}`
     + ` · ${unidades}`
-    + ` · app ${cs.getPropertyValue('--app-t').trim()}+${cs.getPropertyValue('--app-h').trim()}`
     + ` · ${caja2('app')} · ${caja2('topbar')} · ${caja2('bottombar')}`
     + ` · standalone ${!!navigator.standalone}`;
 }

@@ -31,22 +31,29 @@
   --prod-h: 46px; /* alto total de la tira de producción, con bordes y relleno */
 
   /*
-   * Lo que mide de verdad lo que se ve. En un móvil no coincide con la ventana
-   * contra la que se maqueta —la de `inset: 0` y `height: 100%`—, y de esa
-   * diferencia salía la franja muerta de abajo. watchViewport() lo reescribe
-   * con lo que dice `visualViewport`; esto es sólo el valor de partida, para
-   * que la primera pintada ya salga bien sin esperar al guión.
+   * Lo que mide de verdad lo que se ve, de una vez y para todo: la partida, las
+   * superposiciones y los paneles del taller.
    *
-   * Y `--app-t`, dónde empieza: hay navegadores que ponen su barra de
-   * direcciones encima de la ventana de maquetar, y ahí un `top: 0` cae
-   * tapado. Vale cero en los que la dejan por fuera, que son casi todos.
+   * `vh` no vale en un móvil: es la ventana grande, la de cuando el navegador
+   * ha recogido sus barras. Con las barras puestas el juego se sale por abajo y
+   * lo que queda fuera está cortado; con `inset: 0` y `height: 100%` pasa lo
+   * mismo, que es de donde salía la franja.
    */
-  --app-t: 0px;
   --app-h: 100vh;
 }
 @supports (height: 100dvh) {
-  /* `dvh` ya descuenta las barras del navegador: mejor punto de partida que
-     `vh` en todo lo moderno, y vale aunque el guión tarde o no llegue. */
+  /*
+   * `dvh` es exactamente eso: lo que se ve ahora mismo, con las barras que
+   * haya puestas en este momento, y el navegador lo reajusta solo al recoger o
+   * sacar las suyas. Y —lo importante— el teclado no lo toca: al abrirse
+   * encoge la ventana visual, no ésta, así que la maquetación ni se entera.
+   *
+   * Se midió a mano con `visualViewport` y fue peor: esa sí encoge con el
+   * teclado, había que ignorarla mientras se escribiera, y en iOS el teclado se
+   * cierra sin soltar el campo. La medida se quedaba clavada en el alto de
+   * cuando estaba puesto y dejaba media pantalla en negro. Aquí no hay nada
+   * guardado que se pueda quedar viejo.
+   */
   :root { --app-h: 100dvh; }
 }
 
@@ -84,7 +91,7 @@ html, body {
  * la tarjeta empieza arriba y se desplaza entera.
  */
 .overlay {
-  position: fixed; top: var(--app-t); left: 0; right: 0;
+  position: fixed; top: 0; left: 0; right: 0;
   height: var(--app-h);
   display: flex; align-items: flex-start; justify-content: center;
   background: radial-gradient(circle at 50% 30%, rgba(60,44,26,.55), rgba(8,6,4,.94));
@@ -864,7 +871,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 /* Contra lo que se ve, no contra la ventana de maquetar: `inset: 0` daba de sí
    más o menos que la pantalla según el navegador, y de ahí salía la franja. */
-#app { position: fixed; top: var(--app-t); left: 0; right: 0; height: var(--app-h); }
+#app { position: fixed; top: 0; left: 0; right: 0; height: var(--app-h); }
 
 #game {
   position: absolute;

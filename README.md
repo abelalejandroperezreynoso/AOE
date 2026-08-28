@@ -351,51 +351,35 @@ fichero se queda sin refrescar, no se rompe nada).
 
 ### Cuánto mide "toda la pantalla"
 
-En un móvil no hay un solo número. El navegador **maqueta** contra una ventana
-—la de `position: fixed; inset: 0` y `height: 100%`— y **enseña** otra, la que
-queda libre entre sus barras. Las dos se separan en los dos sentidos y las dos
-se notan: si la de maquetar es la más alta, la barra de abajo del juego cae por
-debajo del filo visible y se queda cortada; si es la más baja, sobra una franja
-del color del fondo entre el juego y el borde de la pantalla, y el mapa se
-recorta justo donde empieza.
+En un móvil no hay un solo número, y el que trae `vh` es el equivocado: es la
+**ventana grande**, la de cuando el navegador ha recogido sus barras. Con las
+barras puestas la interfaz se sale por abajo y lo que queda fuera está cortado
+—y `inset: 0` con `height: 100%` da lo mismo—. De ahí salía la franja muerta.
 
-Y no se separan sólo de alto: también de **dónde empiezan**. Hay navegadores
-—Safari en iOS— que ponen su barra de direcciones *encima* de la ventana de
-maquetar en vez de por fuera. Ahí un `top: 0` cae por debajo del filo visible:
-la interfaz se dibuja tapada por la barra del navegador y, como lo que sobra
-sale por el otro lado, parece que todo se haya subido para esquivar el hueco de
-arriba, con la franja vacía abajo.
+Lo que se usa es **`100dvh`**, publicado una vez en `--app-h`: de él cuelgan la
+partida (`#app`), las superposiciones (`.overlay`) y los paneles del taller que
+antes iban en `vh`. `dvh` es exactamente lo que se ve ahora mismo, con las
+barras que haya puestas en este momento, y el navegador lo reajusta solo al
+recogerlas o sacarlas. Con `@supports` queda `100vh` para lo muy viejo, que es
+lo que se hacía antes.
 
-Así que no se maqueta contra ninguna de las dos a ciegas. `js/viewport.js`
-pregunta por la ventana visual (`visualViewport`, lo que el jugador tiene
-delante) y publica las dos cosas: dónde empieza en **`--app-t`** y cuánto mide
-en **`--app-h`**. De ellas cuelgan la partida (`#app`) y las superposiciones
-(`.overlay`), además de los paneles del taller que antes iban en `vh`. Como
-valor de partida el CSS pone `--app-t: 0` y `100dvh` —que ya descuenta las
-barras del navegador—, de modo que la primera pintada sale bien aunque el guión
-tarde. En los navegadores que dejan su barra por fuera, `--app-t` vale cero y
-no cambia nada.
+**Y el teclado no lo toca.** Al abrirse encoge la ventana visual, no ésta, así
+que la maquetación ni se entera. Eso es lo que hace que ésta sea la forma buena
+y no una más:
 
-Dos cosas se dejan fuera a propósito:
+> Antes se midió a mano con `visualViewport` desde un módulo aparte. Esa medida
+> sí encoge con el teclado, así que había que ignorarla mientras hubiera un
+> campo enfocado; pero en iOS el teclado se cierra **sin soltar el campo**, y la
+> medida se quedaba clavada en el alto de cuando estaba puesto. En un iPhone de
+> 812 puntos, la pantalla se quedaba pintada hasta el 562 y los 250 restantes
+> —justo lo que mide el teclado— en negro, tapando media sala. Guardar la
+> medida era el error: aquí no hay nada guardado que se pueda quedar viejo.
 
-- **El teclado.** Al abrirse encoge la ventana visual hasta la mitad, y encoger
-  la maquetación entera para escribir un nombre en la sala no arregla nada. Con
-  un campo enfocado no se remide; al salir de él, sí.
-- **El pellizco para acercar.** También encoge y desplaza la ventana visual,
-  pero ahí lo que cambia es la lupa, no la pantalla: con la lupa puesta
-  (`scale > 1`) la medida buena vuelve a ser la de la raíz empezando en cero.
-
-Al girar y al entrar o salir de pantalla completa hay navegadores que durante
-la animación contestan con las medidas de antes, así que se remide un par de
-veces más después; son dos lecturas y sólo escriben si de verdad cambia.
-
-Tocando la versión se ven los números que han salido junto a los de cada unidad
-(`vh`, `dvh`, `svh`, `lvh`): `visual N desde M` es lo que dice el navegador,
-`app M+N` con qué se ha maquetado, y `app`, `topbar` y `bottombar` dónde ha
-acabado cada capa de verdad. Si `#app` no empieza y acaba donde la ventana
-visual, ahí está la franja. **La versión está también en el menú de pausa**,
-porque el desajuste se ve en partida y hasta ahora había que salirse para
-leerlo.
+Tocando la versión se ven los números de cada unidad (`vh`, `dvh`, `svh`,
+`lvh`), el que ha salido (`app N`) y dónde ha acabado de verdad cada capa
+(`app`, `topbar`, `bottombar`). Si `#app` no llega al filo de la pantalla, ahí
+está la franja. **La versión está también en el menú de pausa**, porque el
+desajuste se ve en partida y si no hay que salirse para leerlo.
 
 En partida, la franja de abajo la lleva la barra de selección, que aparece y se
 retira con lo que haya elegido. Al retirarse se vuelve a medir a mano, sin
