@@ -340,10 +340,14 @@ guardada puede seguir con una copia vieja durante un rato; esa línea dice de un
 vistazo qué build hay delante, que es lo primero que hay que saber cuando algo
 "sigue igual" después de un despliegue.
 
-La misma versión va en la dirección de la hoja de estilos y del módulo de
-arranque (`css/style.css?v=...`), para que un cambio de CSS llegue aunque el
-navegador tuviera guardada la hoja anterior. **Se cambia a mano** al tocar el
-CSS o al desplegar algo que deba llegar sí o sí.
+La misma versión va en la dirección de la hoja de estilos y **de todos los
+módulos**, estos últimos por un mapa de importaciones en `index.html`. Con
+ponérsela sólo al fichero de arranque no basta: lo que él importa se pide sin
+versión y el navegador puede servirlo de su copia guardada, con lo que se
+acaba ejecutando código viejo bajo un arranque nuevo —y la versión del menú
+mentiría—. **Se cambia a mano** al desplegar algo que deba llegar sí o sí, y al
+añadir un módulo nuevo hay que añadirlo también al mapa (si se olvida, ese
+fichero se queda sin refrescar, no se rompe nada).
 
 En partida, la franja de abajo la lleva la barra de selección, que aparece y se
 retira con lo que haya elegido. Al retirarse se vuelve a medir a mano, sin

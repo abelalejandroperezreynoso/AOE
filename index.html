@@ -23,7 +23,7 @@
      en vez de la que tuviera guardada. Sin compilación no hay quien ponga
      esto solo: se cambia a mano al tocar el CSS, y es la misma que se
      enseña en el menú. -->
-<link rel="stylesheet" href="css/style.css?v=2026.08.28-4">
+<link rel="stylesheet" href="css/style.css?v=2026.08.28-5">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
 <link rel="icon" type="image/svg+xml" sizes="any" href="/icon.svg">
 </head>
@@ -96,7 +96,7 @@
         <li>En el <b>Taller de edificios</b> puedes rehacerle el modelo a cualquier edificio del juego sin tocar lo que cuesta ni lo que hace.</li>
       </ul>
       <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios.
-        Todo el arte se genera por código. <span class="version">v2026.08.28-4</span></p>
+        Todo el arte se genera por código. <span class="version">v2026.08.28-5</span></p>
     </div>
   </div>
 </div>
@@ -418,6 +418,49 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=2026.08.28-4"></script>
+<!-- La versión, en cada módulo.
+     `main.js?v=...` sólo refresca el fichero de arranque: lo que él importa
+     («./ui.js», «./render.js»...) se pide sin versión y el navegador puede
+     servirlo de su copia guardada, con lo que se acaba ejecutando código
+     viejo bajo un arranque nuevo. Este mapa le pone la versión a todos, así
+     que la que se enseña en el menú es la de todo el juego y no sólo la del
+     HTML. Al añadir un módulo nuevo, añádelo también aquí (si se olvida, ese
+     fichero simplemente se queda sin refrescar, no se rompe nada). -->
+<script type="importmap">
+{
+  "imports": {
+    "/js/ai.js": "/js/ai.js?v=2026.08.28-5",
+    "/js/audio.js": "/js/audio.js?v=2026.08.28-5",
+    "/js/catalog.js": "/js/catalog.js?v=2026.08.28-5",
+    "/js/config.js": "/js/config.js?v=2026.08.28-5",
+    "/js/data/appearance.js": "/js/data/appearance.js?v=2026.08.28-5",
+    "/js/data/builtin-designs.js": "/js/data/builtin-designs.js?v=2026.08.28-5",
+    "/js/data/cloud-config.js": "/js/data/cloud-config.js?v=2026.08.28-5",
+    "/js/data/cloud.js": "/js/data/cloud.js?v=2026.08.28-5",
+    "/js/data/designs.js": "/js/data/designs.js?v=2026.08.28-5",
+    "/js/data/overrides.js": "/js/data/overrides.js?v=2026.08.28-5",
+    "/js/entities.js": "/js/entities.js?v=2026.08.28-5",
+    "/js/game.js": "/js/game.js?v=2026.08.28-5",
+    "/js/gfx3d/buildings.js": "/js/gfx3d/buildings.js?v=2026.08.28-5",
+    "/js/gfx3d/engine.js": "/js/gfx3d/engine.js?v=2026.08.28-5",
+    "/js/gfx3d/nodes.js": "/js/gfx3d/nodes.js?v=2026.08.28-5",
+    "/js/gfx3d/parts.js": "/js/gfx3d/parts.js?v=2026.08.28-5",
+    "/js/gfx3d/units.js": "/js/gfx3d/units.js?v=2026.08.28-5",
+    "/js/lobby-ui.js": "/js/lobby-ui.js?v=2026.08.28-5",
+    "/js/main.js": "/js/main.js?v=2026.08.28-5",
+    "/js/map.js": "/js/map.js?v=2026.08.28-5",
+    "/js/net/lobby.js": "/js/net/lobby.js?v=2026.08.28-5",
+    "/js/net/protocol.js": "/js/net/protocol.js?v=2026.08.28-5",
+    "/js/net/session.js": "/js/net/session.js?v=2026.08.28-5",
+    "/js/path.js": "/js/path.js?v=2026.08.28-5",
+    "/js/render.js": "/js/render.js?v=2026.08.28-5",
+    "/js/sprites.js": "/js/sprites.js?v=2026.08.28-5",
+    "/js/studio.js": "/js/studio.js?v=2026.08.28-5",
+    "/js/ui.js": "/js/ui.js?v=2026.08.28-5",
+    "/js/utils.js": "/js/utils.js?v=2026.08.28-5"
+  }
+}
+</script>
+<script type="module" src="/js/main.js?v=2026.08.28-5"></script>
 </body>
 </html>
