@@ -57,6 +57,33 @@
   :root { --app-h: 100dvh; }
 }
 
+/*
+ * Y la excepción, que es de donde venía la franja.
+ *
+ * Instalado en la pantalla de inicio no hay barras de navegador que aparezcan y
+ * desaparezcan, así que `dvh` no tiene nada que descontar y debería dar la
+ * pantalla entera. En iOS no la da: descuenta la franja de la hora **pero
+ * empieza a pintar arriba del todo, debajo de ella**, así que sobra por abajo
+ * justo lo que ha quitado por arriba. Ésa es la franja muerta, y `100%`,
+ * `inset: 0` e `innerHeight` valen lo mismo, con lo que ninguno servía.
+ *
+ * `vh` sí da la pantalla entera. Medido en un iPhone de 375×812 con el juego
+ * instalado: `vh` y `lvh` 812; `dvh`, `svh`, `innerHeight` e `inset: 0` los
+ * tres 762, que son 812 menos los 50 de la zona segura de arriba. Los 50 que
+ * faltaban.
+ *
+ * Aquí `vh` no tiene el inconveniente de siempre —ser la ventana grande, la de
+ * cuando el navegador ha recogido sus barras—, porque en modo aplicación no hay
+ * barras que recoger: es la pantalla y punto. Y donde iOS no falla, `vh` y
+ * `dvh` valen lo mismo, así que esto no cambia nada.
+ *
+ * De la franja de la hora y de la barra de inicio siguen apartando las zonas
+ * seguras, que ya las llevaban las barras del HUD.
+ */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root { --app-h: 100vh; }
+}
+
 * { box-sizing: border-box; }
 
 html, body {
