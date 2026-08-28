@@ -1,34 +1,45 @@
-// Taller de edificios: modelar en 3D dentro del propio juego.
+// Taller de edificios: rehacerle el modelo a los edificios del propio juego.
 //
-// Un edificio se arma con piezas —cajas, tejados, torres, vigas— colocadas
-// sobre su huella, y lo que se ve mientras se modela está proyectado e
-// iluminado con la misma cámara y la misma luz que usa el horneado, así que la
-// vista de trabajo y el sprite final son la misma cosa. Debajo se hornea de
-// verdad, a tamaño de juego, en las tres etapas de obra.
+// Aquí no se inventan edificios: se coge uno de los que ya hay —la casa, el
+// molino, el castillo— y se le hace **otra cara**, armada con piezas (cajas,
+// tejados, torres, vigas) sobre la huella que ese edificio ocupa en el mapa. Lo
+// que cuesta, lo que aguanta y lo que hace no se toca desde aquí: eso vive en
+// el catálogo, y así el taller cambia cómo se ve una partida sin poder
+// desequilibrarla.
+//
+// Lo que se ve mientras se modela está proyectado e iluminado con la misma
+// cámara y la misma luz que usa el horneado, así que la vista de trabajo y el
+// sprite final son la misma cosa. Debajo se hornea de verdad, a tamaño de
+// juego, en las tres etapas de obra.
 //
 // El visor pinta los triángulos por orden de lejanía con la API de Canvas (el
 // pintor de toda la vida) en vez de rasterizar a mano: aquí interesa responder
 // al arrastre del ratón, no clavar el resultado, que para eso está la vista
 // previa horneada de al lado.
 
-import { PLAYER_COLORS, AGES, UNITS, BUILDINGS, RESOURCES, RES_NAME } from './config.js';
+import { PLAYER_COLORS, AGES, UNITS, BUILDINGS, BUILD_ORDER, RESOURCES, RES_NAME } from './config.js';
 import { project, depth, faceLight, rotZ, bake, HW, HH, VZ } from './gfx3d/engine.js';
 import {
   PARTS, PART_KEYS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
-  DEFAULT_PALETTE, designParts, designMesh, renderSize,
+  DEFAULT_PALETTE, designParts, designMesh,
 } from './gfx3d/parts.js';
+import { buildingMesh } from './gfx3d/buildings.js';
 import {
-  myDesigns, getDesign, saveDesign, deleteDesign, duplicateDesign, canAddDesign,
-  designFromTemplate, resizeDesign, TEMPLATES, ROLES, STAT_FIELDS,
-  ROLE_FIELDS, STOCK_BUILDINGS, MAX_PARTS, MAX_DESIGNS,
+  getDesign, isCustom, isBuiltin, saveDesign, resetBuilding,
+  designFromTemplate, TEMPLATES, STOCK_BUILDINGS, MAX_PARTS,
 } from './data/designs.js';
 import { clearSpriteCaches, drawSprite } from './sprites.js';
-import { captureBuilding, captureBuildingLook, forgetBuilding, reset } from './data/overrides.js';
+import { captureBuildingLook, reset } from './data/overrides.js';
 
 const el = (id) => document.getElementById(id);
 
 const STAGE_NAMES = ['Cimientos', 'En obra', 'Terminado'];
-/** Dónde se guarda la imagen de guía, aparte de los diseños. */
+/** Los edificios del juego, en el mismo orden en que salen en la barra de obra. */
+const BUILDING_ORDER = [
+  ...BUILD_ORDER.filter((t) => BUILDINGS[t]),
+  ...STOCK_BUILDINGS.filter((t) => !BUILD_ORDER.includes(t)),
+];
+/** Dónde se guarda la imagen de guía, aparte de los modelos. */
 const REF_KEY = 'aor-studio-ref';
 /** Lado máximo con el que se guarda la guía: es para calcar, no para enmarcar. */
 const REF_MAX = 640;
@@ -38,9 +49,10 @@ const SNAPS = [
 
 export class Studio {
   constructor() {
-    this.design = null;      // copia de trabajo del diseño abierto
+    this.type = null;        // el edificio del juego que se está vistiendo
+    this.design = null;      // copia de trabajo de su modelo (null: el del juego)
     this.selected = -1;      // índice de la pieza elegida
-    this.tab = 'part';
+    this.tab = 'build';
     this.colorIdx = 0;
     this.viewYaw = 0;        // 0-3: giro de la vista, sólo para trabajar
     this.zoom = 4;
@@ -63,17 +75,7 @@ export class Studio {
   bind() {
     el('btn-studio').onclick = () => this.open();
     el('btn-studio-close').onclick = () => this.close();
-    el('btn-studio-new').onclick = () => this.askTemplate();
-    el('btn-studio-dup').onclick = () => {
-      const d = duplicateDesign(this.design?.id);
-      if (!d) return this.status(`No caben más de ${MAX_DESIGNS} edificios.`);
-      captureBuilding(d.id);
-      clearSpriteCaches();
-      this.load(d.id);
-      this.renderList();
-      return this.status(`Copiado como «${d.name}».`);
-    };
-    el('btn-studio-del').onclick = (e) => this.confirmDelete(e.currentTarget);
+    el('btn-studio-reset').onclick = (e) => this.confirmReset(e.currentTarget);
     el('btn-studio-share').onclick = () => this.openShare('export');
     el('btn-studio-import').onclick = () => this.openShare('import');
     el('btn-share-close').onclick = () => el('studio-share').classList.add('hidden');
@@ -120,15 +122,23 @@ export class Studio {
    * buscar el botón de plegar.
    */
   showTab(tab) {
+    // Un edificio con la cara de siempre no tiene piezas ni colores que tocar:
+    // lo que hace falta es la pantalla de empezar, que es la de «Edificio».
+    if (!this.design && tab !== 'list') tab = 'build';
     const card = el('studio-card');
     if (tab === this.tab && card.dataset.sheet !== 'off') { this.foldSheet(true); return; }
+    this.setTab(tab);
+    if (card.dataset.sheet === 'off') this.foldSheet(false);
+    this.renderPanel();
+  }
+
+  /** Deja puesta una pestaña sin tocar la hoja: para cuando cambia el edificio. */
+  setTab(tab) {
     this.tab = tab;
     for (const b of document.querySelectorAll('#studio-tabs button')) {
       b.classList.toggle('active', b.dataset.tab === tab);
     }
-    card.dataset.mtab = tab;
-    if (card.dataset.sheet === 'off') this.foldSheet(false);
-    this.renderPanel();
+    el('studio-card').dataset.mtab = tab;
   }
 
   /** Pliega la hoja de los paneles para dejar el modelo a pantalla completa. */
@@ -148,20 +158,13 @@ export class Studio {
     this.renderTools();
     this.restoreRef();
     this.renderList();
-    /*
-     * Se vuelve al que se estaba tocando y, si es la primera vez, al primero
-     * propio. Los que trae el juego no se abren solos: no se pueden editar, y
-     * empezar por algo que no se deja tocar es un mal recibimiento.
-     */
-    const first = getDesign(this.lastId) || myDesigns()[0];
-    if (first) { this.showTab(this.tab === 'new' ? 'part' : this.tab); this.load(first.id); return; }
-    // Sin nada propio se enseñan las plantillas; los del juego están en la lista.
-    this.showTab('new');
-    this.clearView();
+    // Se vuelve al edificio que se estaba tocando; la primera vez, al primero
+    // de la barra de obra.
+    this.load(BUILDINGS[this.lastType] ? this.lastType : BUILDING_ORDER[0]);
   }
 
   close() {
-    this.persist(true);
+    this.flush();
     clearTimeout(this.bakeTimer);
     el('studio').classList.add('hidden');
     el('main-menu').classList.remove('hidden');
@@ -173,16 +176,27 @@ export class Studio {
     if (msg) this.statusTimer = setTimeout(() => { el('studio-status').textContent = ''; }, 4000);
   }
 
-  // --- Diseños ---------------------------------------------------------------
+  // --- Edificios --------------------------------------------------------------
 
-  /** Abre un diseño guardado en una copia de trabajo. */
-  load(id) {
-    const d = getDesign(id);
-    if (!d) return;
-    this.design = structuredClone(d);
-    this.lastId = d.id;
-    this.selected = this.design.parts.length ? 0 : -1;
+  /**
+   * Pone en la mesa un edificio del juego. Si ya tiene un modelo —propio o de
+   * los que trae el juego— se abre una copia de trabajo; si todavía lleva el
+   * suyo de siempre no hay piezas que tocar y se recibe con las plantillas.
+   */
+  load(type) {
+    if (!BUILDINGS[type]) return;
+    this.flush();
+    this.type = type;
+    this.lastType = type;
+    const base = getDesign(type);
+    this.design = base ? structuredClone(base) : null;
+    this.selected = this.design && this.design.parts.length ? 0 : -1;
     this.undo = [];
+    this.baked = null;
+    this.cancelReset();
+    // Sin modelo propio no hay piezas ni colores: la pestaña que sirve es la
+    // del edificio, que es donde están las plantillas.
+    this.setTab(!this.design && this.tab !== 'list' ? 'build' : this.tab);
     this.fit();
     this.renderList();
     this.renderPanel();
@@ -190,84 +204,90 @@ export class Studio {
     this.schedulePreview();
   }
 
-  askTemplate() {
-    if (!canAddDesign()) { this.status(`No caben más de ${MAX_DESIGNS} edificios.`); return; }
-    this.showTab('new');
-  }
-
+  /** Le pone al edificio el modelo de una plantilla, ajustado a su huella. */
   newDesign(templateKey) {
-    if (!canAddDesign()) { this.status(`No caben más de ${MAX_DESIGNS} edificios.`); return; }
-    const draft = designFromTemplate(templateKey);
-    const saved = saveDesign(draft);
-    if (!saved) { this.status('No se ha podido crear el edificio.'); return; }
-    captureBuilding(saved.id);
-    clearSpriteCaches();
+    if (!this.type) return;
+    const saved = saveDesign(designFromTemplate(templateKey, this.type));
+    if (!saved) { this.status('No se ha podido empezar el modelo.'); return; }
+    this.afterSave();
+    this.load(this.type);
     this.showTab('part');
-    this.load(saved.id);
-    this.status(`«${saved.name}» ya se puede construir en la partida.`);
+    this.status(`${BUILDINGS[this.type].name}: modelo empezado. Se ve así en la partida desde ya.`);
   }
 
-  confirmDelete(btn = el('btn-studio-del')) {
-    if (!this.design) return;
+  /** Le devuelve al edificio la cara que tenía antes de tocarlo. */
+  confirmReset(btn = el('btn-studio-reset')) {
+    if (!isCustom(this.type)) return;
     if (!this.confirming) {
       this.confirming = true;
       btn.textContent = '¿Seguro?';
       btn.classList.add('confirming');
       clearTimeout(this.delTimer);
-      this.delTimer = setTimeout(() => this.cancelDelete(), 5000);
+      this.delTimer = setTimeout(() => this.cancelReset(), 5000);
       return;
     }
-    this.cancelDelete();
-    const id = this.design.id;
-    if (!deleteDesign(id)) { this.warnReadOnly(); return; }
-    forgetBuilding(id);
+    this.cancelReset();
+    clearTimeout(this.saveTimer);
+    this.saveTimer = 0;
+    const type = this.type;
+    resetBuilding(type);
+    // El aspecto vuelve a ser el de fábrica, así que los retoques de color que
+    // el catálogo tuviera sobre el modelo propio ya no significan nada.
+    captureBuildingLook(type);
+    reset('buildingLook', type);
     clearSpriteCaches();
-    this.design = null;
-    const next = myDesigns()[0];
-    this.renderList();
-    if (next) this.load(next.id);
-    else { this.clearView(); this.renderPanel(); }
-    this.status('Edificio borrado.');
+    this.load(type);
+    this.status(isBuiltin(type)
+      ? `${BUILDINGS[type].name} vuelve al modelo que trae el juego.`
+      : `${BUILDINGS[type].name} vuelve a su aspecto original.`);
   }
 
-  cancelDelete() {
+  cancelReset() {
     clearTimeout(this.delTimer);
     this.confirming = false;
-    // Hay dos botones de borrar: el de la columna y el de la hoja del móvil.
-    for (const b of document.querySelectorAll('.studio-del-btn')) {
-      b.textContent = 'Borrar';
+    // Hay dos botones: el de la columna y el de la hoja del móvil.
+    for (const b of document.querySelectorAll('.studio-reset-btn')) {
+      b.textContent = 'Restablecer';
       b.classList.remove('confirming');
     }
   }
 
   /**
-   * Guarda la copia de trabajo. Los edificios del taller son suyos: al guardar
-   * se dejan mandar sus valores y sus colores, así que se retiran los cambios
-   * que el catálogo tuviera puestos encima de este edificio (los del resto del
-   * juego no se tocan).
+   * Guarda la copia de trabajo, sin prisa: mientras se arrastra una pieza no
+   * hace falta escribir en el navegador cada fotograma.
    */
-  persist(now = false) {
-    clearTimeout(this.saveTimer);
+  persist() {
     if (!this.design) return;
-    const doIt = () => {
-      const saved = saveDesign(this.design);
-      if (!saved) { this.status('No se ha podido guardar.'); return; }
-      if (saved.replaces) {
-        // Le ha cambiado la cara a un edificio de serie: lo que pasa a ser suyo
-        // son los colores, y nada más. Sus cifras siguen siendo las del juego,
-        // con los retoques que tengan en el catálogo.
-        captureBuildingLook(saved.replaces);
-        reset('buildingLook', saved.replaces);
-      } else {
-        captureBuilding(saved.id);
-        reset('building', saved.id);
-        reset('buildingLook', saved.id);
-      }
-      clearSpriteCaches();
-      this.renderList();
-    };
-    if (now) doIt();
-    else this.saveTimer = setTimeout(doIt, 350);
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => { this.saveTimer = 0; this.doSave(); }, 350);
+  }
+
+  /** Escribe ya lo que estuviera esperando: al cambiar de edificio o al salir. */
+  flush() {
+    if (!this.saveTimer) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = 0;
+    this.doSave();
+  }
+
+  doSave() {
+    if (!this.design || !this.type) return;
+    const saved = saveDesign(this.design, this.type);
+    if (!saved) { this.status('No se ha podido guardar.'); return; }
+    this.afterSave();
+    this.renderList();
+  }
+
+  /**
+   * Lo que hay que rehacer tras cambiarle la cara a un edificio: el modelo
+   * manda sobre sus colores, así que se retiran los retoques de aspecto que el
+   * catálogo tuviera puestos sobre él. Sus cifras no se tocan —siguen siendo
+   * las del juego, con lo que el catálogo diga— ni las del resto del juego.
+   */
+  afterSave() {
+    captureBuildingLook(this.type);
+    reset('buildingLook', this.type);
+    clearSpriteCaches();
   }
 
   pushUndo() {
@@ -287,7 +307,7 @@ export class Studio {
   }
 
   /**
-   * Todo lo que hay que rehacer tras tocar el diseño. El punto de deshacer se
+   * Todo lo que hay que rehacer tras tocar el modelo. El punto de deshacer se
    * apunta antes de cambiar nada (`pushUndo`), no aquí: si no, se guardaría el
    * estado nuevo y deshacer no desharía nada.
    */
@@ -304,44 +324,36 @@ export class Studio {
     this.fillList(el('studio-list'));
     // En pantallas pequeñas la lista vive en la hoja de abajo, en su pestaña.
     if (this.tab === 'list') this.fillList(el('studio-panel').querySelector('.studio-list-panel'));
-    el('btn-studio-dup').disabled = !this.design || !canAddDesign();
-    el('btn-studio-del').disabled = !this.design;
+    el('btn-studio-reset').disabled = !isCustom(this.type);
     el('btn-studio-share').disabled = !this.design;
-    el('btn-studio-new').disabled = !canAddDesign();
   }
 
-  /** Pinta los edificios guardados en una lista cualquiera. */
   /**
-   * Los edificios que ha hecho quien juega. Los que trae el juego no salen: no
-   * son cosas que estén en el taller, son la cara de un edificio del juego, y
-   * de casa (o de molino, o de cuartel) sólo hay una a la vez.
+   * Los edificios del juego, todos, con la cara que tengan ahora mismo. La
+   * lista es la misma siempre: aquí no se añaden ni se quitan edificios, sólo
+   * se les cambia el modelo.
    */
   fillList(list) {
     if (!list) return;
     list.innerHTML = '';
-    const designs = myDesigns();
-    if (!designs.length) {
-      list.innerHTML = '<li class="cat-empty">Todavía no has hecho ninguno.</li>';
-      return;
-    }
-    for (const d of designs) {
+    for (const type of BUILDING_ORDER) {
+      const def = BUILDINGS[type];
       const li = document.createElement('li');
-      li.className = 'cat-item' + (this.design && d.id === this.design.id ? ' active' : '');
-      const thumb = this.thumb(d, 44);
+      li.className = 'cat-item' + (type === this.type ? ' active' : '');
+      const thumb = this.thumb(type, 44);
       thumb.className = 'cat-thumb';
       const text = document.createElement('div');
       text.className = 'cat-text';
       const n = document.createElement('div');
       n.className = 'cat-name';
-      n.textContent = d.name;
+      n.textContent = def.name;
       const sub = document.createElement('div');
       sub.className = 'cat-sub';
-      sub.textContent = d.replaces
-        ? `Aspecto de ${BUILDINGS[d.replaces]?.name || d.replaces}`
-        : `${ROLES[d.role].short} · ${d.size}×${d.size} · ${AGES[d.age].short}`;
+      const look = isCustom(type) ? 'Modelo tuyo' : (isBuiltin(type) ? 'Modelo del juego' : 'Aspecto original');
+      sub.textContent = `${look} · ${def.size}×${def.size} · ${AGES[def.age].short}`;
       text.append(n, sub);
       li.append(thumb, text);
-      li.onclick = () => { this.persist(true); this.load(d.id); };
+      li.onclick = () => this.load(type);
       list.appendChild(li);
     }
   }
@@ -352,8 +364,6 @@ export class Studio {
     const ul = document.createElement('ul');
     ul.className = 'catalog-list studio-list-panel';
     this.fillList(ul);
-    const acts = document.createElement('div');
-    acts.className = 'studio-actions';
     const mk = (text, fn, cls = '') => {
       const b = document.createElement('button');
       b.textContent = text;
@@ -361,54 +371,58 @@ export class Studio {
       b.onclick = fn;
       return b;
     };
-    const nuevo = mk('Nuevo edificio', () => this.askTemplate());
-    nuevo.disabled = !canAddDesign();
-    const dup = mk('Duplicar', () => el('btn-studio-dup').click());
-    const del = mk('Borrar', (e) => this.confirmDelete(e.currentTarget), 'studio-del studio-del-btn');
-    dup.disabled = !this.design;
-    del.disabled = !this.design;
-    acts.append(nuevo, dup, del);
-    const acts2 = document.createElement('div');
-    acts2.className = 'studio-actions';
+    const acts = document.createElement('div');
+    acts.className = 'studio-actions';
     const share = mk('Compartir', () => this.openShare('export'));
     share.disabled = !this.design;
-    acts2.append(share, mk('Importar', () => this.openShare('import')));
+    acts.append(share, mk('Importar', () => this.openShare('import')));
+    const acts2 = document.createElement('div');
+    acts2.className = 'studio-actions';
+    const undo = mk('Restablecer', (e) => this.confirmReset(e.currentTarget), 'studio-del studio-reset-btn');
+    undo.disabled = !isCustom(this.type);
+    acts2.append(undo);
     wrap.append(ul, acts, acts2);
     return wrap;
   }
 
-  /** Miniatura horneada de un diseño, encajada en su hueco. */
-  thumb(design, size) {
+  /** Miniatura horneada de un edificio, con la cara que tenga, en su hueco. */
+  thumb(type, size) {
     const c = document.createElement('canvas');
     c.width = size; c.height = size;
     const ctx = c.getContext('2d');
     try {
-      const s = bake(designMesh(design, this.colorIdx, 2));
+      const d = type === this.type ? this.design : getDesign(type);
+      const s = bake(d ? designMesh(d, this.colorIdx, 2, type === this.type)
+        : buildingMesh(type, this.colorIdx, 2));
       const sc = Math.min((size - 4) / s.w, (size - 4) / s.h);
       ctx.imageSmoothingEnabled = false;
       drawSprite(ctx, s, size / 2 - (s.w / 2 - s.ox) * sc, size - 2 - (s.h - s.oy) * sc, sc);
-    } catch { /* un diseño vacío no tiene nada que enseñar */ }
+    } catch { /* un modelo vacío no tiene nada que enseñar */ }
     return c;
   }
 
   // --- Compartir --------------------------------------------------------------
 
   /**
-   * Sacar un edificio de aquí y meterlo en otro sitio. Un diseño es sólo datos,
+   * Sacar un modelo de aquí y meterlo en otro sitio. Un modelo es sólo datos,
    * así que cabe en una línea de texto: se copia, se manda por donde sea y al
    * otro lado se pega. Y esa misma línea es lo que se pone en
-   * `js/data/builtin-designs.js` para que el edificio viaje con el juego y le
-   * llegue a todo el mundo, sin que nadie tenga que importar nada.
+   * `js/data/builtin-designs.js` para que el edificio se vea así en el juego de
+   * todo el mundo, sin que nadie tenga que importar nada.
    */
   openShare(mode) {
     this.shareMode = mode;
     const box = el('studio-share');
     const exporting = mode === 'export';
-    if (exporting && !this.design) { this.status('Elige antes un edificio.'); return; }
-    el('share-title').textContent = exporting ? 'Compartir edificio' : 'Importar edificio';
+    if (exporting && !this.design) {
+      this.status('Este edificio todavía lleva su modelo de siempre: no hay nada que compartir.');
+      return;
+    }
+    const name = BUILDINGS[this.type]?.name || 'edificio';
+    el('share-title').textContent = exporting ? `Compartir ${name}` : `Importar un modelo para ${name}`;
     el('share-hint').textContent = exporting
-      ? 'Cópialo y mándalo a quien quieras. Quien lo reciba lo pega en Importar y lo tendrá en su juego.'
-      : 'Pega aquí el texto de un edificio. Entra como uno nuevo tuyo, sin tocar los que ya tienes.';
+      ? 'Cópialo y mándalo a quien quieras. Quien lo reciba lo pega en Importar y verá así su edificio.'
+      : `Pega aquí el modelo de un edificio. Se le pondrá a ${BUILDINGS[this.type]?.name || 'este edificio'}, ajustado a su huella.`;
     el('share-text').value = exporting ? JSON.stringify(this.design) : '';
     el('share-text').readOnly = exporting;
     el('share-note').textContent = '';
@@ -438,7 +452,7 @@ export class Studio {
   }
 
   downloadShare() {
-    const name = (this.design?.name || 'edificio').replace(/[^\w\-]+/g, '-').toLowerCase();
+    const name = (this.type || 'edificio').replace(/[^\w\-]+/g, '-').toLowerCase();
     const blob = new Blob([el('share-text').value], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
@@ -458,35 +472,29 @@ export class Studio {
     }
   }
 
-  /** Mete lo pegado como un edificio nuevo, pasando por el validador de siempre. */
+  /**
+   * Le pone al edificio que hay en la mesa el modelo pegado, pasando por el
+   * validador de siempre. Manda el edificio elegido, no el que trajera el
+   * texto: así el mismo modelo sirve para vestir el molino o el cuartel, y se
+   * ajusta solo a la huella del que toque.
+   */
   applyShare() {
     let raw = null;
     try {
       raw = JSON.parse(el('share-text').value);
     } catch {
-      this.shareNote('Eso no es un edificio: el texto no se entiende.');
+      this.shareNote('Eso no es un modelo: el texto no se entiende.');
       return;
     }
-    // Vale tanto un edificio suelto como una lista de ellos.
-    const list = Array.isArray(raw) ? raw : [raw];
-    const added = [];
-    for (const item of list) {
-      if (!canAddDesign()) { this.shareNote(`No caben más de ${MAX_DESIGNS} edificios.`); break; }
-      // Sin identificador: entra como uno nuevo y nunca pisa lo que ya había.
-      const saved = saveDesign({ ...item, id: null });
-      if (saved) {
-        captureBuilding(saved.id);
-        added.push(saved);
-      }
-    }
-    if (!added.length) { this.shareNote('No se ha podido importar: el edificio no es válido.'); return; }
-    clearSpriteCaches();
+    // Vale tanto un modelo suelto como una lista: de una lista se coge el primero.
+    const item = Array.isArray(raw) ? raw[0] : raw;
+    const saved = saveDesign(item, this.type);
+    if (!saved) { this.shareNote('No se ha podido importar: el modelo no es válido.'); return; }
+    this.afterSave();
     el('studio-share').classList.add('hidden');
+    this.load(this.type);
     this.showTab('part');
-    this.load(added[0].id);
-    this.status(added.length === 1
-      ? `«${added[0].name}» importado: ya se puede construir.`
-      : `${added.length} edificios importados.`);
+    this.status(`${BUILDINGS[this.type].name}: modelo importado.`);
   }
 
   // --- Barra de herramientas --------------------------------------------------
@@ -721,7 +729,7 @@ export class Studio {
   fitRef() {
     if (!this.ref) return;
     const { img } = this.ref;
-    const s = renderSize(this.design || { size: 2 });
+    const s = this.viewSize();
     let x0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const [x, y] of [[0, 0], [s, 0], [s, s], [0, s]]) {
       const [rx, ry] = this.spin(x, y);
@@ -814,7 +822,14 @@ export class Studio {
   // --- Piezas -----------------------------------------------------------------
 
   addPart(kind) {
-    if (!this.design) return;
+    if (!this.type) return;
+    // La primera pieza empieza el modelo: si el edificio todavía llevaba su
+    // cara de siempre, se parte de la huella vacía y encima va lo que se pida.
+    if (!this.design) {
+      if (!saveDesign(designFromTemplate('empty', this.type))) return;
+      this.afterSave();
+      this.load(this.type);
+    }
     if (this.design.parts.length >= MAX_PARTS) {
       this.status(`Un edificio no puede pasar de ${MAX_PARTS} piezas.`);
       return;
@@ -824,7 +839,7 @@ export class Studio {
     const p = { ...structuredClone(spec.def), k: kind };
     // La pieza nace en el centro de la huella; si hay otra elegida, encima de
     // ella, que es lo que se quiere el 90% de las veces (muro → tejado).
-    const s = this.design.size;
+    const s = this.viewSize();
     const sel = this.design.parts[this.selected];
     if (p.x !== undefined) p.x = sel ? sel.x : s / 2;
     if (p.y !== undefined) p.y = sel ? sel.y : s / 2;
@@ -867,15 +882,24 @@ export class Studio {
 
   // --- Visor ------------------------------------------------------------------
 
-  clearView() {
-    const c = el('studio-view');
-    const ctx = c.getContext('2d');
-    ctx.clearRect(0, 0, c.width, c.height);
-    el('studio-shots').innerHTML = '';
-    el('studio-info').textContent = '';
-    this.picks = [];
-    this.anchors = [];
-    el('studio-pad').classList.add('hidden');
+  /** La huella sobre la que se trabaja: la del edificio, siempre. */
+  viewSize() { return BUILDINGS[this.type]?.size || 2; }
+
+  /**
+   * Lo que hay en la mesa, pieza a pieza: el modelo que se está haciendo o, si
+   * el edificio sigue con el suyo de siempre, el que trae escrito el juego (que
+   * se enseña entero, en un solo bulto, porque no está hecho de piezas).
+   */
+  viewGroups() {
+    if (this.design) return designParts(this.design, this.colorIdx, 2, true);
+    return [{ part: null, tris: buildingMesh(this.type, this.colorIdx, 2) }];
+  }
+
+  /** Lo mismo, en una sola malla, para hornear. */
+  viewMesh(stage = 2) {
+    return this.design
+      ? designMesh(this.design, this.colorIdx, stage, true)
+      : buildingMesh(this.type, this.colorIdx, stage);
   }
 
   /** Punto del mundo (ya girado por la vista) a píxeles del lienzo. */
@@ -888,7 +912,7 @@ export class Studio {
   spin(x, y) {
     if (!this.viewYaw) return [x, y];
     const a = (this.viewYaw * Math.PI) / 2;
-    const c = Math.cos(a), s = Math.sin(a), m = renderSize(this.design || { size: 2 }) / 2;
+    const c = Math.cos(a), s = Math.sin(a), m = this.viewSize() / 2;
     return [m + (x - m) * c - (y - m) * s, m + (x - m) * s + (y - m) * c];
   }
 
@@ -897,19 +921,19 @@ export class Studio {
    * encuadre. La usan el encaje de la vista y el de la imagen de guía.
    */
   modelBounds() {
-    const s = renderSize(this.design || { size: 2 });
+    const s = this.viewSize();
     const pts = [];
     for (const [x, y] of [[0, 0], [s, 0], [s, s], [0, s]]) {
       const [rx, ry] = this.spin(x, y);
       pts.push(project([rx, ry, 0]));
     }
-    if (this.design) {
-      for (const g of designParts(this.design, this.colorIdx, 2, true)) {
-        for (const t of g.tris) {
-          for (const p of t.p) {
-            const [rx, ry] = this.spin(p[0], p[1]);
-            pts.push(project([rx, ry, p[2]]));
-          }
+    // Y lo que haya encima: el modelo que se está haciendo o, si el edificio
+    // sigue con su cara de siempre, la del juego, que también hay que ver entera.
+    for (const g of this.viewGroups()) {
+      for (const t of g.tris) {
+        for (const p of t.p) {
+          const [rx, ry] = this.spin(p[0], p[1]);
+          pts.push(project([rx, ry, p[2]]));
         }
       }
     }
@@ -954,7 +978,7 @@ export class Studio {
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#3f5a30';
     ctx.fillRect(0, 0, W, H);
-    if (!this.design) return;
+    if (!this.type) return;
 
     this.drawGround(ctx);
     // Detrás del modelo, que es como se calca; delante si se pide, para
@@ -965,12 +989,12 @@ export class Studio {
     // el algoritmo del pintor. Con unos miles de caras va sobrado y responde al
     // arrastre sin pensárselo. Se calculan siempre, se pinten o no, porque son
     // también con lo que se sabe qué pieza hay bajo el dedo.
-    const groups = designParts(this.design, this.colorIdx, 2, true);
+    const groups = this.viewGroups();
     const list = [];
     for (const g of groups) {
-      const gi = this.design.parts.indexOf(g.part);
+      const gi = this.design ? this.design.parts.indexOf(g.part) : -1;
       if (this.viewYaw) {
-        const m = renderSize(this.design) / 2;
+        const m = this.viewSize() / 2;
         rotZ(g.tris, (this.viewYaw * Math.PI) / 2, m, m);
       }
       for (const t of g.tris) {
@@ -988,7 +1012,7 @@ export class Studio {
     // El ancla de cada pieza en pantalla: es a lo que se agarra un dedo cuando
     // no acierta de lleno en una cara.
     this.anchors = [];
-    this.design.parts.forEach((p, i) => {
+    (this.design ? this.design.parts : []).forEach((p, i) => {
       if (p.x === undefined) return;
       const [rx, ry] = this.spin(p.x, p.y);
       const [ax, ay] = this.toScreen([rx, ry, p.z || 0]);
@@ -1052,8 +1076,7 @@ export class Studio {
   /** Todo lo que cambia el sprite. Mover o encuadrar la vista no está: no lo cambia. */
   bakeKey() {
     return JSON.stringify([
-      this.design.id, this.design.size, this.design.replaces || '',
-      this.design.palette, this.design.parts,
+      this.type, this.design ? this.design.palette : null, this.design ? this.design.parts : null,
       this.viewYaw, this.colorIdx, this.bakeRes(),
     ]);
   }
@@ -1073,20 +1096,20 @@ export class Studio {
   }
 
   bakeView() {
-    if (!this.design || !this.isOpen()) return;
+    if (!this.type || !this.isOpen()) return;
     const res = this.bakeRes();
     let sprite = null, ms = 0;
     try {
-      const mesh = designMesh(this.design, this.colorIdx, 2, true);
+      const mesh = this.viewMesh(2);
       if (this.viewYaw) {
-        const m = renderSize(this.design) / 2;
+        const m = this.viewSize() / 2;
         rotZ(mesh, (this.viewYaw * Math.PI) / 2, m, m);
       }
       const t0 = performance.now();
       sprite = bake(mesh, { res });
       ms = performance.now() - t0;
     } catch {
-      // Un diseño imposible no deja el taller sin visor: se sigue con el pintor.
+      // Un modelo imposible no deja el taller sin visor: se sigue con el pintor.
       return;
     }
     // Si al aparato le cuesta, se le pide menos la próxima vez: más vale un
@@ -1101,7 +1124,7 @@ export class Studio {
 
   /** La huella del edificio: las casillas que ocupará en el mapa. */
   drawGround(ctx) {
-    const s = renderSize(this.design);
+    const s = this.viewSize();
     const corner = (x, y) => {
       const [rx, ry] = this.spin(x, y);
       return this.toScreen([rx, ry, 0]);
@@ -1181,12 +1204,21 @@ export class Studio {
    * imprescindible en vez de salirse por el borde.
    */
   drawLegend(ctx, W) {
-    const part = this.design.parts[this.selected];
+    const part = this.design?.parts[this.selected];
     ctx.fillStyle = 'rgba(20,16,11,.65)';
     ctx.fillRect(0, 0, W, 22);
     ctx.fillStyle = '#d5c6a2';
     ctx.font = '12px "Trebuchet MS", sans-serif';
     ctx.textAlign = 'left';
+    // Sin modelo propio no hay nada que colocar: lo que se ve es el edificio
+    // tal y como lo dibuja el juego, y lo que toca decir es por dónde se empieza.
+    if (!this.design) {
+      const name = BUILDINGS[this.type]?.name || 'Este edificio';
+      ctx.fillText(W < 420
+        ? `${name}: aspecto original`
+        : `${name} con su aspecto original · elige una plantilla en «Edificio» para rehacerlo`, 10, 15);
+      return;
+    }
     const pos = part && part.x !== undefined
       ? `(${part.x.toFixed(2)}, ${part.y.toFixed(2)}, ${(part.z || 0).toFixed(2)})`
       : 'Nada elegido';
@@ -1510,13 +1542,13 @@ export class Studio {
 
   /**
    * Las tres etapas de obra tal y como saldrán en la partida: mismo horneado,
-   * mismo tamaño. Es la prueba de fuego de un diseño, porque a tamaño de juego
+   * mismo tamaño. Es la prueba de fuego de un modelo, porque a tamaño de juego
    * se ven las siluetas y no la micro-geometría.
    */
   renderPreview() {
     const wrap = el('studio-shots');
     wrap.innerHTML = '';
-    if (!this.design) return;
+    if (!this.type) return;
     let tris = 0, px = 0;
     for (let stage = 0; stage < 3; stage++) {
       const cell = document.createElement('div');
@@ -1525,7 +1557,7 @@ export class Studio {
       const label = document.createElement('span');
       label.textContent = STAGE_NAMES[stage];
       try {
-        const mesh = designMesh(this.design, this.colorIdx, stage, true);
+        const mesh = this.viewMesh(stage);
         const s = bake(mesh);
         if (stage === 2) { tris = mesh.length; px = `${s.canvas.width}×${s.canvas.height}`; }
         c.width = Math.max(24, Math.ceil(s.w) + 8);
@@ -1541,8 +1573,10 @@ export class Studio {
       cell.append(c, label);
       wrap.appendChild(cell);
     }
-    el('studio-info').textContent =
-      `${this.design.parts.length} pieza${this.design.parts.length === 1 ? '' : 's'} · `
+    const n = this.design ? this.design.parts.length : 0;
+    el('studio-info').textContent = (this.design
+      ? `${n} pieza${n === 1 ? '' : 's'} · `
+      : 'Modelo del juego · ')
       + `${tris} triángulos · sprite de ${px || '—'} px`;
   }
 
@@ -1551,25 +1585,26 @@ export class Studio {
   renderPanel() {
     const box = el('studio-panel');
     box.innerHTML = '';
-    if (this.tab === 'new') { box.appendChild(this.templatePanel()); return; }
-    // "Míos" trae la lista de edificios a la hoja: en un móvil no hay sitio
-    // para tenerla siempre en una columna aparte.
+    // "Edificios" trae la lista a la hoja: en un móvil no hay sitio para
+    // tenerla siempre en una columna aparte.
     if (this.tab === 'list') { box.appendChild(this.listPanel()); return; }
-    if (!this.design) {
-      box.innerHTML = '<p class="cat-empty">Crea un edificio para empezar.</p>';
+    if (!this.type) {
+      box.innerHTML = '<p class="cat-empty">Elige un edificio para empezar.</p>';
       return;
     }
+    // Sin modelo propio no hay piezas ni colores que tocar: sale su ficha, que
+    // es donde están las plantillas por las que empezar.
+    if (!this.design || this.tab === 'build') { box.appendChild(this.buildPanel()); return; }
     if (this.tab === 'part') box.appendChild(this.partPanel());
-    else if (this.tab === 'build') box.appendChild(this.buildPanel());
     else box.appendChild(this.colorPanel());
   }
 
-
-  templatePanel() {
+  /** Las plantillas por las que empezar (o volver a empezar) un modelo. */
+  templateList(title) {
     const wrap = document.createElement('div');
     const h = document.createElement('h4');
     h.className = 'studio-h';
-    h.textContent = 'Empezar por...';
+    h.textContent = title;
     wrap.appendChild(h);
     for (const t of TEMPLATES) {
       const b = document.createElement('button');
@@ -1701,131 +1736,75 @@ export class Studio {
     return row;
   }
 
-  /** La ficha del edificio: cómo se comporta en la partida. */
+  /**
+   * La ficha del edificio del juego: qué es, qué cuesta y qué hace. Aquí no se
+   * toca nada de eso —para eso está el catálogo—; lo que se hace es empezar,
+   * rehacer o deshacer **su modelo**.
+   */
   buildPanel() {
-    const d = this.design;
+    const type = this.type;
+    const def = BUILDINGS[type];
     const wrap = document.createElement('div');
 
-    const nameRow = textRow('Nombre', d.name, 28, (v) => { d.name = v; this.afterChange(); });
-    const descRow = textRow('Descripción', d.desc, 120, (v) => { d.desc = v; this.afterChange(); });
+    const h = document.createElement('h4');
+    h.className = 'studio-h';
+    h.textContent = def.name;
+    const desc = document.createElement('p');
+    desc.className = 'studio-hint-text';
+    desc.textContent = def.desc;
+    wrap.append(h, desc);
 
-    /*
-     * Un diseño puede ser un edificio nuevo o **el aspecto de uno que ya
-     * existe**. Lo segundo es lo que se quiere casi siempre: cambiarle la cara
-     * a la casa o al cuartel sin tocar lo que cuestan ni lo que hacen. Al
-     * elegir a quién viste, el modelo se ajusta solo a la huella de ese
-     * edificio, que es la que manda.
-     */
-    const skinRow = selectRow('Aspecto de', d.replaces || '',
-      [['', 'Nada: es un edificio nuevo'],
-        ...STOCK_BUILDINGS.map((t) => [t, `${BUILDINGS[t].name} (${BUILDINGS[t].size}×${BUILDINGS[t].size})`])],
-      (v) => this.setSkinTarget(v));
-    wrap.appendChild(group('Ficha', [nameRow, descRow, skinRow]));
+    const rows = [
+      infoRow('Huella', `${def.size}×${def.size} casillas`),
+      infoRow('Edad', AGES[def.age].name),
+      infoRow('Coste', RESOURCES.filter((r) => def.cost?.[r])
+        .map((r) => `${def.cost[r]} de ${RES_NAME[r].toLowerCase()}`).join(', ') || 'Nada'),
+      infoRow('Resistencia', `${def.hp} puntos de vida`),
+    ];
+    if (def.pop) rows.push(infoRow('Población', `+${def.pop}`));
+    if (def.trains) rows.push(infoRow('Entrena', def.trains.map((t) => UNITS[t].name).join(', ')));
+    if (def.dropoff) rows.push(infoRow('Almacena', def.dropoff.map((r) => RES_NAME[r]).join(', ')));
+    if (def.attack) rows.push(infoRow('Defensa', `${def.attack} de ataque · ${def.range} de alcance`));
+    wrap.appendChild(group('Lo que pone el juego', rows));
 
-    if (d.replaces) {
-      const note = document.createElement('div');
-      note.className = 'studio-builtin-note';
-      const p = document.createElement('p');
-      p.textContent = `Este modelo es la cara de ${BUILDINGS[d.replaces].name}: se dibuja en su sitio, con su huella de `
-        + `${BUILDINGS[d.replaces].size}×${BUILDINGS[d.replaces].size}, y lo que cuesta y lo que hace lo sigue poniendo el juego.`;
-      note.appendChild(p);
-      wrap.appendChild(note);
+    const note = document.createElement('div');
+    note.className = 'studio-builtin-note';
+    const p = document.createElement('p');
+    p.textContent = this.design
+      ? 'Estás cambiándole la cara, no la ficha: lo que cuesta, lo que aguanta y lo '
+        + 'que hace lo sigue poniendo el juego. Sus números se retocan en el catálogo.'
+      : `${def.name} se dibuja con el modelo que trae el juego, escrito en código y no `
+        + 'hecho de piezas, así que no se puede abrir y retocar. Empieza por una plantilla '
+        + 'y a partir de ahí queda como tú quieras: se ajusta sola a su huella.';
+    note.appendChild(p);
+    wrap.appendChild(note);
+
+    if (!this.design) {
+      wrap.appendChild(this.templateList('Empezar por...'));
       return wrap;
     }
 
-    const sizeRow = selectRow('Huella', String(d.size), [1, 2, 3, 4].map((n) => [String(n), `${n}×${n} casillas`]), (v) => {
-      d.size = Number(v);
-      this.fit();
-      this.afterChange();
-    });
-    const ageRow = selectRow('Edad', String(d.age), AGES.map((a, i) => [String(i), a.name]), (v) => {
-      d.age = Number(v);
-      this.afterChange();
-    });
-    wrap.appendChild(group('Dónde y cuándo', [sizeRow, ageRow]));
+    const acts = document.createElement('div');
+    acts.className = 'studio-actions';
+    const undo = document.createElement('button');
+    undo.className = 'studio-del studio-reset-btn';
+    undo.textContent = 'Restablecer';
+    undo.title = isBuiltin(type)
+      ? 'Vuelve al modelo que trae el juego'
+      : 'Vuelve al aspecto original del edificio';
+    undo.disabled = !isCustom(type);
+    undo.onclick = (e) => this.confirmReset(e.currentTarget);
+    acts.appendChild(undo);
+    wrap.appendChild(acts);
 
-    const roleRow = selectRow('Función', d.role,
-      Object.entries(ROLES).map(([k, r]) => [k, r.label]), (v) => {
-        d.role = v;
-        // Los valores propios del papel nuevo se rellenan solos al validar.
-        Object.assign(d, pickRoleDefaults(v, d));
-        this.afterChange();
-      });
-    const roleRows = [roleRow];
-    const roleHint = document.createElement('p');
-    roleHint.className = 'studio-hint-text';
-    roleHint.textContent = ROLES[d.role].hint;
-
-    if (d.role === 'store') {
-      for (const r of RESOURCES) {
-        roleRows.push(checkRow(RES_NAME[r], d.dropoff.includes(r), (on) => {
-          const set = new Set(d.dropoff);
-          if (on) set.add(r); else set.delete(r);
-          d.dropoff = [...set];
-          if (!d.dropoff.length) d.dropoff = [r];
-          this.afterChange();
-        }));
-      }
-    }
-    if (d.role === 'train') {
-      for (const [type, def] of Object.entries(UNITS)) {
-        roleRows.push(checkRow(def.name, d.trains.includes(type), (on) => {
-          const set = new Set(d.trains);
-          if (on) set.add(type); else set.delete(type);
-          d.trains = [...set];
-          if (!d.trains.length) d.trains = [type];
-          this.afterChange();
-        }));
-      }
-    }
-    for (const f of ROLE_FIELDS[d.role] || []) roleRows.push(this.statField(d, f));
-    const roleGroup = group('Qué hace', roleRows);
-    roleGroup.insertBefore(roleHint, roleGroup.querySelector('.cat-grid'));
-    wrap.appendChild(roleGroup);
-
-    const costRows = RESOURCES.map((r) => this.statField(d.cost, {
-      key: r, label: RES_NAME[r], min: 0, max: 5000, step: 5,
-    }));
-    wrap.appendChild(group('Coste', costRows));
-    wrap.appendChild(group('Valores', STAT_FIELDS.map((f) => this.statField(d, f))));
+    // Volver a empezar se deja plegado: es tirar lo hecho, no algo de todos los días.
+    const again = document.createElement('details');
+    again.className = 'studio-more';
+    const sum = document.createElement('summary');
+    sum.textContent = 'Empezar de nuevo';
+    again.append(sum, this.templateList('Cambiar por...'));
+    wrap.appendChild(again);
     return wrap;
-  }
-
-  /**
-   * Pone (o quita) el edificio al que este modelo le da la cara. El modelo se
-   * estira o encoge hasta la huella del edificio elegido, de modo que lo que se
-   * ve en el taller es exactamente lo que se verá en la partida.
-   */
-  setSkinTarget(type) {
-    const d = this.design;
-    if (!d) return;
-    this.pushUndo();
-    if (!type) {
-      delete d.replaces;
-    } else {
-      d.replaces = type;
-      const size = BUILDINGS[type].size;
-      if (d.size !== size) {
-        Object.assign(d, resizeDesign(d, size));
-        this.status(`Modelo ajustado a la huella de ${BUILDINGS[type].name} (${size}×${size}).`);
-      }
-    }
-    this.fit();
-    this.afterChange();
-  }
-
-  statField(obj, f) {
-    const row = document.createElement('label');
-    row.className = 'cat-field';
-    const name = document.createElement('span');
-    name.className = 'cat-label';
-    name.textContent = f.unit ? `${f.label} (${f.unit})` : f.label;
-    row.append(name, numberStepper(obj[f.key] ?? f.min, f, (v) => {
-      obj[f.key] = Math.min(f.max, Math.max(f.min, v));
-      this.afterChange();
-      return obj[f.key];
-    }));
-    return row;
   }
 
   /** Los colores del edificio: sólo los materiales que usa de verdad. */
@@ -2007,19 +1986,17 @@ function group(title, rows, open = true) {
   return sec;
 }
 
-function textRow(label, value, max, onChange) {
-  const row = document.createElement('label');
-  row.className = 'cat-field wide';
+/** Fila de sólo lectura: un dato del edificio que aquí no se toca. */
+function infoRow(label, value) {
+  const row = document.createElement('div');
+  row.className = 'cat-field studio-info-row';
   const name = document.createElement('span');
   name.className = 'cat-label';
   name.textContent = label;
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.maxLength = max;
-  input.value = value;
-  input.onchange = () => onChange(input.value);
-  input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
-  row.append(name, input);
+  const v = document.createElement('span');
+  v.className = 'studio-info-value';
+  v.textContent = value;
+  row.append(name, v);
   return row;
 }
 
@@ -2049,17 +2026,4 @@ function checkRow(label, checked, onChange) {
   input.onchange = () => onChange(input.checked);
   row.append(name, input);
   return row;
-}
-
-/** Valores de partida al cambiar de función, sin pisar los que ya tuviera. */
-function pickRoleDefaults(role, d) {
-  if (role === 'house') return { pop: d.pop ?? 5 };
-  if (role === 'store') return { dropoff: d.dropoff?.length ? d.dropoff : ['food'] };
-  if (role === 'train') return { trains: d.trains?.length ? d.trains : ['militia'] };
-  if (role === 'defense') {
-    return {
-      attack: d.attack ?? 6, range: d.range ?? 7, rof: d.rof ?? 2, arrows: d.arrows ?? 1,
-    };
-  }
-  return {};
 }

@@ -77,8 +77,8 @@ import { UNITS, BUILD_ORDER, PLAYER_COLORS, RESOURCE_NODES } from '../js/config.
 const $ = (id) => document.getElementById(id);
 const q = new URLSearchParams(location.search);
 
-// Los edificios que el jugador haya hecho en el taller están guardados en este
-// mismo origen, así que el visor también los enseña.
+// Los modelos que el jugador les haya hecho a los edificios en el taller están
+// guardados en este mismo origen, así que el visor también los enseña.
 loadDesigns();
 
 const NODE_KINDS = [...Object.keys(RESOURCE_NODES), 'stump'];

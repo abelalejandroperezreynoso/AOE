@@ -104,9 +104,9 @@ Limitaciones conocidas:
   herramientas del navegador podría ver el mapa entero. En pantalla la niebla
   de guerra funciona con normalidad para cada jugador.
 - No hay equipos ni alianzas: todos contra todos.
-- Los edificios del taller que se reparten al empezar tienen un tope de tamaño;
-  si el anfitrión tuviera muchísimos y muy recargados, los últimos se quedarían
-  fuera de esa partida.
+- Los modelos del taller que se reparten al empezar tienen un tope de tamaño; si
+  el anfitrión hubiera rehecho muchísimos edificios y muy recargados, los últimos
+  se quedarían con su aspecto de siempre en esa partida.
 
 ## Catálogo del juego
 
@@ -154,13 +154,27 @@ Detalles a tener en cuenta:
 ## Taller de edificios
 
 Desde el menú principal, **Taller de edificios**: un editor 3D dentro del propio
-juego para **hacerse edificios nuevos**, que luego se construyen en la partida
-como cualquier otro.
+juego para **rehacerle el modelo a los edificios que ya trae**. Aquí no se
+inventan edificios nuevos: se elige uno —la casa, el molino, el castillo— y se
+le hace otra cara. Lo que cuesta, lo que aguanta y lo que hace lo sigue poniendo
+el juego (y el catálogo, si se retoca allí), así que el taller cambia cómo se ve
+una partida sin poder desequilibrarla. Y siempre se puede **restablecer**.
 
-Un edificio se arma con **piezas** —cajas, cilindros, cúpulas, tejados a dos y a
+En la columna de la izquierda están **todos los edificios del juego**, en el
+mismo orden de la barra de obra, con la cara que tengan ahora mismo y una línea
+que dice de quién es esa cara: la original del juego, la que trae hecha el juego
+o la que le has hecho tú.
+
+Un modelo se arma con **piezas** —cajas, cilindros, cúpulas, tejados a dos y a
 cuatro aguas, faldones, vigas, ruedas, almenas, torreones, puertas, ventanas,
 estandartes, escalinatas, cercas, pilas de troncos y barriles— colocadas sobre
-la huella que ocupará en el mapa.
+la huella que ese edificio ocupa en el mapa, que es la que manda.
+
+Los edificios que aún llevan su aspecto de siempre se ven en la mesa, pero su
+modelo está escrito en código y no hecho de piezas, así que no se puede abrir y
+retocar: se **empieza por una plantilla** (en blanco, cabaña, torreón,
+cobertizo o casa grande) y desde ahí queda como se quiera. La plantilla se
+ajusta sola a la huella del edificio, mida lo que mida.
 
 La mesa de trabajo va despejada a propósito: encima del modelo sólo hay cuatro
 controles, y lo demás sale en **menús desplegables** —**Añadir** abre la caja de
@@ -199,14 +213,11 @@ Para colocar:
   que no hay sorpresas al construirlo. Debajo están además las **tres etapas de
   obra horneadas** a tamaño de partida: cimientos, en obra y terminado. Las de
   en medio salen solas, no hay que modelarlas.
-- En **Edificio** se elige qué es. O bien **el aspecto de un edificio que ya
-  existe** —la casa, el molino, el cuartel...—, y entonces el modelo se ajusta
-  solo a la huella de ese edificio y lo que cuesta y lo que hace lo sigue
-  poniendo el juego: se le cambia la cara sin tocar el equilibrio. O bien un
-  edificio nuevo, y ahí se elige qué hace (sin función, dar población, almacén
-  de los recursos que se marquen, defensa que dispara flechas o edificio que
-  entrena unidades) junto con su coste, su tiempo de construcción, sus puntos de
-  vida, su armadura, su visión, su huella (de 1×1 a 4×4) y en qué edad aparece.
+- En **Edificio** está la ficha de lo que pone el juego —huella, edad, coste,
+  resistencia y qué hace—, para tenerla delante mientras se modela. Ahí no se
+  toca nada de eso: sus números se retocan en el **catálogo**. Lo que hay ahí es
+  **Restablecer** (devolverle su cara anterior) y **Empezar de nuevo** por otra
+  plantilla.
 - En **Colores** se le da color a cada material que use. El **color del
   jugador** no se elige: lo pone quien construya el edificio, así que conviene
   darle a alguna pieza (un estandarte, un paño) ese material.
@@ -216,8 +227,8 @@ Para colocar:
 El taller cabe en un teléfono sin renunciar a nada:
 
 - La **mesa se lleva toda la pantalla** y los paneles pasan a una hoja de abajo
-  con pestañas —Pieza, Edificio, Colores y Míos—, de la que sólo se ve una cosa
-  a la vez. Se **pliega** con el botón de la esquina o tocando otra vez la
+  con pestañas —Pieza, Edificio, Colores y Edificios—, de la que sólo se ve una
+  cosa a la vez. Se **pliega** con el botón de la esquina o tocando otra vez la
   pestaña que ya está puesta, y entonces el modelo ocupa casi el doble. En
   apaisado la hoja se pone de pie a la derecha.
 - **Un dedo** elige y arrastra piezas; con el botón **Altura** puesto, ese mismo
@@ -229,44 +240,42 @@ El taller cabe en un teléfono sin renunciar a nada:
 - Los números llevan botones de **menos y más** para afinar sin sacar el
   teclado.
 
-Los edificios hechos aquí se guardan **en ese navegador**, salen en la barra de
-construcción de los aldeanos con su coste y su tecla, aparecen en el catálogo
-—donde se les pueden retocar valores y colores como a los de serie— y se pueden
-duplicar para probar variantes. Caben 24 edificios de hasta 200 piezas.
+Lo que se hace aquí se guarda **en ese navegador** y se ve al momento en la
+partida y en el catálogo, que además deja retocarle los colores a cualquier
+edificio. Un modelo puede llegar a 200 piezas.
 
-### Compartir un edificio
+### Compartir el modelo de un edificio
 
-Un diseño es sólo datos, así que cabe en una línea de texto y viaja por donde
+Un modelo es sólo datos, así que cabe en una línea de texto y viaja por donde
 sea:
 
-- **Compartir** saca el edificio entero como texto, con botones para copiarlo al
-  portapapeles o descargarlo como fichero.
-- **Importar** hace lo contrario: se pega el texto y entra como un edificio nuevo
-  —con identificador nuevo, así que nunca pisa lo que ya había—. Pasa por el
-  mismo validador que todo lo demás, de modo que un texto raro se queda en un
-  edificio soso y nunca en una partida rota.
+- **Compartir** saca el modelo del edificio que tengas puesto como texto, con
+  botones para copiarlo al portapapeles o descargarlo como fichero.
+- **Importar** hace lo contrario: se pega el texto y ese modelo pasa a ser la
+  cara del edificio que tengas puesto, se hiciera para el que se hiciera —se
+  ajusta solo a su huella—. Así el mismo modelo sirve para vestir el molino o el
+  cuartel, y es también la forma de llevarse una cara de un edificio a otro.
+  Pasa por el mismo validador que todo lo demás, de modo que un texto raro se
+  queda en un edificio soso y nunca en una partida rota.
 
-Y para que un edificio deje de ser de un navegador y **le llegue a todo el
-mundo**, su texto se pega en `js/data/builtin-designs.js` con un identificador
-que empiece por `b_`. Los de ese fichero viajan con el código: se dan de alta al
-arrancar en cualquier dispositivo, sin que nadie importe nada. No salen en la
-lista del taller —no son cosas del taller, son la cara de un edificio del
-juego—, y hay como mucho uno por edificio vestido: un diseño nuevo para la casa
-sustituye al que hubiera. Si quien juega hace el suyo para ese mismo edificio,
-el suyo manda mientras lo tenga.
+Y para que un modelo deje de ser de un navegador y **le llegue a todo el
+mundo**, su texto se pega en `js/data/builtin-designs.js`. Los de ese fichero
+viajan con el código: se aplican al arrancar en cualquier dispositivo, sin que
+nadie importe nada. Hay como mucho uno por edificio, y si quien juega le hace el
+suyo a ese mismo edificio, el suyo manda mientras lo tenga.
 
-La **casa** del juego es justo eso: su modelo sale de un diseño hecho en el
-taller, con la ficha de siempre (25 de madera, +5 de población, dos casillas).
+La **casa** del juego es justo eso: su modelo sale del taller, con la ficha de
+siempre (25 de madera, +5 de población, dos casillas).
 
 Detalles a tener en cuenta:
 
-- Al guardar en el taller mandan sus valores: si el catálogo tenía cambios sobre
-  **ese** edificio, se retiran (los del resto del juego no se tocan).
-- En **multijugador manda quien invita**: sus edificios viajan a los demás al
-  empezar la partida y todos juegan con ellos —también los que trae el juego,
-  por si los dos lados no van con la misma versión—. Los propios vuelven al
-  recargar la página.
-- La máquina no construye edificios del taller: los usa quien los hizo.
+- Al guardar en el taller manda el modelo sobre los colores de **ese** edificio:
+  se retiran los retoques de aspecto que el catálogo tuviera puestos encima (sus
+  números, y los del resto del juego, no se tocan).
+- En **multijugador manda quien invita**: las caras de sus edificios viajan a los
+  demás al empezar la partida y todos ven lo mismo en el mapa —también las que
+  trae el juego, por si los dos lados no van con la misma versión—. Las propias
+  vuelven al recargar la página.
 
 ## Cómo se juega
 
@@ -337,8 +346,8 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
   recursos, control de velocidad (1x a 3x) y estadísticas finales.
 - **Catálogo** para consultar y editar todo el juego: sus valores y también el
   aspecto de cada objeto, con vista previa en vivo.
-- **Taller de edificios**: modelado 3D dentro del juego para hacerse edificios
-  propios y construirlos en la partida.
+- **Taller de edificios**: modelado 3D dentro del juego para rehacerle la cara a
+  cualquier edificio del juego, sin tocar lo que cuesta ni lo que hace.
 
 ## Estructura del código
 
@@ -370,8 +379,8 @@ js/audio.js         Efectos de sonido sintetizados con WebAudio
 js/catalog.js       Catálogo: fichas y edición de los datos del juego
 js/data/appearance.js Colores y tamaño con los que se dibuja cada objeto
 js/data/overrides.js  Valores editados: validación, guardado y aplicación
-js/data/designs.js  Edificios hechos en el taller: validación, guardado y alta
-js/data/builtin-designs.js  Edificios del taller que vienen con el juego
+js/data/designs.js  Modelos del taller: validación, guardado y aplicación
+js/data/builtin-designs.js  Modelos de edificio que vienen con el juego
 js/lobby-ui.js      Pantalla de la sala de espera
 js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
 js/net/protocol.js  Codificación binaria del estado y de las órdenes
