@@ -309,12 +309,16 @@ export class Studio {
     else this.cloudTimer = setTimeout(go, 1200);
   }
 
-  /** El estado de la nube, en la cinta de arriba del taller. */
+  /**
+   * El estado de la nube, en la cinta de arriba del taller. El «Taller
+   * compartido:» va en su propia etiqueta porque en un móvil estorba y el CSS
+   * lo esconde: ahí sólo cabe el estado.
+   */
   showCloud(text, title = '') {
     const box = el('studio-cloud');
     if (!box) return;
     box.classList.toggle('hidden', !cloudEnabled());
-    box.textContent = cloudEnabled() ? `Taller compartido: ${text}` : '';
+    box.querySelector('.studio-cloud-state').textContent = cloudEnabled() ? text : '';
     box.title = title;
   }
 
