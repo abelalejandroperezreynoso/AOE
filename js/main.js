@@ -191,9 +191,28 @@ el('build').onclick = (e) => {
   const sa = [p.paddingTop, p.paddingRight, p.paddingBottom, p.paddingLeft]
     .map((v) => Math.round(parseFloat(v) || 0)).join('/');
   probe.remove();
+  /*
+   * Y cuánto mide cada forma de decir "toda la pantalla". En iOS no todas
+   * valen lo mismo: `inset: 0` y `100%` se quedan en el área visible, mientras
+   * que las unidades de ventana grande pueden dar la pantalla entera. Saber
+   * cuál da el alto de verdad es lo que decide con qué se maqueta.
+   */
+  const caja = document.createElement('div');
+  caja.style.cssText = 'position:fixed;left:-9999px;top:0;width:1px';
+  document.body.appendChild(caja);
+  const alto = (v) => {
+    caja.style.height = v;
+    return Math.round(caja.getBoundingClientRect().height) || '—';
+  };
+  const unidades = `vh ${alto('100vh')} · dvh ${alto('100dvh')} · svh ${alto('100svh')}`
+    + ` · lvh ${alto('100lvh')} · fill ${alto('-webkit-fill-available')}`;
+  caja.remove();
   const anchos = [480, 620, 900].filter((n) => matchMedia(`(max-width:${n}px)`).matches).join(',') || 'ninguna';
   box.textContent = `${box.dataset.was} · página ${innerWidth}×${innerHeight}`
+    + ` · raíz ${document.documentElement.clientHeight}`
+    + ` · visual ${Math.round(window.visualViewport?.height || 0)}`
     + ` · pantalla ${screen.width}×${screen.height} · zonas ${sa}`
+    + ` · ${unidades}`
     + ` · medios ≤${anchos} · standalone ${!!navigator.standalone}`;
 };
 
