@@ -187,6 +187,11 @@ pieza propia es **datos**: unas cuantas piezas del juego colocadas y guardadas
 con un nombre. Se hacen en la segunda mitad de la parrilla de entrada, «Piezas
 del taller», con las mismas herramientas y las mismas barras que un edificio.
 
+Debajo va el catálogo de las que trae el juego. Ésas no se pueden cambiar —son
+código—, pero tocar una empieza una pieza del taller con ella dentro, que es lo
+más parecido a editarlas y por donde se empieza casi siempre: se parte de la
+caja o del tejado y se le añade lo que haga falta.
+
 Lo que las hace útiles es que quedan **enlazadas**: una pieza puesta en un
 edificio no es una copia, es la pieza. Cambiarla cambia de golpe todos los
 edificios que la lleven —y, con el taller compartido, para todo el que juegue—.

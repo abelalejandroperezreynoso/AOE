@@ -420,6 +420,14 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   margin: 18px 0 4px; font-size: 12px; color: var(--gold-l);
   text-transform: uppercase; letter-spacing: 1px; flex: none;
 }
+/* Cuando todavía no hay ninguna pieza propia, decirlo donde iría la primera. */
+.pick-none {
+  /* El -2 compensa el acolchado de la rejilla, para que la línea empiece a
+     plomo con el párrafo de arriba y no dos píxeles metida. */
+  grid-column: 1 / -1; margin: 0 0 0 -2px; padding: 2px 0 4px;
+  font-size: 13px; color: #63533a;
+}
+
 /* La ficha de empezar una pieza: un hueco con su cruz, no una miniatura. */
 .pick-new { justify-content: center; }
 .pick-plus {
@@ -924,6 +932,11 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   text-align: center;
 }
 .piece-card:hover { background: rgba(201,162,39,.13); filter: none; }
+/* El mismo catálogo, pero en la parrilla de entrada en vez de en la hoja: allí
+   la rejilla se reparte el alto de la hoja y desplaza por su cuenta; aquí va
+   detrás de todo lo demás y quien desplaza es la pantalla entera. Va después de
+   `.piece-grid` a propósito, que si no le gana su `flex: 1` y la deja sin alto. */
+.pick-base { flex: none; overflow: visible; }
 .piece-card canvas { display: block; }
 .piece-card b { font-size: 12.5px; font-weight: normal; color: var(--tinta); line-height: 1.25; }
 
