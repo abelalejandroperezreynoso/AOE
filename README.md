@@ -383,6 +383,11 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
 ```
 index.html          Estructura de la página y el HUD
 css/style.css       Interfaz, incluida la adaptación a móvil
+manifest.webmanifest  Aplicación instalable: nombre, iconos y modo pantalla
+icon.svg            El icono, dibujado por código como el resto del arte
+icon-maskable.svg   El mismo, con aire alrededor para el recorte de Android
+icon-512.png        El icono horneado, para donde no se acepte el SVG
+apple-touch-icon.png  El de la pantalla de inicio de iOS, que sólo lee PNG
 js/config.js        Datos de juego: edades, unidades, edificios, tecnologías
 js/main.js          Menú, arranque y bucle principal
 js/game.js          Estado de la partida, simulación, combate y órdenes
@@ -444,6 +449,35 @@ Para depurar, el objeto de la partida está disponible en la consola como
   posiciones difieren menos de una décima de casilla.
 - Con la partida llena, el anfitrión reparte los envíos a lo largo del ciclo en
   vez de mandárselos a los siete a la vez, para no dar un tirón cada 200 ms.
+
+### Instalado en el móvil
+
+Añadido a la pantalla de inicio, el juego se abre sin navegador y el contenido
+pasa por debajo de la franja del reloj y la batería en vez de empezar por debajo
+de ella. Lo hacen el manifiesto y las etiquetas de iOS de `index.html`, de las
+que la que importa es `apple-mobile-web-app-status-bar-style` en
+`black-translucent`. De la muesca y de la barra de inicio apartan las zonas
+seguras (`env(safe-area-inset-*)`).
+
+El precio es que iOS le miente a la página sobre cuánto mide la pantalla: dice
+762 donde hay 812 —los 50 de la franja del reloj— pero la coloca empezando
+arriba del todo, así que esos 50 sobran por abajo. Ninguna medida de CSS los
+recupera: `inset: 0`, `height: 100%`, `innerHeight`, `dvh` y `svh` valen los
+mismos 762.
+
+Así que no se intenta acertar con el alto. **El fondo de las pantallas lo pinta
+el lienzo de la ventana**, con el fondo de `html`: el navegador lo propaga a la
+pantalla física entera sin depender de ninguna caja, que es exactamente por lo
+que una aplicación normal —una que se desplaza como un documento— nunca tiene
+este problema. Las pantallas van con `class="overlay pantalla"` y sin fondo
+propio; una nueva va igual.
+
+La única capa que sí tiene que medir la pantalla es la partida, porque el mapa y
+las dos barras se reparten ese alto: ahí se le suma `--sa-top`, que es justo lo
+que falta, y que fuera de este caso vale cero.
+
+Un cambio en el manifiesto sólo se aplica **quitando el icono de la pantalla de
+inicio y volviéndolo a añadir**: iOS congela el que había al añadirlo.
 
 ## Aviso legal
 
