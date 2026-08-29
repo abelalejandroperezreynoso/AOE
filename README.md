@@ -179,6 +179,29 @@ debajo se eligen, con cada una dibujada como está puesta y su color al lado, y
 encima se sigue viendo el modelo, que se recoloca solo en lo que la hoja deja
 libre. Se abre con **Pieza**, y elegir no la cierra, para poder ir mirando.
 
+### Piezas propias
+
+Además de vestir los edificios, el taller deja **hacer piezas nuevas**. Una
+pieza del juego —la caja, el cilindro, el tejado— es código y no cambia; una
+pieza propia es **datos**: unas cuantas piezas del juego colocadas y guardadas
+con un nombre. Se hacen en la segunda mitad de la parrilla de entrada, «Piezas
+del taller», con las mismas herramientas y las mismas barras que un edificio.
+
+Lo que las hace útiles es que quedan **enlazadas**: una pieza puesta en un
+edificio no es una copia, es la pieza. Cambiarla cambia de golpe todos los
+edificios que la lleven —y, con el taller compartido, para todo el que juegue—.
+La ficha de cada pieza dice a cuántos edificios afecta antes de tocar nada, y
+quitarla avisa de cuántos se quedarían sin ella.
+
+Van en su propia tabla, `custom_parts` (migración en `supabase/migrations/`), y
+se leen **antes** que los modelos: si un edificio lleva una pieza propia y ésa
+no estuviera dada de alta, el validador de modelos la tiraría por no existir.
+
+Los límites: cuarenta piezas propias, sesenta piezas del juego dentro de cada
+una, y **no se anidan** —una pieza propia se compone sólo con las de serie—, que
+así ninguna puede contenerse a sí misma. Al colocarla nace con la talla que
+tenga modelada y desde ahí se estira, se gira y se coloca como cualquier otra.
+
 Añadir una pieza abre una **hoja que sube desde abajo**, al modo de iOS: fondo
 velado, esquinas de arriba redondeadas y asa. Dentro, el catálogo entero con
 **cada pieza dibujada como va a colocarse** —horneada igual que en la partida y
@@ -471,6 +494,7 @@ js/audio.js         Efectos de sonido sintetizados con WebAudio
 js/catalog.js       Catálogo: fichas y edición de los datos del juego
 js/data/appearance.js Colores y tamaño con los que se dibuja cada objeto
 js/data/overrides.js  Valores editados: validación, guardado y aplicación
+js/data/pieces.js    Piezas propias: almacén, validación y nube
 js/data/designs.js  Modelos del taller: validación, guardado y aplicación
 js/data/builtin-designs.js  Modelos de edificio que vienen con el juego
 js/data/cloud.js    El taller compartido: los modelos, contra la API de Supabase

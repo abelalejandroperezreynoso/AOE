@@ -54,7 +54,7 @@ let builtin = new Map();
 let designs = new Map();
 
 /** Todos los modelos en vigor, uno por edificio. */
-function allDesigns() {
+export function allDesigns() {
   return STOCK_BUILDINGS.map((t) => designs.get(t) || builtin.get(t)).filter(Boolean);
 }
 

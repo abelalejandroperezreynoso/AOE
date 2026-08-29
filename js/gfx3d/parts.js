@@ -17,6 +17,7 @@ import { PLAYER_COLORS, BUILDINGS } from '../config.js';
 import { LOOK } from '../data/appearance.js';
 import {
   quad, box, cyl, sphere, limb, wheel, tone, srand, translate, scaleMesh,
+  mapVerts, rotZ,
 } from './engine.js';
 import {
   gableRoof, hipRoof, battlements, roundTower, flag, scaffold, foundation,
@@ -405,7 +406,92 @@ export const PARTS = {
   },
 };
 
+/** Las que trae el juego. Las propias van aparte, que se hacen y se deshacen. */
 export const PART_KEYS = Object.keys(PARTS);
+
+// --- Piezas propias ----------------------------------------------------------
+
+/*
+ * Además de las de arriba, que son código, el taller deja hacer piezas nuevas
+ * componiéndolas con éstas: una reja, una ventana con su marco, un torreón
+ * rematado. Una pieza propia es **datos** —una lista de piezas del juego— y se
+ * da de alta aquí, así que el resto del juego no nota la diferencia:
+ * `PARTS['mia:reja']` se dibuja, se hornea y se valida igual que la caja.
+ *
+ * No se anidan: una pieza propia se compone sólo con las del juego. Así no hay
+ * forma de que una se contenga a sí misma, ni de que una cadena larga cueste
+ * una eternidad de dibujar.
+ */
+export const MINE = 'mia:';
+
+/** ¿Es una pieza de las que se hacen en el taller? */
+export function isMine(k) { return typeof k === 'string' && k.startsWith(MINE); }
+
+/** Los límites de una malla: lo que ocupa, para poder llevarla a otra caja. */
+export function meshBounds(tris) {
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity;
+  let x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (const t of tris) {
+    for (const q of t.p) {
+      if (q[0] < x0) x0 = q[0];
+      if (q[0] > x1) x1 = q[0];
+      if (q[1] < y0) y0 = q[1];
+      if (q[1] > y1) y1 = q[1];
+      if (q[2] < z0) z0 = q[2];
+      if (q[2] > z1) z1 = q[2];
+    }
+  }
+  return tris.length ? { x0, y0, z0, x1, y1, z1 } : { x0: 0, y0: 0, z0: 0, x1: 1, y1: 1, z1: 1 };
+}
+
+/** La malla de una pieza propia en sus propias medidas, sin colocar. */
+export function pieceMesh(def, c) {
+  const tris = [];
+  for (const sub of def.parts || []) {
+    const spec = PARTS[sub.k];
+    // Ni piezas que no existen ni piezas propias dentro de otra.
+    if (!spec || spec.mine) continue;
+    try { spec.build(tris, sub, c); } catch { /* una rota no tumba a las demás */ }
+  }
+  return tris;
+}
+
+/**
+ * Da de alta una pieza propia, o la rehace si ya estaba. Al colocarla se la
+ * lleva a la caja que se le pida —ancho, fondo y alto—, centrada en su sitio y
+ * apoyada en su altura, para que se estire y se gire como cualquier otra.
+ */
+export function registerPiece(def) {
+  const talla = def.talla || { w: 1, d: 1, h: 1 };
+  PARTS[MINE + def.key] = {
+    label: def.label,
+    glyph: '◆',
+    hint: 'Pieza hecha en el taller. Cambiarla cambia todo lo que la lleve.',
+    mine: true,
+    fields: ['x', 'y', 'z', 'w', 'd', 'h', 'yaw'],
+    def: { x: 1, y: 1, z: 0, w: talla.w, d: talla.d, h: talla.h, yaw: 0, m: 'wall' },
+    build(out, p, c) {
+      const tris = pieceMesh(def, c);
+      if (!tris.length) return;
+      const b = meshBounds(tris);
+      const lw = Math.max(1e-4, b.x1 - b.x0);
+      const ld = Math.max(1e-4, b.y1 - b.y0);
+      const lh = Math.max(1e-4, b.z1 - b.z0);
+      const sx = (p.w || lw) / lw, sy = (p.d || ld) / ld, sz = (p.h || lh) / lh;
+      const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+      mapVerts(tris, (q) => [(q[0] - cx) * sx, (q[1] - cy) * sy, (q[2] - b.z0) * sz]);
+      if (p.yaw) rotZ(tris, rad(p.yaw));
+      translate(tris, p.x, p.y, p.z);
+      for (const t of tris) out.push(t);
+    },
+  };
+}
+
+/** La quita del catálogo. Lo que la llevara puesta deja de dibujarse. */
+export function unregisterPiece(key) { delete PARTS[MINE + key]; }
+
+/** Las propias que hay dadas de alta ahora mismo. */
+export function minePartKeys() { return Object.keys(PARTS).filter(isMine); }
 
 // --- De modelo a malla -------------------------------------------------------
 

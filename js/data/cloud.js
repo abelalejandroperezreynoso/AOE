@@ -15,6 +15,7 @@
 import { CLOUD_URL, CLOUD_KEY } from './cloud-config.js';
 
 const TABLE = 'building_models';
+const PARTS_TABLE = 'custom_parts';
 /** Lo que se espera a la nube antes de seguir sin ella. */
 const TIMEOUT = 8000;
 /** Dónde se puede apuntar a otro proyecto sin tocar el código. */
@@ -110,6 +111,34 @@ export async function pushModel(model) {
 }
 
 /** Quita la cara de un edificio: vuelve a dibujarse como venga en el código. */
+/*
+ * Las piezas que se hacen en el taller, en su propia tabla. Van aparte de los
+ * modelos porque no son de ningún edificio: son el vocabulario con el que se
+ * hacen todos, y una sola pieza puede estar en veinte edificios.
+ */
+export async function pullParts() {
+  const { data, error, reason } = await call(`${PARTS_TABLE}?select=key,part`);
+  if (error || !Array.isArray(data)) return { error: error || 'respuesta rara', reason: reason || 'net' };
+  return { parts: data.map((row) => row?.part).filter((m) => m && typeof m === 'object') };
+}
+
+export async function pushPart(part) {
+  const { error, reason } = await call(`${PARTS_TABLE}?on_conflict=key`, {
+    method: 'POST',
+    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify([{ key: part.key, part }]),
+  });
+  return { ok: !error, error, reason };
+}
+
+export async function removePart(key) {
+  const { error, reason } = await call(`${PARTS_TABLE}?key=eq.${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+    headers: { Prefer: 'return=minimal' },
+  });
+  return { ok: !error, error, reason };
+}
+
 export async function removeModel(target) {
   const { error, reason } = await call(`${TABLE}?target=eq.${encodeURIComponent(target)}`, {
     method: 'DELETE',

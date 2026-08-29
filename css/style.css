@@ -413,8 +413,22 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 .studio-pick { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .studio-pick-hint { margin: 0; font-size: 13px; color: #63533a; line-height: 1.5; }
+/* La parrilla tiene dos mitades —edificios y piezas—, así que quien desplaza
+   es la pantalla entera y no cada una por su lado. */
+.studio-pick { overflow-y: auto; }
+.studio-pick-h {
+  margin: 18px 0 4px; font-size: 12px; color: var(--gold-l);
+  text-transform: uppercase; letter-spacing: 1px; flex: none;
+}
+/* La ficha de empezar una pieza: un hueco con su cruz, no una miniatura. */
+.pick-new { justify-content: center; }
+.pick-plus {
+  display: flex; align-items: center; justify-content: center;
+  width: 92px; height: 92px; font-size: 40px; color: var(--gold-l);
+}
+
 .studio-pick-grid {
-  flex: 1; min-height: 0; overflow-y: auto;
+  flex: none; min-height: 0;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
   gap: 10px; align-content: start;
   padding: 2px;
@@ -895,6 +909,12 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   flex: 1; min-height: 0; overflow-y: auto;
   display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 8px; align-content: start; padding: 2px;
+}
+/* El rótulo que parte el catálogo en dos: las del juego y las del taller. */
+.piece-grid-h {
+  grid-column: 1 / -1; margin: 10px 0 0;
+  font-size: 12px; color: var(--gold-l);
+  text-transform: uppercase; letter-spacing: 1px;
 }
 .piece-card {
   display: flex; flex-direction: column; align-items: center; gap: 2px;

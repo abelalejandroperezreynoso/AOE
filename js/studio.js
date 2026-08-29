@@ -21,14 +21,18 @@ import { PLAYER_COLORS, AGES, UNITS, BUILDINGS, BUILD_ORDER, RESOURCES, RES_NAME
 import { project, depth, faceLight, rotZ, bake, HW, HH, VZ } from './gfx3d/engine.js';
 import {
   PARTS, PART_KEYS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
-  DEFAULT_PALETTE, designParts, designMesh,
+  DEFAULT_PALETTE, designParts, designMesh, MINE, isMine, minePartKeys,
 } from './gfx3d/parts.js';
 import { buildingMesh } from './gfx3d/buildings.js';
 import {
   getDesign, isCustom, isBuiltin, saveDesign, resetBuilding,
   designFromTemplate, TEMPLATES, STOCK_BUILDINGS, MAX_PARTS,
-  cloudEnabled, syncDesigns, pendingCount,
+  cloudEnabled, syncDesigns, pendingCount, allDesigns,
 } from './data/designs.js';
+import {
+  allPieces, getPiece, savePiece, deletePiece, freeKey, syncPieces,
+  MAX_PIECES, MAX_PIECE_PARTS,
+} from './data/pieces.js';
 import { drawSprite } from './sprites.js';
 import { rebaseBuildingLooks } from './data/overrides.js';
 
@@ -64,6 +68,7 @@ const SNAPS = [
 export class Studio {
   constructor() {
     this.type = null;        // el edificio del juego que se está vistiendo
+    this.pieza = null;       // o la pieza propia que se está haciendo, si toca
     this.design = null;      // copia de trabajo de su modelo (null: el del juego)
     this.selected = -1;      // índice de la pieza elegida
     this.redo = [];          // lo deshecho, esperando a que lo rehagan
@@ -268,6 +273,9 @@ export class Studio {
 
   setVista(vista) {
     this.vista = vista;
+    // La pestaña de la ficha dice qué hay en la mesa: un edificio o una pieza.
+    const ficha = document.querySelector('#studio-tabs button[data-tab="build"]');
+    if (ficha) ficha.textContent = this.enPieza() ? 'Pieza' : 'Edificio';
     el('studio-card').dataset.vista = vista;
     el('btn-studio-close').textContent = vista === 'editor' ? 'Elegir otro' : 'Volver al menú';
   }
@@ -305,6 +313,9 @@ export class Studio {
     this.flush();
     if (this.cloudTimer) this.cloudSync(true);
     this.type = type;
+    // En la mesa hay una cosa cada vez: poner un edificio suelta la pieza que
+    // se estuviera haciendo, y al revés.
+    this.pieza = null;
     this.lastType = type;
     const base = getDesign(type);
     this.design = base ? structuredClone(base) : null;
@@ -317,6 +328,7 @@ export class Studio {
     this.cancelReset();
     // Sin modelo propio no hay piezas ni colores: la pestaña que sirve es la
     // del edificio, que es donde están las plantillas.
+    this.setVista('editor');
     this.setTab(this.design ? this.tab : 'build');
     if (desdeLaParrilla) {
       this.foldSheet(true);
@@ -328,6 +340,71 @@ export class Studio {
     this.renderPanel();
     this.redraw();
     this.schedulePreview();
+  }
+
+  /**
+   * Pone en la mesa una pieza propia en vez de un edificio. Se modela igual
+   * —las mismas herramientas, las mismas barras— sobre una huella de dos
+   * casillas, que es el patrón contra el que se mide: lo que ocupe ahí es lo
+   * que ocupará al colocarla, y desde ahí se estira como cualquier otra.
+   */
+  loadPiece(key) {
+    const def = getPiece(key);
+    if (!def) return;
+    const desdeLaParrilla = this.vista !== 'editor';
+    this.setVista('editor');
+    this.flush();
+    if (this.cloudTimer) this.cloudSync(true);
+    this.type = null;
+    this.pieza = key;
+    this.design = { target: null, size: 2, palette: { ...DEFAULT_PALETTE }, parts: structuredClone(def.parts) };
+    this.selected = -1;
+    this.undo = [];
+    this.redo = [];
+    this.baked = null;
+    this.cancelReset();
+    if (desdeLaParrilla) {
+      this.foldSheet(true);
+      if (window.matchMedia('(max-width: 620px), (max-height: 520px)').matches) this.foldPreview(true);
+    }
+    this.setVista('editor');
+    this.fit();
+    this.renderPanel();
+    this.redraw();
+    this.schedulePreview();
+  }
+
+  /** Empieza una pieza vacía y la pone en la mesa. */
+  newPiece() {
+    if (allPieces().length >= MAX_PIECES) {
+      this.status(`No caben más de ${MAX_PIECES} piezas propias.`);
+      return;
+    }
+    const key = freeKey('pieza');
+    if (!key || !savePiece({ key, label: 'Pieza nueva', parts: [] })) {
+      this.status('No se ha podido empezar la pieza.');
+      return;
+    }
+    this.afterPieceSave();
+    this.loadPiece(key);
+    this.status('Pieza nueva. Añádele piezas del juego y ponle nombre.');
+  }
+
+  /** ¿Se está haciendo una pieza en vez de vistiendo un edificio? */
+  enPieza() { return !!this.pieza; }
+
+  /** Cuántos edificios llevan puesta una pieza propia. */
+  usosDe(key) {
+    return allDesigns().filter((d) => d.parts.some((p) => p.k === MINE + key)).length;
+  }
+
+  /** Tras tocar una pieza: se repintan los edificios que la lleven, y a la nube. */
+  afterPieceSave() {
+    const conLaPieza = allDesigns()
+      .filter((d) => d.parts.some((p) => isMine(p.k)))
+      .map((d) => d.target);
+    rebaseBuildingLooks(conLaPieza);
+    this.cloudSync();
   }
 
   /** Le pone al edificio el modelo de una plantilla, ajustado a su huella. */
@@ -483,7 +560,16 @@ export class Studio {
   }
 
   doSave() {
-    if (!this.design || !this.type) return;
+    if (!this.design) return;
+    if (this.enPieza()) {
+      const def = getPiece(this.pieza);
+      const saved = savePiece({ key: this.pieza, label: def?.label || this.pieza, parts: this.design.parts });
+      if (!saved) { this.status('No se ha podido guardar la pieza.'); return; }
+      this.afterPieceSave();
+      this.refreshActions();
+      return;
+    }
+    if (!this.type) return;
     const saved = saveDesign(this.design, this.type);
     if (!saved) { this.status('No se ha podido guardar.'); return; }
     this.afterSave();
@@ -595,8 +681,50 @@ export class Studio {
       b.onclick = () => this.load(type);
       grid.appendChild(b);
     }
+    this.renderPiecePick();
   }
 
+  /**
+   * La segunda mitad de la parrilla: las piezas del taller. Un edificio se
+   * viste con piezas, y éstas se hacen aquí igual que se hace un edificio, con
+   * las mismas herramientas. Cambiar una cambia todos los edificios que la
+   * lleven, así que cada ficha dice a cuántos.
+   */
+  renderPiecePick() {
+    const caja = el('studio-pick-pieces');
+    if (!caja) return;
+    caja.innerHTML = '';
+    for (const def of allPieces()) {
+      const b = document.createElement('button');
+      b.className = 'pick-item' + (def.key === this.pieza ? ' active' : '');
+      const thumb = this.bakeThumb(structuredClone(def.parts), 92);
+      thumb.className = 'pick-thumb';
+      const n = document.createElement('div');
+      n.className = 'pick-name';
+      n.textContent = def.label;
+      const usos = this.usosDe(def.key);
+      const sub = document.createElement('div');
+      sub.className = 'pick-sub';
+      sub.textContent = `${def.parts.length} ${def.parts.length === 1 ? 'pieza' : 'piezas'}\n`
+        + (usos ? `en ${usos} ${usos === 1 ? 'edificio' : 'edificios'}` : 'sin usar');
+      b.append(thumb, n, sub);
+      b.onclick = () => this.loadPiece(def.key);
+      caja.appendChild(b);
+    }
+
+    const nueva = document.createElement('button');
+    nueva.className = 'pick-item pick-new';
+    nueva.innerHTML = '<span class="pick-plus">+</span>';
+    const n = document.createElement('div');
+    n.className = 'pick-name';
+    n.textContent = 'Pieza nueva';
+    const sub = document.createElement('div');
+    sub.className = 'pick-sub';
+    sub.textContent = `${allPieces().length} de ${MAX_PIECES}`;
+    nueva.append(n, sub);
+    nueva.onclick = () => this.newPiece();
+    caja.appendChild(nueva);
+  }
 
   /** Miniatura horneada de un edificio, con la cara que tenga, en su hueco. */
   thumb(type, size) {
@@ -1024,7 +1152,7 @@ export class Studio {
     closeMenus();
     const grid = el('piece-sheet-grid');
     grid.innerHTML = '';
-    for (const k of PART_KEYS) {
+    const ficha = (k) => {
       const spec = PARTS[k];
       const b = document.createElement('button');
       b.className = 'piece-card';
@@ -1034,7 +1162,22 @@ export class Studio {
       name.textContent = spec.label;
       b.append(thumb, name);
       b.onclick = () => { this.closePieceSheet(); this.addPart(k); };
-      grid.appendChild(b);
+      return b;
+    };
+    for (const k of PART_KEYS) grid.appendChild(ficha(k));
+
+    /*
+     * Las del taller van detrás y bajo su rótulo: son las mismas de la parrilla
+     * de entrada, ya dadas de alta en el catálogo del dibujante. Dentro de una
+     * pieza no salen, que las piezas propias no se anidan.
+     */
+    const mias = this.enPieza() ? [] : minePartKeys();
+    if (mias.length) {
+      const h = document.createElement('h4');
+      h.className = 'piece-grid-h';
+      h.textContent = 'Mis piezas';
+      grid.appendChild(h);
+      for (const k of mias) grid.appendChild(ficha(k));
     }
     el('piece-sheet').classList.remove('hidden');
   }
@@ -1042,6 +1185,120 @@ export class Studio {
   closePieceSheet() { el('piece-sheet').classList.add('hidden'); }
 
   sheetOpen() { return !el('piece-sheet').classList.contains('hidden'); }
+
+  /**
+   * La ficha de una pieza propia: cómo se llama, cuántos edificios la llevan
+   * puesta —que es lo que hay que saber antes de tocarla— y el botón de
+   * quitarla, que avisa de a cuántos se les caería.
+   */
+  piecePanel() {
+    const def = getPiece(this.pieza);
+    const wrap = document.createElement('div');
+    if (!def) {
+      wrap.innerHTML = '<p class="cat-empty">Esta pieza ya no está.</p>';
+      return wrap;
+    }
+    const h = document.createElement('h4');
+    h.className = 'studio-h';
+    h.textContent = 'Pieza del taller';
+    wrap.appendChild(h);
+
+    // El nombre es lo que se lee en el catálogo de piezas.
+    const fila = document.createElement('label');
+    fila.className = 'cat-field wide';
+    const et = document.createElement('span');
+    et.className = 'cat-label';
+    et.textContent = 'Nombre';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 32;
+    input.value = def.label;
+    input.onchange = () => {
+      const guardada = savePiece({ ...def, label: input.value, parts: this.design.parts }, this.pieza);
+      if (!guardada) { input.value = def.label; return; }
+      this.afterPieceSave();
+      this.renderPanel();
+      this.renderPick();
+      this.status('Nombre cambiado.');
+    };
+    fila.append(et, input);
+    wrap.appendChild(fila);
+
+    const usos = this.usosDe(this.pieza);
+    const nota = document.createElement('div');
+    nota.className = 'studio-builtin-note';
+    const p = document.createElement('p');
+    p.textContent = usos
+      ? `La llevan ${usos} ${usos === 1 ? 'edificio' : 'edificios'}. Lo que cambies aquí `
+        + 'les cambia a todos, y a todo el que juegue.'
+      : 'Todavía no la lleva ningún edificio. Se pone desde Añadir, en «Mis piezas».';
+    nota.appendChild(p);
+    wrap.appendChild(nota);
+
+    wrap.appendChild(group('Lo que ocupa', [
+      infoRow('Piezas', `${this.design.parts.length} de ${MAX_PIECE_PARTS}`),
+      infoRow('Edificios que la usan', String(usos)),
+    ]));
+
+    const acts = document.createElement('div');
+    acts.className = 'studio-actions';
+    const del = document.createElement('button');
+    del.className = 'studio-del studio-reset-btn';
+    del.textContent = 'Quitar la pieza';
+    del.title = usos
+      ? `Se caería de ${usos} ${usos === 1 ? 'edificio' : 'edificios'}`
+      : 'No la lleva ningún edificio';
+    del.onclick = (e) => this.confirmDeletePiece(e.currentTarget);
+    acts.appendChild(del);
+    wrap.appendChild(acts);
+    return wrap;
+  }
+
+  /**
+   * Quitar una pieza se pregunta dos veces, como restablecer un edificio, y la
+   * segunda dice a cuántos se les cae: no es lo mismo tirar una que no usa
+   * nadie que una que está en media ciudad.
+   */
+  confirmDeletePiece(btn) {
+    const usos = this.usosDe(this.pieza);
+    if (!this.confirming) {
+      this.confirming = true;
+      btn.textContent = usos ? `¿Seguro? Se cae de ${usos}` : '¿Seguro?';
+      btn.classList.add('confirming');
+      clearTimeout(this.delTimer);
+      this.delTimer = setTimeout(() => this.cancelReset(), 5000);
+      return;
+    }
+    this.cancelReset();
+    clearTimeout(this.saveTimer);
+    this.saveTimer = 0;
+    const key = this.pieza;
+    deletePiece(key);
+    this.afterPieceSave();
+    this.showPick();
+    this.status('Pieza quitada.');
+  }
+
+  /**
+   * La vista previa de una pieza propia. No tiene etapas de obra —una pieza no
+   * se construye, se pone—, así que se enseña sola y a los tres tamaños con los
+   * que suele acabar en un edificio.
+   */
+  renderPiecePreview(wrap) {
+    const def = getPiece(this.pieza);
+    if (!def) return;
+    const partes = structuredClone(this.design.parts);
+    for (const [size, label] of [[44, 'Pequeña'], [64, 'A su talla'], [92, 'Grande']]) {
+      const cell = document.createElement('div');
+      cell.className = 'studio-shot';
+      const c = this.bakeThumb(partes, size);
+      const t = document.createElement('span');
+      t.textContent = label;
+      cell.append(c, t);
+      wrap.appendChild(cell);
+    }
+    el('studio-info').textContent = `${partes.length} de ${MAX_PIECE_PARTS} piezas`;
+  }
 
   /** Cómo se ve una pieza del modelo, tal y como está puesta ahora mismo. */
   partThumb(part, size) {
@@ -1081,7 +1338,13 @@ export class Studio {
   // --- Piezas -----------------------------------------------------------------
 
   addPart(kind) {
-    if (!this.type) return;
+    if (!this.type && !this.enPieza()) return;
+    // Dentro de una pieza propia no entra otra: no se anidan.
+    if (this.enPieza() && isMine(kind)) return;
+    if (this.enPieza() && this.design.parts.length >= MAX_PIECE_PARTS) {
+      this.status(`Una pieza no puede pasar de ${MAX_PIECE_PARTS} piezas.`);
+      return;
+    }
     // La primera pieza empieza el modelo: si el edificio todavía llevaba su
     // cara de siempre, se parte de la huella vacía y encima va lo que se pida.
     if (!this.design) {
@@ -1253,7 +1516,9 @@ export class Studio {
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#3f5a30';
     ctx.fillRect(0, 0, W, H);
-    if (!this.type) return;
+    // En la mesa hay un edificio o una pieza; sin ninguno de los dos, nada que
+    // dibujar.
+    if (!this.type && !this.enPieza()) return;
 
     this.drawGround(ctx);
     // Detrás del modelo, que es como se calca; delante si se pide, para
@@ -2000,7 +2265,12 @@ export class Studio {
   updatePad() {
     const part = this.design?.parts[this.selected];
     el('studio-pad').classList.toggle('hidden', !part);
-    el('studio-topbar').classList.toggle('hidden', !part || !this.hayHuecoArriba());
+    /*
+     * La de arriba no espera a que haya pieza elegida: deshacer y añadir hacen
+     * falta antes de que la haya —una pieza propia recién empezada está vacía y
+     * sin «+» no habría por dónde—. Lo que sí depende de la pieza se apaga.
+     */
+    el('studio-topbar').classList.toggle('hidden', !this.design || !this.hayHuecoArriba());
     for (const b of document.querySelectorAll('.studio-scale button')) {
       b.disabled = !part || !this.scaleField(part, b.dataset.eje);
     }
@@ -2031,6 +2301,7 @@ export class Studio {
   renderPreview() {
     const wrap = el('studio-shots');
     wrap.innerHTML = '';
+    if (this.enPieza()) { this.renderPiecePreview(wrap); return; }
     if (!this.type) return;
     let tris = 0, px = 0;
     for (let stage = 0; stage < 3; stage++) {
@@ -2068,13 +2339,13 @@ export class Studio {
   renderPanel() {
     const box = el('studio-panel');
     box.innerHTML = '';
-    if (!this.type) {
+    if (!this.type && !this.enPieza()) {
       box.innerHTML = '<p class="cat-empty">Elige un edificio para empezar.</p>';
       return;
     }
-    // El panel se quedó con una sola cosa: la ficha del edificio. Las piezas
-    // viven en su hoja y el color de cada una, en su barra.
-    box.appendChild(this.buildPanel());
+    // El panel se quedó con una sola cosa: la ficha de lo que hay en la mesa.
+    // Las piezas viven en su hoja y el color de cada una, en su barra.
+    box.appendChild(this.enPieza() ? this.piecePanel() : this.buildPanel());
   }
 
   /** Las plantillas por las que empezar (o volver a empezar) un modelo. */
