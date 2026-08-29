@@ -383,11 +383,6 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
 ```
 index.html          Estructura de la página y el HUD
 css/style.css       Interfaz, incluida la adaptación a móvil
-manifest.webmanifest  Aplicación instalable: nombre, iconos y modo pantalla
-icon.svg            El icono, dibujado por código como el resto del arte
-icon-maskable.svg   El mismo, con aire alrededor para el recorte de Android
-icon-512.png        El icono horneado, para donde no se acepte el SVG
-apple-touch-icon.png  El de la pantalla de inicio de iOS, que sólo lee PNG
 js/config.js        Datos de juego: edades, unidades, edificios, tecnologías
 js/main.js          Menú, arranque y bucle principal
 js/game.js          Estado de la partida, simulación, combate y órdenes
@@ -449,43 +444,6 @@ Para depurar, el objeto de la partida está disponible en la consola como
   posiciones difieren menos de una décima de casilla.
 - Con la partida llena, el anfitrión reparte los envíos a lo largo del ciclo en
   vez de mandárselos a los siete a la vez, para no dar un tirón cada 200 ms.
-
-### Instalado en el móvil
-
-Añadido a la pantalla de inicio, el juego se abre sin navegador y llega a los
-cuatro bordes: el contenido pasa por debajo de la franja de la hora y la batería
-en lugar de empezar por debajo de ella. Lo consiguen el manifiesto
-(`manifest.webmanifest`, con `display: standalone`) y tres etiquetas de iOS en
-`index.html`, de las que la que importa es
-`apple-mobile-web-app-status-bar-style` en `black-translucent`. De la muesca y de
-la barra de inicio apartan las zonas seguras (`env(safe-area-inset-*)`), que ya
-estaban en el CSS.
-
-Eso tiene un precio, y es la trampa de esta pantalla: **en modo aplicación, iOS
-descuenta la franja de la hora del alto de la página pero empieza a pintar arriba
-del todo**, así que esos píxeles sobran por abajo y aparece una franja muerta.
-Medido en un iPhone de 375×812 con el juego instalado:
-
-    modo standalone · pantalla 375x812 · zonas 50/0/34/0
-    inner 762 · raiz 762 · inset:0 762
-    vh 812 · dvh 762 · svh 762 · lvh 812
-
-`inset: 0`, `height: 100%`, `innerHeight`, `dvh` y `svh` valen todos 762 —los 812
-menos los 50 de arriba—, así que ninguno sirve para maquetar contra la pantalla.
-`vh` sí da los 812, y ahí no tiene su inconveniente de siempre —ser la ventana
-grande, la de cuando el navegador ha recogido sus barras—, porque en modo
-aplicación no hay barras que recoger.
-
-Por eso el alto de la partida (`#app`) y el de las superposiciones (`.overlay`)
-cuelgan de `--app-h` y no de `inset: 0`: vale `100dvh` en el navegador, donde hay
-barras que van y vienen, y `100vh` en modo aplicación. **Cualquier capa nueva que
-tenga que llegar al filo de la pantalla va igual.** Medir la pantalla a mano con
-`visualViewport` ya se probó y salió peor: esa medida encoge con el teclado, en
-iOS el teclado se cierra sin soltar el campo, y la medida guardada se quedaba
-clavada dejando media pantalla en negro.
-
-Un cambio en el manifiesto **sólo se aplica reinstalando el icono**: iOS congela
-el que había al añadirlo a la pantalla de inicio.
 
 ## Aviso legal
 
