@@ -93,6 +93,8 @@ export class Studio {
     el('btn-studio-close').onclick = () => this.back();
     el('btn-share-close').onclick = () => el('studio-share').classList.add('hidden');
     el('btn-piece-sheet-close').onclick = () => this.closePieceSheet();
+    el('btn-part-sheet-close').onclick = () => this.closePartSheet();
+    el('part-sheet').onclick = (e) => { if (e.target === el('part-sheet')) this.closePartSheet(); };
     // Tocar el velo la cierra, como cualquier hoja.
     el('piece-sheet').onclick = (e) => { if (e.target === el('piece-sheet')) this.closePieceSheet(); };
     // Tocar el fondo del diálogo también lo cierra, como en cualquier ventana.
@@ -152,7 +154,51 @@ export class Studio {
    * puesta la pliega: es la forma rápida de dejar la mesa despejada sin ir a
    * buscar el botón de plegar.
    */
+  /**
+   * Las piezas del modelo, en una hoja a media pantalla: debajo se eligen y
+   * encima se sigue viendo el modelo, con la elegida señalada. Antes eran una
+   * pestaña de la hoja de abajo, y para ver cuál se había cogido había que
+   * cerrarla.
+   */
+  openPartSheet() {
+    if (!this.design) return;
+    closeMenus();
+    el('part-sheet').classList.remove('hidden');
+    this.renderPartSheet();
+    // El modelo se encaja en lo que la hoja deja libre, que es para lo que se
+    // queda a medias.
+    if (this.encajado) { this.fit(); this.redraw(); }
+  }
+
+  closePartSheet() {
+    el('part-sheet').classList.add('hidden');
+    if (this.encajado) { this.fit(); this.redraw(); }
+  }
+
+  partSheetOpen() { return !el('part-sheet').classList.contains('hidden'); }
+
+  renderPartSheet() {
+    if (!this.partSheetOpen()) return;
+    const box = el('part-sheet-body');
+    box.innerHTML = '';
+    box.appendChild(this.partPanel());
+  }
+
+  /** Lo que la hoja de las piezas le tapa al lienzo por abajo. */
+  tapadoPorHoja() {
+    if (!this.partSheetOpen()) return 0;
+    const panel = el('part-sheet').querySelector('.sheet-panel');
+    const mesa = el('studio-stage').getBoundingClientRect();
+    // Se mide por lo que ocupa en la maqueta y no por dónde está: mientras sube
+    // lleva su caja desplazada, y la cuenta saldría a cero justo cuando hace
+    // falta. La hoja va pegada al borde de abajo de la ventana.
+    const arriba = window.innerHeight - panel.offsetHeight;
+    return Math.max(0, mesa.bottom - arriba);
+  }
+
   showTab(tab) {
+    // «Pieza» no es una pestaña del panel: abre la hoja de las piezas.
+    if (tab === 'part') { this.openPartSheet(); return; }
     // Un edificio con la cara de siempre no tiene piezas ni colores que tocar:
     // lo que hace falta es la pantalla de empezar, que es la de «Edificio».
     if (!this.design) tab = 'build';
@@ -213,6 +259,7 @@ export class Studio {
 
   /** La pantalla de elegir edificio, que es por donde se entra. */
   showPick() {
+    this.closePartSheet();
     this.flush();
     this.cancelReset();
     this.setVista('elegir');
@@ -290,7 +337,6 @@ export class Studio {
     if (!saved) { this.status('No se ha podido empezar el modelo.'); return; }
     this.afterSave();
     this.load(this.type);
-    this.showTab('part');
     this.status(`${BUILDINGS[this.type].name}: modelo empezado. Se ve así en la partida desde ya.`);
   }
 
@@ -500,6 +546,7 @@ export class Studio {
   afterChange() {
     this.redraw();
     this.renderPanel();
+    this.renderPartSheet();
     this.persist();
     this.schedulePreview();
   }
@@ -659,7 +706,6 @@ export class Studio {
     this.afterSave();
     el('studio-share').classList.add('hidden');
     this.load(this.type);
-    this.showTab('part');
     this.status(`${BUILDINGS[this.type].name}: modelo importado.`);
   }
 
@@ -997,12 +1043,23 @@ export class Studio {
 
   sheetOpen() { return !el('piece-sheet').classList.contains('hidden'); }
 
+  /** Cómo se ve una pieza del modelo, tal y como está puesta ahora mismo. */
+  partThumb(part, size) {
+    return this.bakeThumb([{ ...part }], size);
+  }
+
   /**
    * Cómo se ve una pieza suelta: la de serie, horneada igual que en la partida
    * y con la paleta del modelo que se está haciendo, para que el dibujo del
    * catálogo sea el mismo que va a aparecer en la mesa.
    */
   pieceThumb(kind, size) {
+    // La clave va aparte: `def` sólo trae los valores, no de qué es la pieza.
+    return this.bakeThumb([{ ...structuredClone(PARTS[kind].def), k: kind }], size);
+  }
+
+  /** Hornea unas piezas sueltas en su hueco, con la paleta de este modelo. */
+  bakeThumb(parts, size) {
     const c = document.createElement('canvas');
     c.width = size; c.height = size;
     const ctx = c.getContext('2d');
@@ -1011,8 +1068,7 @@ export class Studio {
         target: this.type,
         size: this.viewSize(),
         palette: this.design?.palette || { ...DEFAULT_PALETTE },
-        // La clave va aparte: `def` sólo trae los valores, no de qué es.
-        parts: [{ ...structuredClone(PARTS[kind].def), k: kind }],
+        parts,
       };
       const s = bake(designMesh(d, this.colorIdx, 2, true));
       const sc = Math.min((size - 4) / s.w, (size - 4) / s.h);
@@ -1049,9 +1105,9 @@ export class Studio {
     if (p.z !== undefined && sel) p.z = Math.min(FIELDS.z.max, this.topOf(sel));
     this.design.parts.push(p);
     this.selected = this.design.parts.length - 1;
-    // Quien acaba de añadir una pieza quiere colocarla: se pasa a su ficha, que
-    // en el móvil además es cambiar de hoja (la paleta tapaba el resultado).
-    if (this.tab !== 'part') this.showTab('part');
+    // Nada de abrir la hoja de las piezas: lo que se quiere justo después de
+    // añadir una es verla en el modelo, y la hoja lo taparía. Queda elegida, y
+    // con ella salen sus dos barras.
     this.afterChange();
     this.status(`${spec.label} añadida.`);
   }
@@ -1159,7 +1215,7 @@ export class Studio {
     // barra aparece y desaparece.
     const pad = 18;
     const alto = this.padH();
-    const bottom = alto;
+    const bottom = Math.max(alto, this.tapadoPorHoja());
     const top = 24 + (this.hayHuecoArriba() ? alto : 0);
     const usable = Math.max(60, H - top - bottom);
     // El suelo es sólo para que un modelo diminuto no quede invisible: por
@@ -1676,6 +1732,7 @@ export class Studio {
     if (e.key === 'Escape') {
       // Primero, lo que esté por encima: la hoja de piezas y el compartir.
       if (this.sheetOpen()) { this.closePieceSheet(); return; }
+      if (this.partSheetOpen()) { this.closePartSheet(); return; }
       if (!el('studio-share').classList.contains('hidden')) {
         el('studio-share').classList.add('hidden');
         return;
@@ -2015,11 +2072,9 @@ export class Studio {
       box.innerHTML = '<p class="cat-empty">Elige un edificio para empezar.</p>';
       return;
     }
-    // Sin modelo propio no hay piezas ni colores que tocar: sale su ficha, que
-    // es donde están las plantillas por las que empezar.
-    if (!this.design || this.tab === 'build') { box.appendChild(this.buildPanel()); return; }
-    if (this.tab === 'part') box.appendChild(this.partPanel());
-    else box.appendChild(this.colorPanel());
+    // El panel se quedó con una sola cosa: la ficha del edificio. Las piezas
+    // viven en su hoja y el color de cada una, en su barra.
+    box.appendChild(this.buildPanel());
   }
 
   /** Las plantillas por las que empezar (o volver a empezar) un modelo. */
@@ -2049,14 +2104,14 @@ export class Studio {
     this.design.parts.forEach((p, i) => {
       const li = document.createElement('li');
       li.className = 'studio-part' + (i === this.selected ? ' active' : '');
+      const thumb = this.partThumb(p, 34);
+      thumb.className = 'studio-part-thumb';
       const swatch = document.createElement('i');
       swatch.className = 'studio-swatch';
-      swatch.style.background = p.m === PLAYER_MAT
-        ? PLAYER_COLORS[this.colorIdx].main
-        : (this.design.palette[p.m] || DEFAULT_PALETTE[p.m] || '#888');
+      swatch.style.background = this.matColor(p.m);
       const name = document.createElement('span');
-      name.textContent = `${PARTS[p.k].glyph} ${PARTS[p.k].label}`;
-      li.append(swatch, name);
+      name.textContent = PARTS[p.k].label;
+      li.append(thumb, swatch, name);
       li.onclick = () => { this.selected = i; this.renderPanel(); this.redraw(); };
       list.appendChild(li);
     });
@@ -2257,59 +2312,6 @@ export class Studio {
     return wrap;
   }
 
-  /** Los colores del edificio: sólo los materiales que usa de verdad. */
-  colorPanel() {
-    const wrap = document.createElement('div');
-    const used = new Set(this.design.parts.map((p) => p.m).filter((m) => m !== PLAYER_MAT));
-    used.add('wood');
-    const rows = [];
-    for (const m of MATERIALS) {
-      if (!used.has(m.key)) continue;
-      rows.push(this.colorField(m));
-    }
-    const note = document.createElement('p');
-    note.className = 'studio-hint-text';
-    note.textContent = used.size
-      ? 'Sólo salen los materiales que usa alguna pieza. El color del jugador no se elige aquí: lo pone quien construya el edificio.'
-      : 'Añade piezas para poder darles color.';
-    wrap.appendChild(note);
-    if (rows.length) wrap.appendChild(group('Colores', rows));
-
-    const others = document.createElement('details');
-    others.className = 'studio-more';
-    const sum = document.createElement('summary');
-    sum.textContent = 'Los demás materiales';
-    others.appendChild(sum);
-    const rest = MATERIALS.filter((m) => !used.has(m.key)).map((m) => this.colorField(m));
-    if (rest.length) others.appendChild(group('', rest));
-    wrap.appendChild(others);
-    return wrap;
-  }
-
-  colorField(m) {
-    const row = document.createElement('label');
-    row.className = 'cat-field';
-    const name = document.createElement('span');
-    name.className = 'cat-label';
-    name.textContent = m.label;
-    const input = document.createElement('input');
-    input.type = 'color';
-    input.value = this.design.palette[m.key] || m.def;
-    const apply = () => {
-      this.design.palette[m.key] = input.value.toLowerCase();
-      this.redraw();
-    };
-    input.oninput = () => {
-      // Mientras se arrastra el selector se ve el resultado, pero sin guardar en
-      // cada movimiento del ratón.
-      clearTimeout(this.colorTimer);
-      apply();
-      this.colorTimer = setTimeout(() => { this.persist(); this.schedulePreview(); }, 120);
-    };
-    input.onchange = () => { apply(); this.persist(); this.schedulePreview(); };
-    row.append(name, input);
-    return row;
-  }
 }
 
 // --- Ayudas -----------------------------------------------------------------
