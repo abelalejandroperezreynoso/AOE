@@ -77,9 +77,6 @@ export class Studio {
   bind() {
     el('btn-studio').onclick = () => this.open();
     el('btn-studio-close').onclick = () => this.back();
-    el('btn-studio-reset').onclick = (e) => this.confirmReset(e.currentTarget);
-    el('btn-studio-share').onclick = () => this.openShare('export');
-    el('btn-studio-import').onclick = () => this.openShare('import');
     el('btn-share-close').onclick = () => el('studio-share').classList.add('hidden');
     // Tocar el fondo del diálogo también lo cierra, como en cualquier ventana.
     el('studio-share').onclick = (e) => {
@@ -140,7 +137,7 @@ export class Studio {
   showTab(tab) {
     // Un edificio con la cara de siempre no tiene piezas ni colores que tocar:
     // lo que hace falta es la pantalla de empezar, que es la de «Edificio».
-    if (!this.design && tab !== 'list') tab = 'build';
+    if (!this.design) tab = 'build';
     const card = el('studio-card');
     if (tab === this.tab && card.dataset.sheet !== 'off') { this.foldSheet(true); return; }
     this.setTab(tab);
@@ -154,7 +151,6 @@ export class Studio {
     for (const b of document.querySelectorAll('#studio-tabs button')) {
       b.classList.toggle('active', b.dataset.tab === tab);
     }
-    el('studio-card').dataset.mtab = tab;
   }
 
   /** Pliega la hoja de los paneles para dejar el modelo a pantalla completa. */
@@ -181,7 +177,6 @@ export class Studio {
     el('studio').classList.remove('hidden');
     this.renderTools();
     this.restoreRef();
-    this.renderList();
     // Lo primero es elegir a quién se le cambia la cara: sin edificio no hay
     // nada que modelar, y entrar directo al último dejaba la mesa puesta con
     // uno que a lo mejor no era el que se venía a tocar.
@@ -256,7 +251,7 @@ export class Studio {
     this.cancelReset();
     // Sin modelo propio no hay piezas ni colores: la pestaña que sirve es la
     // del edificio, que es donde están las plantillas.
-    this.setTab(!this.design && this.tab !== 'list' ? 'build' : this.tab);
+    this.setTab(this.design ? this.tab : 'build');
     if (desdeLaParrilla) {
       this.foldSheet(true);
       if (window.matchMedia('(max-width: 620px), (max-height: 520px)').matches) this.foldPreview(true);
@@ -264,7 +259,6 @@ export class Studio {
     // El encaje va después de plegar: mide el hueco que le queda al lienzo, y
     // plegando después se habría quedado con la medida de antes.
     this.fit();
-    this.renderList();
     this.renderPanel();
     this.redraw();
     this.schedulePreview();
@@ -282,7 +276,7 @@ export class Studio {
   }
 
   /** Le devuelve al edificio la cara que tenía antes de tocarlo. */
-  confirmReset(btn = el('btn-studio-reset')) {
+  confirmReset(btn) {
     if (!isCustom(this.type)) return;
     if (!this.confirming) {
       this.confirming = true;
@@ -355,7 +349,7 @@ export class Studio {
           if (!this.isOpen()) { /* nada que enseñar */ }
           else if (this.vista === 'elegir') this.renderPick();
           else if (r.changed.includes(this.type)) this.load(this.type);
-          else { this.renderList(); this.schedulePreview(); }
+          else this.schedulePreview();
         }
         this.showCloud('al día', 'Lo que hay aquí es lo que ve todo el mundo.');
       });
@@ -406,7 +400,9 @@ export class Studio {
     const saved = saveDesign(this.design, this.type);
     if (!saved) { this.status('No se ha podido guardar.'); return; }
     this.afterSave();
-    this.renderList();
+    // Con el primer guardado el edificio pasa a tener modelo propio, y con él
+    // se habilitan compartir y restablecer.
+    this.refreshActions();
   }
 
   /**
@@ -450,19 +446,16 @@ export class Studio {
 
   // --- Lista de edificios -----------------------------------------------------
 
-  renderList() {
-    this.fillList(el('studio-list'));
-    // En pantallas pequeñas la lista vive en la hoja de abajo, en su pestaña.
-    if (this.tab === 'list') this.fillList(el('studio-panel').querySelector('.studio-list-panel'));
-    el('btn-studio-reset').disabled = !isCustom(this.type);
-    el('btn-studio-share').disabled = !this.design;
+  /**
+   * Pone al día lo que se puede hacer con el edificio que hay en la mesa, sin
+   * rehacer el panel entero: compartir pide un modelo propio y restablecer,
+   * que se le haya tocado algo. Cambian al guardar por primera vez.
+   */
+  refreshActions() {
+    for (const b of document.querySelectorAll('.studio-reset-btn')) b.disabled = !isCustom(this.type);
+    for (const b of document.querySelectorAll('.studio-share-btn')) b.disabled = !this.design;
   }
 
-  /**
-   * Los edificios del juego, todos, con la cara que tengan ahora mismo. La
-   * lista es la misma siempre: aquí no se añaden ni se quitan edificios, sólo
-   * se les cambia el modelo.
-   */
   /** Con qué cara anda ahora mismo un edificio. */
   lookOf(type) {
     if (isCustom(type)) return 'Rehecho en el taller';
@@ -470,8 +463,8 @@ export class Studio {
   }
 
   /**
-   * La parrilla de la pantalla de elegir: los mismos edificios que la lista de
-   * la columna, pero con la cara grande, que es lo que se mira para decidir.
+   * La parrilla de la pantalla de elegir, que es la única lista de edificios
+   * que hay: cada uno con la cara grande, que es lo que se mira para decidir.
    */
   renderPick() {
     const grid = el('studio-pick-grid');
@@ -497,56 +490,6 @@ export class Studio {
     }
   }
 
-  fillList(list) {
-    if (!list) return;
-    list.innerHTML = '';
-    for (const type of BUILDING_ORDER) {
-      const def = BUILDINGS[type];
-      const li = document.createElement('li');
-      li.className = 'cat-item' + (type === this.type ? ' active' : '');
-      const thumb = this.thumb(type, 44);
-      thumb.className = 'cat-thumb';
-      const text = document.createElement('div');
-      text.className = 'cat-text';
-      const n = document.createElement('div');
-      n.className = 'cat-name';
-      n.textContent = def.name;
-      const sub = document.createElement('div');
-      sub.className = 'cat-sub';
-      sub.textContent = `${this.lookOf(type)} · ${def.size}×${def.size} · ${AGES[def.age].short}`;
-      text.append(n, sub);
-      li.append(thumb, text);
-      li.onclick = () => this.load(type);
-      list.appendChild(li);
-    }
-  }
-
-  /** La misma lista, con sus botones, para la hoja del móvil. */
-  listPanel() {
-    const wrap = document.createElement('div');
-    const ul = document.createElement('ul');
-    ul.className = 'catalog-list studio-list-panel';
-    this.fillList(ul);
-    const mk = (text, fn, cls = '') => {
-      const b = document.createElement('button');
-      b.textContent = text;
-      b.className = cls;
-      b.onclick = fn;
-      return b;
-    };
-    const acts = document.createElement('div');
-    acts.className = 'studio-actions';
-    const share = mk('Compartir', () => this.openShare('export'));
-    share.disabled = !this.design;
-    acts.append(share, mk('Importar', () => this.openShare('import')));
-    const acts2 = document.createElement('div');
-    acts2.className = 'studio-actions';
-    const undo = mk('Restablecer', (e) => this.confirmReset(e.currentTarget), 'studio-del studio-reset-btn');
-    undo.disabled = !isCustom(this.type);
-    acts2.append(undo);
-    wrap.append(ul, acts, acts2);
-    return wrap;
-  }
 
   /** Miniatura horneada de un edificio, con la cara que tenga, en su hueco. */
   thumb(type, size) {
@@ -719,7 +662,6 @@ export class Studio {
         PLAYER_COLORS.map((c, i) => [String(i), c.name]), (v) => {
           this.colorIdx = Number(v);
           this.redraw();
-          this.renderList();
           this.schedulePreview();
         }));
       pop.appendChild(checkRow('Ver la vista previa', !this.foldedPreview, (on) => {
@@ -1783,9 +1725,6 @@ export class Studio {
   renderPanel() {
     const box = el('studio-panel');
     box.innerHTML = '';
-    // "Edificios" trae la lista a la hoja: en un móvil no hay sitio para
-    // tenerla siempre en una columna aparte.
-    if (this.tab === 'list') { box.appendChild(this.listPanel()); return; }
     if (!this.type) {
       box.innerHTML = '<p class="cat-empty">Elige un edificio para empezar.</p>';
       return;
@@ -1951,6 +1890,9 @@ export class Studio {
     desc.className = 'studio-hint-text';
     desc.textContent = def.desc;
     wrap.append(h, desc);
+    // Antes que la ficha: en la hoja del teléfono lo que va detrás queda
+    // siempre fuera de vista, y estos tres son lo que se viene a hacer.
+    wrap.appendChild(this.buildingActions(type));
 
     const rows = [
       infoRow('Huella', `${def.size}×${def.size} casillas`),
@@ -1982,19 +1924,6 @@ export class Studio {
       return wrap;
     }
 
-    const acts = document.createElement('div');
-    acts.className = 'studio-actions';
-    const undo = document.createElement('button');
-    undo.className = 'studio-del studio-reset-btn';
-    undo.textContent = 'Restablecer';
-    undo.title = isBuiltin(type)
-      ? 'Vuelve al modelo que trae el juego'
-      : 'Vuelve al aspecto original del edificio';
-    undo.disabled = !isCustom(type);
-    undo.onclick = (e) => this.confirmReset(e.currentTarget);
-    acts.appendChild(undo);
-    wrap.appendChild(acts);
-
     // Volver a empezar se deja plegado: es tirar lo hecho, no algo de todos los días.
     const again = document.createElement('details');
     again.className = 'studio-more';
@@ -2002,6 +1931,43 @@ export class Studio {
     sum.textContent = 'Empezar de nuevo';
     again.append(sum, this.templateList('Cambiar por...'));
     wrap.appendChild(again);
+    return wrap;
+  }
+
+  /**
+   * Lo que se puede hacer con el edificio de la mesa. Vivía en una columna
+   * aparte con la lista de edificios; quitada la lista —el edificio ya se elige
+   * al entrar—, su sitio es la ficha del edificio, que es de lo que hablan.
+   */
+  buildingActions(type) {
+    const wrap = document.createElement('div');
+    const mk = (text, title, fn, cls = '') => {
+      const b = document.createElement('button');
+      b.textContent = text;
+      b.title = title;
+      b.className = cls;
+      b.onclick = fn;
+      return b;
+    };
+
+    const pasa = document.createElement('div');
+    pasa.className = 'studio-actions';
+    const share = mk('Compartir', 'Saca el modelo como texto para llevarlo a otro sitio',
+      () => this.openShare('export'), 'studio-share-btn');
+    share.disabled = !this.design;
+    pasa.append(share, mk('Importar', 'Pega aquí un modelo que te hayan pasado',
+      () => this.openShare('import')));
+    wrap.appendChild(pasa);
+
+    const deshacer = document.createElement('div');
+    deshacer.className = 'studio-actions';
+    const undo = mk('Restablecer', isBuiltin(type)
+      ? 'Vuelve al modelo que trae el juego'
+      : 'Vuelve al aspecto original del edificio',
+      (e) => this.confirmReset(e.currentTarget), 'studio-del studio-reset-btn');
+    undo.disabled = !isCustom(type);
+    deshacer.appendChild(undo);
+    wrap.appendChild(deshacer);
     return wrap;
   }
 
