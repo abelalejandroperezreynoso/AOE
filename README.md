@@ -161,10 +161,14 @@ le hace otra cara. Lo que cuesta, lo que aguanta y lo que hace lo sigue poniendo
 el juego (y el catálogo, si se retoca allí), así que el taller cambia cómo se ve
 una partida sin poder desequilibrarla. Y siempre se puede **restablecer**.
 
-En la columna de la izquierda están **todos los edificios del juego**, en el
-mismo orden de la barra de obra, con la cara que tengan ahora mismo y una línea
-que dice de quién es esa cara: la original del juego, la que trae hecha el juego
-o la que le has hecho tú.
+**Lo primero al entrar es elegir el edificio**: una parrilla con todos los del
+juego, en el mismo orden de la barra de obra, cada uno con la cara que tenga
+ahora mismo y una línea que dice de quién es esa cara —la original del juego, la
+que trae hecha el juego o la que le has hecho tú—. Al elegir uno se pone en la
+mesa; **Elegir otro** vuelve a la parrilla, y desde ella se sale al menú. La
+misma lista queda en la columna de la izquierda para cambiar de edificio sin
+salir de la mesa (en el teléfono, en la pestaña «Edificios» de la hoja de
+abajo).
 
 Un modelo se arma con **piezas** —cajas, cilindros, cúpulas, tejados a dos y a
 cuatro aguas, faldones, vigas, ruedas, almenas, torreones, puertas, ventanas,
