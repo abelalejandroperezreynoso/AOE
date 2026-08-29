@@ -235,11 +235,15 @@ Para colocar:
 
 El taller cabe en un teléfono sin renunciar a nada:
 
-- La **mesa se lleva toda la pantalla** y los paneles pasan a una hoja de abajo
-  con pestañas —Pieza, Edificio, Colores y Edificios—, de la que sólo se ve una
-  cosa a la vez. Se **pliega** con el botón de la esquina o tocando otra vez la
-  pestaña que ya está puesta, y entonces el modelo pasa del 43 % de la tarjeta
-  al 89 %. En apaisado la tira de pestañas se pone de pie a la derecha.
+- El taller va **de borde a borde**, sin tarjeta ni marco: sólo respeta las
+  zonas seguras del aparato.
+- **Los mandos, arriba; el modelo, abajo.** Bajo la cabecera van las pestañas
+  —Pieza, Edificio, Colores y Edificios—, el panel que toque, las herramientas
+  y la cruceta, y el modelo se lleva de una pieza todo lo que queda, sin filas
+  de botones partiéndolo por el pie. De los paneles sólo se ve uno a la vez, y
+  se **pliegan** con el botón de la esquina o tocando otra vez la pestaña que
+  ya está puesta: entonces el modelo pasa del 43 % de la pantalla al 89 %. En
+  apaisado la tira de pestañas se pone de pie a la derecha.
 - **Un dedo** elige y arrastra piezas; con el botón **Altura** puesto, ese mismo
   arrastre las sube y las baja. **Dos dedos** acercan, alejan y mueven la vista,
   y nunca descolocan la pieza: al apoyar el segundo dedo, lo que hubiera movido

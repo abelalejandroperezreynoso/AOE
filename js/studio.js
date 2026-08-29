@@ -1100,9 +1100,11 @@ export class Studio {
     const box = el('studio-view').getBoundingClientRect();
     const W = Math.max(120, box.width), H = Math.max(120, box.height);
     const { x0, y0, x1, y1 } = this.modelBounds();
-    // Arriba está la cinta de datos y abajo la cruceta: el modelo se encaja en
-    // lo que queda entre las dos, para que no lo tapen.
-    const pad = 18, top = 24, bottom = 44;
+    // Arriba están la cinta de datos y la cruceta, una debajo de otra: el
+    // modelo se encaja por debajo de las dos, para que no lo tapen. Se reserva
+    // el hueco aunque no haya pieza elegida, o el modelo daría un salto cada
+    // vez que la cruceta aparece y desaparece.
+    const pad = 18, top = 68, bottom = 18;
     const usable = Math.max(60, H - top - bottom);
     // El suelo es sólo para que un modelo diminuto no quede invisible: por
     // encima de lo que cabe no puede ir, o el castillo se sale del lienzo en un
