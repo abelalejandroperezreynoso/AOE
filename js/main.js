@@ -11,13 +11,17 @@ import { Catalog } from './catalog.js';
 import { Studio } from './studio.js';
 import { loadOverrides, adoptOverrides, rebaseBuildingLooks } from './data/overrides.js';
 import { loadDesigns, adoptDesigns, syncDesigns } from './data/designs.js';
+import { loadPieces, syncPieces } from './data/pieces.js';
 import { clearSpriteCaches } from './sprites.js';
 
 const el = (id) => document.getElementById(id);
 
-// Primero las caras que el jugador les haya hecho a los edificios en el taller,
-// porque fijan los colores de partida de los que vista; encima de eso se
-// aplican los valores y los retoques guardados en el catálogo.
+// Primero las piezas que se hayan hecho en el taller: un edificio puede llevar
+// alguna puesta, y sin darlas de alta antes el validador de modelos la tiraría
+// por no existir. Después las caras de los edificios, porque fijan los colores
+// de partida de los que vista; encima de eso, los valores y los retoques del
+// catálogo.
+loadPieces();
 loadDesigns();
 loadOverrides();
 
@@ -29,7 +33,9 @@ loadOverrides();
  * modelos a mitad de partida dejaría edificios que se dibujan de otra forma de
  * un fotograma al siguiente.
  */
-syncDesigns().then((r) => rebaseBuildingLooks(r.changed));
+// Las piezas van delante también aquí: si en la nube hay una nueva y un modelo
+// que la lleva, el modelo tiene que leerse con la pieza ya de alta.
+syncPieces().then(() => syncDesigns()).then((r) => rebaseBuildingLooks(r.changed));
 const catalog = new Catalog();
 const studio = new Studio();
 
