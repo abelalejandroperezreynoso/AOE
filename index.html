@@ -18,7 +18,6 @@
     <p class="subtitle">Estrategia medieval en tiempo real · homenaje a los clásicos del género</p>
 
     <button id="btn-new" class="primary">Comenzar partida</button>
-    <button id="btn-multi" class="secondary">Jugar con otra persona</button>
     <button id="btn-catalog" class="secondary">Catálogo del juego</button>
     <button id="btn-studio" class="secondary">Taller de edificios</button>
     <button id="btn-fullscreen-menu" class="secondary fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
@@ -33,14 +32,27 @@
   </div>
 </div>
 
-<!-- ---------- Ajustes de la partida ---------- -->
+<!-- ---------- Nueva partida: contra la máquina o con otra persona ---------- -->
 <div id="setup" class="overlay hidden">
-  <div class="menu-card">
+  <div class="menu-card" id="setup-card" data-modo="solo">
     <h2>Nueva partida</h2>
-    <p class="subtitle">Contra la máquina. Si no tocas nada, se juega con lo de siempre.</p>
+
+    <!-- Contra quién se juega manda sobre lo que se pregunta debajo: cada modo
+         enseña sus opciones y esconde las del otro. -->
+    <div id="setup-modos" class="modo-tabs">
+      <button data-elige="solo" class="active">Contra la máquina</button>
+      <button data-elige="red">Con otra persona</button>
+    </div>
+
+    <p class="subtitle" data-modo="solo">Si no tocas nada, se juega con lo de siempre.</p>
+    <p class="subtitle" data-modo="red">De dos a ocho jugadores, cada quien desde su dispositivo.</p>
 
     <div class="options">
-      <label>
+      <label data-modo="red">
+        <span>Tu nombre</span>
+        <input id="lobby-name" type="text" maxlength="20" placeholder="¿Cómo te llamas?" autocomplete="nickname">
+      </label>
+      <label data-modo="solo">
         <span>Rivales</span>
         <select id="opt-opponents">
           <option value="1" selected>1 rival</option>
@@ -52,7 +64,7 @@
           <option value="7">7 rivales</option>
         </select>
       </label>
-      <label>
+      <label data-modo="solo">
         <span>Dificultad</span>
         <select id="opt-difficulty">
           <option value="easy">Fácil</option>
@@ -60,6 +72,8 @@
           <option value="hard">Difícil</option>
         </select>
       </label>
+      <!-- El tamaño lo preguntan los dos modos, así que es el mismo control:
+           en red vale el del anfitrión, que es quien monta la partida. -->
       <label>
         <span>Tamaño del mapa</span>
         <select id="opt-size">
@@ -68,15 +82,18 @@
           <option value="80">Grande</option>
           <option value="96">Enorme</option>
         </select>
-        <small class="hint">Con muchos rivales el mapa se agranda solo para que quepan todas las bases.</small>
       </label>
-      <label>
+      <label data-modo="solo">
         <span>Semilla del mapa</span>
         <input id="opt-seed" type="text" inputmode="numeric" placeholder="aleatoria">
       </label>
+      <small class="hint" data-modo="solo">Con muchos rivales el mapa se agranda solo para que quepan todas las bases.</small>
+      <small class="hint" data-modo="red">Manda el tamaño de quien invita, y se agranda solo si hay muchos jugadores.</small>
     </div>
 
-    <button id="btn-start" class="primary">Comenzar</button>
+    <button id="btn-start" class="primary" data-modo="solo">Comenzar</button>
+    <button id="btn-lobby-enter" class="primary" data-modo="red">Entrar en la sala</button>
+    <div id="setup-error" class="lobby-error hidden"></div>
     <button id="btn-setup-back" class="secondary">Volver al menú</button>
   </div>
 </div>
@@ -207,58 +224,35 @@
 <!-- ---------- Sala de espera (multijugador) ---------- -->
 <div id="lobby" class="overlay hidden">
   <div class="menu-card">
-    <h2>Jugar con otras personas</h2>
-    <p class="subtitle">De dos a ocho jugadores, cada quien desde su dispositivo.</p>
+    <h2>Sala de espera</h2>
 
-    <div id="lobby-join">
-      <div class="options">
-        <label>
-          <span>Tu nombre</span>
-          <input id="lobby-name" type="text" maxlength="20" placeholder="¿Cómo te llamas?" autocomplete="nickname">
-        </label>
-        <label>
-          <span>Tamaño del mapa</span>
-          <select id="lobby-size">
-            <option value="48">Pequeño</option>
-            <option value="64" selected>Mediano</option>
-            <option value="80">Grande</option>
-            <option value="96">Enorme</option>
-          </select>
-          <small class="hint">Lo elige el anfitrión, y se agranda solo si hay muchos jugadores.</small>
-        </label>
-      </div>
-      <button id="btn-lobby-enter" class="primary">Entrar en la sala</button>
+    <div class="lobby-head">
+      <span>Conectado como <b id="lobby-me"></b></span>
+      <span id="lobby-status" class="lobby-status">Buscando jugadores...</span>
     </div>
 
-    <div id="lobby-room" class="hidden">
-      <div class="lobby-head">
-        <span>Conectado como <b id="lobby-me"></b></span>
-        <span id="lobby-status" class="lobby-status">Buscando jugadores...</span>
+    <div class="lobby-cols">
+      <div class="lobby-col">
+        <h3>En la sala <small id="lobby-count"></small></h3>
+        <ul id="lobby-players" class="lobby-list"></ul>
       </div>
-
-      <div class="lobby-cols">
-        <div class="lobby-col">
-          <h3>En la sala <small id="lobby-count"></small></h3>
-          <ul id="lobby-players" class="lobby-list"></ul>
-        </div>
-        <div id="lobby-party-box" class="lobby-col hidden">
-          <h3>Tu partida <small id="lobby-party-count"></small></h3>
-          <ul id="lobby-party" class="lobby-list"></ul>
-          <button id="btn-lobby-start" class="primary hidden">Empezar partida</button>
-          <button id="btn-lobby-cancel" class="secondary">Cancelar partida</button>
-        </div>
+      <div id="lobby-party-box" class="lobby-col hidden">
+        <h3>Tu partida <small id="lobby-party-count"></small></h3>
+        <ul id="lobby-party" class="lobby-list"></ul>
+        <button id="btn-lobby-start" class="primary hidden">Empezar partida</button>
+        <button id="btn-lobby-cancel" class="secondary">Cancelar partida</button>
       </div>
-
-      <p class="lobby-hint">
-        Quien invita hace de anfitrión: su dispositivo lleva la partida de todos,
-        así que conviene que sea el de mejor conexión. Puede invitar a varias
-        personas y empezar cuando estén listas; y quien llegue después siempre
-        puede pedirle unirse. Comparte esta página para que aparezcan aquí.
-      </p>
-      <button id="btn-lobby-leave" class="secondary">Salir de la sala</button>
     </div>
+
+    <p class="lobby-hint">
+      Quien invita hace de anfitrión: su dispositivo lleva la partida de todos,
+      así que conviene que sea el de mejor conexión. Puede invitar a varias
+      personas y empezar cuando estén listas; y quien llegue después siempre
+      puede pedirle unirse. Comparte esta página para que aparezcan aquí.
+    </p>
 
     <div id="lobby-error" class="lobby-error hidden"></div>
+    <button id="btn-lobby-leave" class="secondary">Salir de la sala</button>
   </div>
 </div>
 
@@ -335,7 +329,7 @@
       <tr><td>Supr</td><td>Eliminar lo seleccionado</td></tr>
       <tr><td>P / Esc o el botón ☰</td><td>Pausa y menú: edad, tiempo, velocidad, pantalla completa, volumen y ayuda</td></tr>
       <tr><td>F11 o el menú</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
-      <tr><td>Multijugador</td><td>Desde el menú principal: entra en la sala, elige a alguien e invítalo</td></tr>
+      <tr><td>Multijugador</td><td>En Comenzar partida, modo «Con otra persona»: entra en la sala, elige a alguien e invítalo</td></tr>
       <tr><td>Catálogo</td><td>Desde el menú principal: consulta y edita los valores y el aspecto de todo el juego</td></tr>
       <tr><td>Taller de edificios</td><td>Desde el menú principal: modela tus propios edificios con piezas y constrúyelos en la partida como uno más. Con el ratón, arrastra para mover y Mayús para subir y bajar; con el dedo, uno arrastra la pieza y dos acercan y mueven la vista. La cruceta de debajo del modelo la coloca al detalle. Las piezas y los controles de vista están en menús desplegables, y la vista previa y el panel se pliegan para dejar la pantalla libre. Con Compartir e Importar, un edificio se copia como texto y se lleva a otro dispositivo o a otra persona. En Guía se pone una imagen de referencia debajo del modelo para calcarla</td></tr>
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>

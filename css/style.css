@@ -128,7 +128,22 @@ html, body {
   font-family: inherit;
 }
 .options select:focus, .options input:focus { outline: 2px solid var(--gold); }
-.options .hint { font-size: 11.5px; color: #8e7c5c; line-height: 1.4; }
+/* La nota es de la rejilla, no de una opción: puesta dentro de una columna la
+   estiraba y dejaba la de al lado a media altura. */
+.options .hint { grid-column: 1 / -1; font-size: 11.5px; color: #8e7c5c; line-height: 1.4; }
+
+/* Contra quién se juega: manda sobre el resto de la pantalla, así que se
+   pregunta arriba y en dos mitades iguales. */
+.modo-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.modo-tabs button { flex: 1; padding: 8px 10px; font-size: 14px; }
+.modo-tabs button.active {
+  background: linear-gradient(180deg, #b8912f, #7c5c17);
+  border-color: #e0c470; color: #241a08; font-weight: bold;
+}
+
+/* Cada modo enseña lo suyo y esconde lo del otro. */
+#setup-card[data-modo="solo"] [data-modo="red"],
+#setup-card[data-modo="red"] [data-modo="solo"] { display: none; }
 
 button {
   font-family: inherit;
@@ -1230,6 +1245,9 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   .menu-card h2 { font-size: clamp(20px, 6.5vw, 28px); margin-bottom: 10px; }
   .subtitle { font-size: 12px; margin-bottom: 14px; line-height: 1.4; }
   .options { grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 8px; margin-bottom: 14px; }
+  /* En negrita el rótulo del modo activo crece y partía en dos líneas, y la
+     fila cambiaba de alto al cambiar de modo. */
+  .modo-tabs button { padding: 8px 4px; font-size: 13px; }
   .options label { font-size: 12px; gap: 3px; }
   .options select, .options input { padding: 7px 8px; font-size: 13.5px; }
   button.primary { font-size: 16px; padding: 11px 20px; }

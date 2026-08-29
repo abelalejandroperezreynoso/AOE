@@ -51,8 +51,9 @@ El repositorio está listo para desplegarse tal cual:
 
 De dos a ocho jugadores, cada quien desde su dispositivo:
 
-1. En el menú principal, **Jugar con otras personas**.
-2. Escribe tu nombre y entra en la sala. Verás a quienes estén conectados.
+1. **Comenzar partida** y, arriba, el modo **Con otra persona**.
+2. Escribe tu nombre, elige el tamaño del mapa y entra en la sala. Verás a
+   quienes estén conectados.
 3. Pulsa **Invitar** en cada persona que quieras meter en tu partida. Según van
    aceptando aparecen en «Tu partida», con el color que les tocará.
 4. Cuando estén listas, pulsa **Empezar partida**. Arranca en todos los
