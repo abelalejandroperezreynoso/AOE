@@ -273,7 +273,12 @@ El taller cabe en un teléfono sin renunciar a nada:
   y nunca descolocan la pieza: al apoyar el segundo dedo, lo que hubiera movido
   el primero se deshace.
 - Los toques tienen **margen**: si no aciertas de lleno en una pieza se coge la
-  que tengas más cerca, que un dedo tapa más de lo que apunta.
+  que tengas más cerca, que un dedo tapa más de lo que apunta. El margen es de
+  toda su silueta, no sólo de su punto de anclaje, y dentro de él **manda la
+  pieza que ya estuviera elegida**: fallar por unos píxeles junto a la que
+  estás colocando no la suelta ni salta a la de al lado. Para cambiar de pieza
+  se toca encima, que un acierto de lleno siempre gana; y para soltarla, en el
+  suelo, lejos de todo.
 - Los números llevan botones de **menos y más** para afinar sin sacar el
   teclado.
 

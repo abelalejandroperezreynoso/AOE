@@ -361,7 +361,7 @@ export class Studio {
           // los ha tirado `rebaseBuildingLooks` y la partida los rehará.
           if (!this.isOpen()) { /* nada que enseñar */ }
           else if (this.vista === 'elegir') this.renderPick();
-          else if (r.changed.includes(this.type)) this.load(this.type);
+          else if (r.changed.includes(this.type)) this.refreshFromCloud();
           else this.schedulePreview();
         }
         this.showCloud('al día', 'Lo que hay aquí es lo que ve todo el mundo.');
@@ -369,6 +369,28 @@ export class Studio {
     };
     if (now) go();
     else this.cloudTimer = setTimeout(go, 1200);
+  }
+
+  /**
+   * El edificio que hay en la mesa ha cambiado en la nube. Antes se recargaba
+   * entero con `load()`, que suelta la pieza elegida y vacía el deshacer: a
+   * mitad de colocar una pieza, eso es perderla sin motivo. Ahora, si lo que
+   * llega es lo que ya tenemos —lo normal, que es el eco de lo que acabamos de
+   * mandar—, no se toca nada; y si de verdad viene distinto, se repone la copia
+   * de trabajo sin soltar la pieza.
+   */
+  refreshFromCloud() {
+    // Con algo sin guardar todavía manda lo de aquí: es más nuevo que lo que
+    // la nube pueda devolver, y pisarlo se llevaría lo que se acaba de colocar.
+    if (this.saveTimer) return;
+    const base = getDesign(this.type);
+    if (JSON.stringify(base ?? null) === JSON.stringify(this.design ?? null)) return;
+    this.design = base ? structuredClone(base) : null;
+    this.selected = Math.min(this.selected, (this.design?.parts.length ?? 0) - 1);
+    this.baked = null;
+    this.renderPanel();
+    this.redraw();
+    this.schedulePreview();
   }
 
   /** El estado de la nube, en la cinta de arriba del taller. */
@@ -1385,12 +1407,24 @@ export class Studio {
       if (pointInTri(px, py, it.pts)) return it.gi;
     }
     if (!slack) return -1;
-    let best = -1, bestD = slack * slack;
-    for (const a of this.anchors) {
-      const d = (a.x - px) ** 2 + (a.y - py) ** 2;
-      if (d < bestD) { bestD = d; best = a.gi; }
-    }
-    return best;
+    /*
+     * Nada justo debajo: se coge lo más cercano dentro del margen. El margen
+     * era sólo del punto de anclaje, así que fallar el dedo por unos píxeles
+     * contra el cuerpo de la pieza no la cogía y encima soltaba la que hubiera
+     * elegida. Ahora el margen es de toda su silueta.
+     */
+    const tope = slack * slack;
+    let best = -1, bestD = tope, dElegida = Infinity;
+    const mide = (gi, d) => {
+      if (gi === this.selected) dElegida = Math.min(dElegida, d);
+      if (d < bestD) { bestD = d; best = gi; }
+    };
+    for (const a of this.anchors) mide(a.gi, (a.x - px) ** 2 + (a.y - py) ** 2);
+    for (const it of this.picks) mide(it.gi, distToTri(px, py, it.pts));
+    // Dentro del margen manda la que ya estaba elegida: fallar el dedo junto a
+    // la pieza en la que se está trabajando no puede saltar a la de al lado.
+    // Para cambiar de pieza se toca encima, que eso siempre gana.
+    return dElegida <= tope ? this.selected : best;
   }
 
   /** Margen de acierto: con el dedo hace falta bastante más que con el ratón. */
@@ -2180,6 +2214,24 @@ function numberStepper(value, f, apply) {
   input.onkeydown = (e) => { if (e.key === 'Enter') input.blur(); };
   wrap.append(bump(-1), input, bump(1));
   return wrap;
+}
+
+/**
+ * Distancia al cuadrado de un punto al borde de un triángulo. Sirve para el
+ * margen de acierto: cuánto se ha fallado contra el cuerpo de una pieza.
+ */
+function distToTri(px, py, pts) {
+  let best = Infinity;
+  for (let i = 0; i < 3; i++) {
+    const [ax, ay] = pts[i];
+    const [bx, by] = pts[(i + 1) % 3];
+    const dx = bx - ax, dy = by - ay;
+    const largo = dx * dx + dy * dy;
+    const t = largo ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / largo)) : 0;
+    const qx = ax + t * dx - px, qy = ay + t * dy - py;
+    best = Math.min(best, qx * qx + qy * qy);
+  }
+  return best;
 }
 
 function clampField(key, v) {
