@@ -200,19 +200,28 @@ Para colocar:
 
 - **Se coloca arrastrando**: pulsa una pieza en el modelo y muévela por el
   suelo. La rueda acerca y aleja, y arrastrar el fondo mueve la vista.
-- Al elegir una pieza sale al pie del lienzo su **barra**, en cuatro piezas
-  redondeadas con los botones dentro separados por un pelo, al modo de los
-  mandos agrupados de iOS: las cuatro flechas **en cruz de dos por dos** la
-  empujan un paso de rejilla en la dirección que se ve; subir y bajar van **uno
-  encima de otro**; **estirar y encoger** tiene una columna por lado —ancho,
-  largo y alto—, con las flechas dobles apuntando por el mismo diagonal por el
-  que crece ese lado en la mesa; y duplicar y borrar cierran la fila. Las
+- Al elegir una pieza salen sus **dos barras**, con la misma hechura —grupos
+  redondeados de dos filas, al modo de los mandos agrupados de iOS—: **abajo,
+  dónde se pone**; **arriba, qué se le hace**.
+- **Abajo**: las cuatro flechas **en cruz de dos por dos** la empujan un paso de
+  rejilla en la dirección que se ve; subir y bajar van **uno encima de otro**; y
+  **estirar y encoger** tiene una columna por lado —ancho, largo y alto—, con
+  las flechas dobles apuntando por el mismo diagonal por el que crece ese lado
+  en la mesa. Las
   piezas no llaman igual a sus lados —la caja tiene ancho y fondo, el cilindro
   radios, la viga largo y grueso—, así que cada botón toca el campo que a esa
   pieza le hace de ese lado, los dos radios del cilindro a la vez para que no
   se vuelva cono, y se apaga en las que no lo tienen (un barril no se estira
   desde aquí). La barra es una rejilla de siete columnas, así que cabe igual en
-  un teléfono pequeño que en uno grande. Los iconos están dibujados a
+  un teléfono pequeño que en uno grande.
+- **Arriba**: **deshacer y rehacer**, **añadir** —la misma caja de piezas— y
+  **duplicar**, y el **color de la pieza** y **borrarla**. El botón del color
+  enseña el material que lleva y despliega los demás con su muestra, para
+  cambiarlo de un toque. Sus botones miden lo mismo que los de abajo porque
+  comparten su rejilla. Con la mesa muy corta —la hoja desplegada en un
+  teléfono pequeño— esta barra se aparta: lo suyo está también en la barra de
+  herramientas y en la ficha de la pieza, y lo de abajo, que es colocar, no
+  está en ninguna otra parte. Los iconos están dibujados a
   trazo, todos con el mismo grosor, y borrar se distingue por el color del
   icono y no por un botón rojo entero. Sin pieza elegida no hay barra: al poner
   un edificio en la mesa se llega a verlo, no con una pieza cogida de antemano.

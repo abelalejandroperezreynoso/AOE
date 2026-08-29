@@ -66,6 +66,7 @@ export class Studio {
     this.type = null;        // el edificio del juego que se está vistiendo
     this.design = null;      // copia de trabajo de su modelo (null: el del juego)
     this.selected = -1;      // índice de la pieza elegida
+    this.redo = [];          // lo deshecho, esperando a que lo rehagan
     this.tab = 'build';
     this.vista = 'elegir';   // 'elegir' los edificios o 'editor' la mesa
     this.colorIdx = 0;
@@ -140,6 +141,7 @@ export class Studio {
       window.addEventListener('resize', () => { if (this.isOpen()) this.redraw(); });
     }
     this.buildPad();
+    this.buildTopbar();
   }
 
   /**
@@ -260,6 +262,7 @@ export class Studio {
     // pieza sólo tiene sentido cuando hay una que mover.
     this.selected = -1;
     this.undo = [];
+    this.redo = [];
     this.baked = null;
     this.cancelReset();
     // Sin modelo propio no hay piezas ni colores: la pestaña que sirve es la
@@ -453,18 +456,37 @@ export class Studio {
 
   pushUndo() {
     if (!this.design) return;
-    this.undo.push(JSON.stringify({ parts: this.design.parts, sel: this.selected }));
+    this.undo.push(this.snapshot());
     if (this.undo.length > 40) this.undo.shift();
+    // Un cambio nuevo corta la rama: lo que se había deshecho ya no se rehace.
+    this.redo = [];
   }
 
-  undoLast() {
-    const snap = this.undo.pop();
-    if (!snap || !this.design) return;
+  /** El modelo y la pieza elegida, en texto, para las dos pilas. */
+  snapshot() {
+    return JSON.stringify({ parts: this.design.parts, sel: this.selected });
+  }
+
+  /** Repone un punto guardado. Vale para deshacer y para rehacer. */
+  restore(snap) {
     const state = JSON.parse(snap);
     this.design.parts = state.parts;
     this.selected = Math.min(state.sel, this.design.parts.length - 1);
     this.afterChange();
+  }
+
+  undoLast() {
+    if (!this.design || !this.undo.length) return;
+    this.redo.push(this.snapshot());
+    this.restore(this.undo.pop());
     this.status('Deshecho.');
+  }
+
+  redoLast() {
+    if (!this.design || !this.redo.length) return;
+    this.undo.push(this.snapshot());
+    this.restore(this.redo.pop());
+    this.status('Rehecho.');
   }
 
   /**
@@ -1097,8 +1119,10 @@ export class Studio {
     // encaja entre las dos, para que no lo tapen. El hueco de abajo se reserva
     // aunque no haya pieza elegida, o el modelo daría un salto cada vez que la
     // barra aparece y desaparece.
-    const pad = 18, top = 24;
-    const bottom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pad-h')) || 86;
+    const pad = 18;
+    const alto = this.padH();
+    const bottom = alto;
+    const top = 24 + (this.hayHuecoArriba() ? alto : 0);
     const usable = Math.max(60, H - top - bottom);
     // El suelo es sólo para que un modelo diminuto no quede invisible: por
     // encima de lo que cabe no puede ir, o el castillo se sale del lienzo en un
@@ -1622,7 +1646,12 @@ export class Studio {
     }
     const tag = document.activeElement?.tagName;
     if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); this.undoLast(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) this.redoLast(); else this.undoLast();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); this.redoLast(); return; }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') { e.preventDefault(); this.duplicatePart(); return; }
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); this.deletePart(); return; }
     if (!this.design?.parts[this.selected]) return;
@@ -1652,15 +1681,6 @@ export class Studio {
    */
   buildPad() {
     const pad = el('studio-pad');
-    /*
-     * Iconos de trazo en vez de caracteres: ▲ y ↖ los pinta la tipografía con
-     * pesos distintos —uno macizo y el otro un hilo— y en fila no parecían la
-     * misma familia. Dibujados aquí, todos llevan el mismo grosor y las mismas
-     * puntas redondas.
-     */
-    const icono = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"`
-      + ` stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"`
-      + ` aria-hidden="true">${d}</svg>`;
     const mk = (dibujo, title, fn, cls = '') => {
       const b = document.createElement('button');
       b.innerHTML = icono(dibujo);
@@ -1705,24 +1725,132 @@ export class Studio {
       mkEscala('h', '<path d="M12 3v6"/><path d="m8 5 4 4 4-4"/><path d="M12 21v-6"/><path d="m8 19 4-4 4 4"/>', 'Bajar el alto', -1),
     );
 
-    const acts = document.createElement('div');
-    acts.className = 'studio-pad-acts';
-    acts.append(
-      mk('<rect x="9" y="9" width="11" height="11" rx="3"/>'
-        + '<path d="M15.5 9V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v5.5a3 3 0 0 0 3 3h2"/>',
-        'Duplicar la pieza', () => this.duplicatePart()),
-      mk('<path d="M4.5 7h15"/><path d="M9.5 7V5.5a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2V7"/>'
-        + '<path d="M6.5 7l.8 11a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.5 7"/>'
-        + '<path d="M10.2 11v5M13.8 11v5"/>',
-        'Borrar la pieza', () => this.deletePart(), 'studio-del'),
-    );
     // Una rejilla, no una fila: cada grupo se lleva tantas columnas como
     // botones tiene de ancho, y así la barra cabe siempre, del teléfono
     // pequeño al grande, sin números de ancho escritos a mano.
     const rejilla = document.createElement('div');
     rejilla.className = 'studio-pad-grid';
-    rejilla.append(cross, lift, escala, acts);
+    rejilla.append(cross, lift, escala);
     pad.append(rejilla);
+  }
+
+  /**
+   * La barra de arriba: lo que se le hace a la pieza, no dónde se pone.
+   * Deshacer y rehacer, añadir y duplicar, y su color y borrarla. Misma
+   * hechura que la de abajo —grupos redondeados de dos filas— y el mismo
+   * tamaño de botón, porque comparte su rejilla de siete columnas.
+   */
+  buildTopbar() {
+    const bar = el('studio-topbar');
+    const mk = (dibujo, title, fn, cls = '') => {
+      const b = document.createElement('button');
+      b.innerHTML = icono(dibujo);
+      b.title = title;
+      b.setAttribute('aria-label', title);
+      b.className = cls;
+      if (fn) b.onclick = fn;
+      return b;
+    };
+    const grupo = (cls, ...hijos) => {
+      const g = document.createElement('div');
+      g.className = cls;
+      g.append(...hijos);
+      return g;
+    };
+
+    this.btnUndo = mk('<path d="M4 9h11a5 5 0 0 1 0 10h-6"/><path d="m8 5-4 4 4 4"/>',
+      'Deshacer [Ctrl+Z]', () => this.undoLast());
+    this.btnRedo = mk('<path d="M20 9H9a5 5 0 0 0 0 10h6"/><path d="m16 5 4 4-4 4"/>',
+      'Rehacer [Ctrl+Mayús+Z]', () => this.redoLast());
+
+    // Añadir abre la misma caja de piezas que la barra de herramientas.
+    const btnAdd = this.padMenu(bar, mk('<path d="M12 5v14M5 12h14"/>', 'Añadir una pieza', null), (pop) => {
+      const grid = document.createElement('div');
+      grid.className = 'studio-add-grid';
+      for (const b of this.paletteButtons()) grid.appendChild(b);
+      pop.appendChild(grid);
+    });
+
+    this.btnDup = mk('<rect x="9" y="9" width="11" height="11" rx="3"/>'
+      + '<path d="M15.5 9V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v5.5a3 3 0 0 0 3 3h2"/>',
+      'Duplicar la pieza', () => this.duplicatePart());
+
+    // El color de la pieza es el de su material: el botón enseña el que lleva y
+    // despliega los demás, con su muestra, para cambiarlo de un toque.
+    this.btnColor = mk('', 'Color de la pieza', null);
+    this.btnColor.innerHTML = '<i class="studio-swatch studio-swatch-big"></i>';
+    this.padMenu(bar, this.btnColor, (pop) => {
+      const part = this.design?.parts[this.selected];
+      if (!part) return;
+      const grid = document.createElement('div');
+      grid.className = 'studio-mat-grid';
+      const opciones = [...MATERIALS.map((m) => [m.key, m.label]), [PLAYER_MAT, 'Color del jugador']];
+      for (const [key, label] of opciones) {
+        const b = document.createElement('button');
+        b.className = 'studio-mat' + (part.m === key ? ' active' : '');
+        b.title = label;
+        const sw = document.createElement('i');
+        sw.className = 'studio-swatch';
+        sw.style.background = this.matColor(key);
+        const t = document.createElement('span');
+        t.textContent = label;
+        b.append(sw, t);
+        b.onclick = () => { closeMenus(); this.pushUndo(); part.m = key; this.afterChange(); };
+        grid.appendChild(b);
+      }
+      pop.appendChild(grid);
+    });
+
+    this.btnDel = mk('<path d="M4.5 7h15"/><path d="M9.5 7V5.5a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2V7"/>'
+      + '<path d="M6.5 7l.8 11a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.5 7"/>'
+      + '<path d="M10.2 11v5M13.8 11v5"/>',
+      'Borrar la pieza', () => this.deletePart(), 'studio-del');
+
+    const rejilla = document.createElement('div');
+    rejilla.className = 'studio-pad-grid';
+    rejilla.append(
+      grupo('studio-hist', this.btnUndo, this.btnRedo),
+      grupo('studio-make', btnAdd, this.btnDup),
+      grupo('studio-look', this.btnColor, this.btnDel),
+    );
+    bar.prepend(rejilla);
+  }
+
+  /**
+   * Un botón de barra con su menú. El menú se cuelga de la barra y no del
+   * grupo: los grupos recortan lo que se sale de sus esquinas redondeadas, y
+   * dentro se quedaba en una rendija detrás del grupo de al lado.
+   */
+  padMenu(bar, btn, build) {
+    const pop = document.createElement('div');
+    pop.className = 'studio-pop hidden';
+    pop.owner = btn;
+    pop.addEventListener('pointerdown', (e) => e.stopPropagation());
+    bar.appendChild(pop);
+    btn.addEventListener('pointerdown', (e) => e.stopPropagation());
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      const abierto = !pop.classList.contains('hidden');
+      closeMenus();
+      if (abierto) return;
+      pop.innerHTML = '';
+      build(pop);
+      pop.classList.remove('hidden');
+      btn.classList.add('on');
+      // Centrado bajo su botón, y sin salirse de la barra por ningún lado.
+      pop.style.left = '0px';
+      const b = btn.getBoundingClientRect(), caja = bar.getBoundingClientRect();
+      const ancho = pop.getBoundingClientRect().width;
+      const x = Math.min(Math.max(0, b.left - caja.left + (b.width - ancho) / 2), caja.width - ancho);
+      pop.style.left = `${Math.round(x)}px`;
+    };
+    return btn;
+  }
+
+  /** El color con el que se pinta un material en este modelo. */
+  matColor(key) {
+    if (key === PLAYER_MAT) return PLAYER_COLORS[this.colorIdx].main;
+    return this.design?.palette?.[key] || DEFAULT_PALETTE[key] || '#888';
   }
 
   /** Qué campo de esta pieza hace de ancho, de largo o de alto. */
@@ -1761,12 +1889,38 @@ export class Studio {
     this.afterChange();
   }
 
-  /** La barra de la pieza sólo está cuando hay una que empujar. */
+  /**
+   * Con la mesa muy corta —hoja desplegada en un teléfono pequeño— las dos
+   * barras y el modelo no caben, y el modelo se quedaría en un hilo. Entonces
+   * la de arriba se aparta: lo suyo está también en la barra de herramientas y
+   * en la ficha de la pieza, y lo de abajo, que es colocar, no está en ninguna
+   * otra parte.
+   */
+  hayHuecoArriba() {
+    return el('studio-stage').getBoundingClientRect().height >= 24 + 2 * this.padH() + 120;
+  }
+
+  /** Lo que mide de alto una de las dos barras, según lo diga la hoja. */
+  padH() {
+    return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pad-h')) || 86;
+  }
+
+  /** Las barras de la pieza sólo están cuando hay una pieza. */
   updatePad() {
     const part = this.design?.parts[this.selected];
     el('studio-pad').classList.toggle('hidden', !part);
+    el('studio-topbar').classList.toggle('hidden', !part || !this.hayHuecoArriba());
     for (const b of document.querySelectorAll('.studio-scale button')) {
       b.disabled = !part || !this.scaleField(part, b.dataset.eje);
+    }
+    if (this.btnUndo) {
+      this.btnUndo.disabled = !this.undo.length;
+      this.btnRedo.disabled = !this.redo.length;
+      this.btnDup.disabled = !part || this.design.parts.length >= MAX_PARTS;
+      this.btnDel.disabled = !part;
+      this.btnColor.disabled = !part;
+      const sw = this.btnColor.querySelector('.studio-swatch');
+      if (sw && part) sw.style.background = this.matColor(part.m);
     }
     el('studio-view').classList.toggle('lifting', this.moveMode === 'z');
   }
@@ -2127,10 +2281,24 @@ export class Studio {
 // --- Ayudas -----------------------------------------------------------------
 
 /** Cierra cualquier menú desplegable que hubiera abierto. */
+/*
+ * Iconos de trazo en vez de caracteres: ▲ y ↖ los pinta la tipografía con pesos
+ * distintos —uno macizo y el otro un hilo— y en fila no parecían la misma
+ * familia. Dibujados aquí, todos llevan el mismo grosor y las mismas puntas
+ * redondas, y las dos barras de la pieza tiran del mismo sitio.
+ */
+function icono(d) {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"`
+    + ` stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"`
+    + ` aria-hidden="true">${d}</svg>`;
+}
+
 function closeMenus() {
   for (const pop of document.querySelectorAll('.studio-pop:not(.hidden)')) {
     pop.classList.add('hidden');
-    pop.previousElementSibling?.classList.remove('on');
+    // Los de la barra de herramientas van pegados a su botón; los de las barras
+    // de la pieza cuelgan de la barra y apuntan al suyo a mano.
+    (pop.owner || pop.previousElementSibling)?.classList.remove('on');
   }
 }
 document.addEventListener('pointerdown', closeMenus);
