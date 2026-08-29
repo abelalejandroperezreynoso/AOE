@@ -21,7 +21,7 @@ import { PLAYER_COLORS, AGES, UNITS, BUILDINGS, BUILD_ORDER, RESOURCES, RES_NAME
 import { project, depth, faceLight, rotZ, bake, HW, HH, VZ } from './gfx3d/engine.js';
 import {
   PARTS, PART_KEYS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
-  DEFAULT_PALETTE, designParts, designMesh, MINE, isMine, minePartKeys,
+  DEFAULT_PALETTE, designParts, designMesh, MINE, isMine, minePartKeys, canExplode,
 } from './gfx3d/parts.js';
 import { buildingMesh } from './gfx3d/buildings.js';
 import {
@@ -2504,6 +2504,20 @@ export class Studio {
     hint.textContent = spec.hint;
     wrap.appendChild(hint);
 
+    // Las compuestas se pueden deshacer en las sueltas que las forman, que es
+    // la única manera de correr un merlón o subir un peldaño por su cuenta. Va
+    // aquí arriba, pegado a lo que explica la pieza, y no abajo con duplicar y
+    // borrar: es lo que se viene buscando al abrir la ficha de una pieza que no
+    // se deja tocar por partes.
+    if (canExplode(part.k)) {
+      const ex = document.createElement('button');
+      ex.className = 'studio-explode';
+      ex.textContent = '⧉ Descomponer en piezas sueltas';
+      ex.title = `Deshacer ${spec.label.toLowerCase()} en las piezas que la forman, para tocarlas una a una`;
+      ex.onclick = () => this.explodePart();
+      wrap.appendChild(ex);
+    }
+
     const rows = [];
     for (const key of spec.fields) rows.push(this.partField(part, key));
     rows.push(this.materialField(part));
@@ -2522,6 +2536,33 @@ export class Studio {
     actions.append(dup, del);
     wrap.appendChild(actions);
     return wrap;
+  }
+
+  /**
+   * Deshace la pieza elegida en las sueltas que la forman. Las almenas dejan de
+   * ser «unas almenas» y pasan a ser su antepecho y sus merlones, cada uno con
+   * su sitio y su tamaño; desde ahí se mueven de una en una como cualquier otra
+   * pieza. Se dibuja igual que antes, así que lo único que cambia es que ahora
+   * hay por dónde cogerla. Para volver atrás, deshacer.
+   */
+  explodePart() {
+    const part = this.design?.parts[this.selected];
+    if (!part || !canExplode(part.k)) return;
+    const spec = PARTS[part.k];
+    let sueltas = [];
+    try { sueltas = spec.explode(part) || []; } catch { sueltas = []; }
+    if (!sueltas.length) return;
+    const tope = this.enPieza() ? MAX_PIECE_PARTS : MAX_PARTS;
+    if (this.design.parts.length - 1 + sueltas.length > tope) {
+      this.status(`No caben: ${spec.label} son ${sueltas.length} piezas sueltas y el tope es ${tope}.`);
+      return;
+    }
+    this.pushUndo();
+    this.design.parts.splice(this.selected, 1, ...sueltas);
+    // Queda elegida la primera de las nuevas, que ocupa el sitio de la de antes.
+    this.afterChange();
+    this.status(`${spec.label}, en ${sueltas.length} piezas sueltas.`
+      + (spec.explodeNota ? ` ${spec.explodeNota}` : ''));
   }
 
   partField(part, key) {

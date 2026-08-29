@@ -151,6 +151,40 @@ function lifted(out, z, fn) {
  * nace la pieza (en casillas, sobre una huella de 2×2, que luego el taller
  * centra donde haga falta).
  */
+/*
+ * Deshacer una pieza compuesta en las sueltas que la forman.
+ *
+ * Algunas piezas del juego no son un cuerpo, sino varios: las almenas son un
+ * antepecho y sus merlones, la escalinata son sus peldaños, la cerca son postes
+ * y travesaños. Puestas en un modelo se mueven y se estiran de una vez, que es
+ * lo cómodo el 90% de las veces; pero cuando lo que se quiere es correr *un*
+ * merlón, no hay por dónde cogerlo.
+ *
+ * Por eso las compuestas traen un `explode(p)`: devuelve las piezas del taller
+ * que dibujan lo mismo, cada una con su sitio y su tamaño, y ya se tocan de una
+ * en una. No hay vuelta atrás automática —para eso está deshacer—, y lo que se
+ * pinta sobre un cuerpo en vez de ser un cuerpo (la saetera del torreón) se
+ * queda por el camino: cada pieza lo avisa en su `explodeNota`.
+ *
+ * Estos dos atajos arman las piezas que salen de ahí, llevándose de la original
+ * el material y la textura, que es lo que hace que las sueltas se vean como se
+ * veía la de antes.
+ */
+function caja(p, x, y, z, w, d, h) {
+  const c = { k: 'box', x, y, z, w, d, h, yaw: 0, m: p.m };
+  if (p.rough) c.rough = true;
+  return c;
+}
+
+function viga(p, x, y, z, len, yaw, pitch, th) {
+  const v = { k: 'beam', x, y, z, len, yaw, pitch, th, m: p.m };
+  if (p.rough) v.rough = true;
+  return v;
+}
+
+/** ¿Está hecha de otras piezas y se puede deshacer en ellas? */
+export function canExplode(k) { return !!(PARTS[k] && PARTS[k].explode && !PARTS[k].mine); }
+
 export const PARTS = {
   box: {
     label: 'Caja', glyph: '■',
@@ -261,6 +295,32 @@ export const PARTS = {
       battlements(out, p.x - p.w / 2, p.y - p.d / 2, p.x + p.w / 2, p.y + p.d / 2,
         p.z, { wall: matColor(p, c) });
     },
+    explode(p) {
+      // Lo mismo que dibuja `battlements`, pero en piezas: el antepecho y sus
+      // merlones. Las esquinas las pintan dos lados, así que se descartan las
+      // repetidas: puestas dos veces se verían igual y estorbarían el doble.
+      const out = [caja(p, p.x, p.y, p.z, p.w + 0.1, p.d + 0.1, 0.1)];
+      const x0 = p.x - p.w / 2, y0 = p.y - p.d / 2, x1 = p.x + p.w / 2, y1 = p.y + p.d / 2;
+      const step = 0.34;
+      const bordes = [
+        [[x0, y0], [x1, y0]], [[x1, y0], [x1, y1]],
+        [[x1, y1], [x0, y1]], [[x0, y1], [x0, y0]],
+      ];
+      const puestos = new Set();
+      for (const [[ax, ay], [bx, by]] of bordes) {
+        const len = Math.hypot(bx - ax, by - ay);
+        const n = Math.max(2, Math.floor(len / step));
+        for (let i = 0; i <= n; i += 2) {
+          const t = i / n;
+          const mx = ax + (bx - ax) * t, my = ay + (by - ay) * t;
+          const sitio = `${mx.toFixed(3)},${my.toFixed(3)}`;
+          if (puestos.has(sitio)) continue;
+          puestos.add(sitio);
+          out.push({ ...caja(p, mx, my, p.z + 0.1, 0.14, 0.14, 0.14), noshadow: true });
+        }
+      }
+      return out;
+    },
   },
 
   tower: {
@@ -270,6 +330,24 @@ export const PARTS = {
     def: { x: 1, y: 1, z: 0, r: 0.4, h: 1.4, m: 'stone' },
     build(out, p, c) {
       lifted(out, p.z, (o) => roundTower(o, p.x, p.y, p.r, p.h, { wall: matColor(p, c) }));
+    },
+    // La saetera es un hueco pintado sobre el fuste, no un cuerpo: al deshacer
+    // la torre en piezas se queda por el camino, y el taller lo avisa.
+    explodeNota: 'Pierde la saetera, que no es una pieza suelta.',
+    explode(p) {
+      const out = [
+        { k: 'cyl', x: p.x, y: p.y, z: p.z, r0: p.r * 1.12, r1: p.r, h: p.h, seg: 10, m: p.m },
+        { k: 'cyl', x: p.x, y: p.y, z: p.z + p.h, r0: p.r * 1.14, r1: p.r * 1.14, h: 0.08, seg: 10, m: p.m },
+      ];
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + 0.2;
+        out.push({
+          ...caja(p, p.x + Math.cos(a) * p.r * 1.02, p.y + Math.sin(a) * p.r * 1.02,
+            p.z + p.h + 0.08, 0.12, 0.12, 0.14),
+          noshadow: true,
+        });
+      }
+      return out;
     },
   },
 
@@ -362,6 +440,17 @@ export const PARTS = {
         }
       }
     },
+    explode(p) {
+      const out = [];
+      const n = Math.round(p.steps), sd = p.d / n;
+      for (let i = 0; i < n; i++) {
+        const rise = p.h * ((i + 1) / n);
+        out.push(p.axis === 'x'
+          ? caja(p, p.x + p.d / 2 - (i + 0.5) * sd, p.y, p.z, sd, p.w, rise)
+          : caja(p, p.x, p.y + p.d / 2 - (i + 0.5) * sd, p.z, p.w, sd, rise));
+      }
+      return out;
+    },
   },
 
   fence: {
@@ -383,6 +472,19 @@ export const PARTS = {
           tone(col, 0.1), { noshadow: true });
       }
     },
+    explode(p) {
+      const out = [];
+      const bx = p.x + p.len * Math.cos(rad(p.yaw)), by = p.y + p.len * Math.sin(rad(p.yaw));
+      const n = Math.max(1, Math.round(p.len / 0.45));
+      for (let i = 0; i <= n; i++) {
+        const t = i / n;
+        out.push(viga(p, p.x + (bx - p.x) * t, p.y + (by - p.y) * t, p.z, p.h, 0, 90, 0.03));
+      }
+      for (const k of [0.45, 0.85]) {
+        out.push({ ...viga(p, p.x, p.y, p.z + p.h * k, p.len, p.yaw, 0, 0.02), noshadow: true });
+      }
+      return out;
+    },
   },
 
   logs: {
@@ -392,6 +494,16 @@ export const PARTS = {
     def: { x: 1, y: 1, z: 0, len: 0.8, n: 6, m: 'wood' },
     build(out, p, c) {
       lifted(out, p.z, (o) => logPile(o, p.x, p.y, p.len, Math.round(p.n), matColor(p, c)));
+    },
+    explode(p) {
+      const out = [];
+      const n = Math.round(p.n);
+      for (let i = 0; i < n; i++) {
+        const z = 0.06 + Math.floor(i / 3) * 0.11;
+        const off = (i % 3) * 0.12 - 0.12 + (Math.floor(i / 3) % 2) * 0.06;
+        out.push(viga(p, p.x - p.len / 2, p.y + off, p.z + z, p.len, 0, 0, 0.06));
+      }
+      return out;
     },
   },
 

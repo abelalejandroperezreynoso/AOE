@@ -179,6 +179,28 @@ debajo se eligen, con cada una dibujada como está puesta y su color al lado, y
 encima se sigue viendo el modelo, que se recoloca solo en lo que la hoja deja
 libre. Se abre con **Pieza**, y elegir no la cierra, para poder ir mirando.
 
+### Piezas compuestas, y cómo deshacerlas
+
+Unas cuantas piezas del juego no son un cuerpo sino varios: las almenas son un
+antepecho y sus merlones, el torreón un fuste con su cornisa y sus almenas, la
+escalinata sus peldaños, la cerca postes y travesaños, la pila sus troncos.
+Puestas en un modelo se mueven y se estiran de una vez, que es lo cómodo casi
+siempre; pero cuando lo que se quiere es correr *un* merlón, no hay por dónde
+cogerlo.
+
+En la ficha de esas piezas sale **«Descomponer en piezas sueltas»**: las cambia
+por las piezas del taller que dibujan lo mismo —cajas y vigas—, cada una con su
+sitio y su tamaño, y desde ahí se tocan de una en una como cualquier otra. Lo
+que se ve no cambia, sólo aparece por dónde cogerlo; y como es un cambio más del
+modelo, deshacer lo devuelve a una pieza.
+
+Va en `explode(p)` dentro de la entrada de `PARTS`, al lado de su `build()`.
+Dos cosas no sobreviven al viaje: lo que está *pintado* sobre un cuerpo en vez
+de ser un cuerpo —la saetera del torreón, que el taller avisa de que se pierde—
+y los medios tonos con los que el constructor separa unas partes de otras (el
+antepecho de las almenas, un pelo más oscuro que sus merlones), porque una pieza
+del taller lleva un material entero, no un tono.
+
 ### Piezas propias
 
 Además de vestir los edificios, el taller deja **hacer piezas nuevas**. Una
