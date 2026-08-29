@@ -375,20 +375,31 @@ export class Studio {
     this.schedulePreview();
   }
 
-  /** Empieza una pieza vacía y la pone en la mesa. */
-  newPiece() {
+  /**
+   * Empieza una pieza y la pone en la mesa. Con `desde`, nace con esa pieza del
+   * juego dentro: es la forma de partir de la caja o del tejado y cambiarlos,
+   * que las del juego son código y no se tocan.
+   */
+  newPiece(desde = null) {
     if (allPieces().length >= MAX_PIECES) {
       this.status(`No caben más de ${MAX_PIECES} piezas propias.`);
       return;
     }
-    const key = freeKey('pieza');
-    if (!key || !savePiece({ key, label: 'Pieza nueva', parts: [] })) {
+    const spec = desde ? PARTS[desde] : null;
+    const nombre = spec ? spec.label : 'Pieza nueva';
+    const key = freeKey(nombre);
+    if (!key || !savePiece({ key, label: nombre, parts: [] })) {
       this.status('No se ha podido empezar la pieza.');
       return;
     }
     this.afterPieceSave();
     this.loadPiece(key);
-    this.status('Pieza nueva. Añádele piezas del juego y ponle nombre.');
+    if (spec) {
+      this.addPart(desde);
+      this.status(`Pieza nueva a partir de ${spec.label}. Cámbiala y ponle nombre.`);
+    } else {
+      this.status('Pieza nueva. Añádele piezas del juego y ponle nombre.');
+    }
   }
 
   /** ¿Se está haciendo una pieza en vez de vistiendo un edificio? */
@@ -747,6 +758,14 @@ export class Studio {
     const caja = el('studio-pick-pieces');
     if (!caja) return;
     caja.innerHTML = '';
+    // Sin ninguna hecha, la sección sería una cruz suelta y no se entendería
+    // que está vacía porque todavía no hay nada, no porque falte algo.
+    if (!allPieces().length) {
+      const vacio = document.createElement('p');
+      vacio.className = 'pick-none';
+      vacio.textContent = 'Todavía no hay ninguna. Las que hagas salen aquí y en el catálogo de piezas de cualquier edificio.';
+      caja.appendChild(vacio);
+    }
     for (const def of allPieces()) {
       const b = document.createElement('button');
       b.className = 'pick-item' + (def.key === this.pieza ? ' active' : '');
@@ -777,6 +796,32 @@ export class Studio {
     nueva.append(n, sub);
     nueva.onclick = () => this.newPiece();
     caja.appendChild(nueva);
+
+    this.renderBasePick();
+  }
+
+  /**
+   * El catálogo de las piezas que trae el juego, en la propia parrilla. No se
+   * pueden cambiar —son código—, pero tocar una empieza una pieza del taller
+   * con ella dentro, que es lo más parecido a editarlas y el sitio por donde se
+   * empieza casi siempre.
+   */
+  renderBasePick() {
+    const caja = el('studio-pick-base');
+    if (!caja) return;
+    caja.innerHTML = '';
+    for (const k of PART_KEYS) {
+      const spec = PARTS[k];
+      const b = document.createElement('button');
+      b.className = 'piece-card';
+      b.title = `Empezar una pieza del taller con ${spec.label.toLowerCase()} dentro`;
+      const thumb = this.pieceThumb(k, 68);
+      const name = document.createElement('b');
+      name.textContent = spec.label;
+      b.append(thumb, name);
+      b.onclick = () => this.newPiece(k);
+      caja.appendChild(b);
+    }
   }
 
   /** Miniatura horneada de un edificio, con la cara que tenga, en su hueco. */
