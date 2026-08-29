@@ -44,19 +44,34 @@ No hay suite de pruebas.
 
 ## Trampas conocidas
 
-- **Instalado en el móvil, la pantalla no mide lo que dice medir.** En modo
-  aplicación iOS descuenta la franja de la hora del alto de la página pero
-  empieza a pintar arriba del todo, así que esos píxeles sobran por abajo y
-  aparece una franja muerta. `inset: 0`, `height: 100%`, `innerHeight`, `dvh` y
-  `svh` valen todos lo mismo y ninguno sirve; sólo `vh` da la pantalla entera.
-  Por eso la partida (`#app`) y las superposiciones (`.overlay`) cuelgan de
-  `--app-h`, y **cualquier capa nueva que tenga que llegar al filo va igual**.
-  Las medidas del aparato donde falla y el porqué están en el CSS, junto a la
-  variable, y en «Instalado en el móvil» del README.
+- **La pantalla completa en el móvil se ha intentado dos veces y se ha
+  revertido dos veces.** No lo vuelvas a intentar por el mismo camino sin
+  medir antes en el teléfono.
 
-  Esto ya costó un revertido entero (`db352fe`): se dio por culpables a las
-  etiquetas de iOS, que no lo eran. Medir con `visualViewport` también se probó
-  y salió peor.
+  Con `apple-mobile-web-app-status-bar-style` en `black-translucent` el
+  contenido sí llega arriba —que es lo que se pide—, pero iOS descuenta la
+  franja de la hora del alto de la página y **empieza a pintar arriba del
+  todo**, así que esos píxeles sobran por abajo y aparece una franja muerta.
+  Medido en un iPhone de 375×812 con el juego instalado: `vh` y `lvh` dan 812;
+  `dvh`, `svh`, `innerHeight` e `inset: 0`, 762.
+
+  Descartado ya, y sin que la franja se fuera:
+
+  - medir la pantalla a mano con `visualViewport` (`1506810`): esa medida encoge
+    con el teclado, en iOS el teclado se cierra sin soltar el campo, y la medida
+    guardada se quedaba clavada dejando media pantalla en negro;
+  - maquetar contra `100vh` en modo aplicación en vez de `inset: 0` (`c9bf985`,
+    y otra vez en `da25624`): venía medido en el aparato y comprobado imitándolo
+    en un navegador, y en el teléfono la franja siguió ahí.
+
+  Los dos revertidos son `db352fe` y el que deshizo `da25624`.
+
+  Lo que **no** se ha probado es lo contrario: dejar que iOS se reserve la
+  franja —`status-bar-style` en `default` o `black`, sin `black-translucent`—.
+  Entonces no hay banda que sobre, y esa franja la pinta el sistema con el
+  fondo de `<html>`, así que se disimula haciendo que ese fondo sea el del
+  elemento que quede pegado arriba. El contenido no pasa por debajo del reloj,
+  que era la parte que gustaba.
 
 - **IDs y funciones en archivos grandes.** Un `getElementById` que apunta a un
   elemento que ya no está revienta con `TypeError` y aborta el resto de la
