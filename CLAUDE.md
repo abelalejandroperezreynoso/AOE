@@ -44,44 +44,34 @@ No hay suite de pruebas.
 
 ## Trampas conocidas
 
-- **Instalado en el móvil, la pantalla no mide lo que dice medir.** Con
-  `apple-mobile-web-app-status-bar-style` en `black-translucent` el contenido
-  llega arriba —pasa por debajo del reloj, que es lo que se pide—, pero iOS le
-  dice a la página que mide 762 en una pantalla de 812 —los 50 de la franja del
-  reloj— y la coloca empezando arriba del todo: esos 50 sobran por abajo.
-  Medido en el iPhone donde falla, de 375×812: `vh` y `lvh` dan 812; `dvh`,
-  `svh`, `innerHeight` e `inset: 0`, 762. **No hay ninguna medida en CSS con la
-  que una capa acierte con la pantalla**, y dos intentos de encontrarla
-  acabaron revertidos (`db352fe` y el revertido de `da25624`): medirla a mano
-  con `visualViewport` se queda vieja con el teclado, y maquetar contra `100vh`
-  no funcionó en el teléfono aunque saliera bien en todas las pruebas.
+- **La pantalla completa en el móvil se ha intentado dos veces y se ha
+  revertido dos veces.** No lo vuelvas a intentar por el mismo camino sin
+  medir antes en el teléfono.
 
-  Por eso **el fondo de las pantallas no lo pinta ninguna capa: lo pinta el
-  lienzo de la ventana**, con el fondo de `html`. El navegador propaga el fondo
-  de la raíz a la pantalla física entera, por encima del reloj y por debajo del
-  último píxel, sin depender de que nada acierte con el alto. Que en iOS lo hace
-  está comprobado en el aparato: cuando había franja, era exactamente del color
-  de fondo del juego (`72edbbd`). Lo que fallaba era el color, no el lienzo.
+  Con `apple-mobile-web-app-status-bar-style` en `black-translucent` el
+  contenido sí llega arriba —que es lo que se pide—, pero iOS descuenta la
+  franja de la hora del alto de la página y **empieza a pintar arriba del
+  todo**, así que esos píxeles sobran por abajo y aparece una franja muerta.
+  Medido en un iPhone de 375×812 con el juego instalado: `vh` y `lvh` dan 812;
+  `dvh`, `svh`, `innerHeight` e `inset: 0`, 762.
 
-  De ahí las reglas:
+  Descartado ya, y sin que la franja se fuera:
 
-  - una pantalla entera lleva `class="overlay pantalla"` y **no pinta fondo**;
-    el `background-color` de `html` es el color en que acaba su degradado, y
-    ese degradado va con `no-repeat` o se repite en los 50 px que faltan;
-  - las capas que se abren **encima** de otra cosa (pausa, fin, invitación,
-    compartir) sí llevan su atenuado: son pequeñas y centradas, y que su borde
-    no llegue al filo no se nota;
-  - la única que tiene que medir la pantalla de verdad es la partida (`#app`),
-    porque el mapa y las dos barras se reparten ese alto. Lo que le falta a
-    `100%` es exactamente `--sa-top`, y así se lo suma la regla bajo
-    `(display-mode: standalone)`. Donde iOS no falla, `--sa-top` vale cero.
+  - medir la pantalla a mano con `visualViewport` (`1506810`): esa medida encoge
+    con el teclado, en iOS el teclado se cierra sin soltar el campo, y la medida
+    guardada se quedaba clavada dejando media pantalla en negro;
+  - maquetar contra `100vh` en modo aplicación en vez de `inset: 0` (`c9bf985`,
+    y otra vez en `da25624`): venía medido en el aparato y comprobado imitándolo
+    en un navegador, y en el teléfono la franja siguió ahí.
 
-  **Una pantalla nueva va igual**: `.pantalla`, sin fondo propio.
+  Los dos revertidos son `db352fe` y el que deshizo `da25624`.
 
-  Un cambio en el manifiesto sólo se aplica **quitando el icono de la pantalla
-  de inicio y volviéndolo a añadir**: iOS congela el que había. Y en la letra
-  pequeña del menú va la versión, que es lo único que distingue «el arreglo no
-  sirve» de «el móvil trae la copia de antes» — ya pasó dos veces.
+  Lo que **no** se ha probado es lo contrario: dejar que iOS se reserve la
+  franja —`status-bar-style` en `default` o `black`, sin `black-translucent`—.
+  Entonces no hay banda que sobre, y esa franja la pinta el sistema con el
+  fondo de `<html>`, así que se disimula haciendo que ese fondo sea el del
+  elemento que quede pegado arriba. El contenido no pasa por debajo del reloj,
+  que era la parte que gustaba.
 
 - **IDs y funciones en archivos grandes.** Un `getElementById` que apunta a un
   elemento que ya no está revienta con `TypeError` y aborta el resto de la
