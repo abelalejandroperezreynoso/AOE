@@ -451,11 +451,6 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  */
 .studio-tools { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .studio-view-tools { min-width: 0; }
-.studio-piece {
-  display: flex; align-items: center; gap: 5px;
-  padding: 4px 9px; font-size: 12px; border-radius: 6px;
-}
-.studio-glyph { font-size: 13px; color: var(--gold-l); }
 .studio-view-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .studio-view-tools button { padding: 5px 11px; font-size: 12.5px; }
 
@@ -697,17 +692,6 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .studio-actions { display: flex; gap: 8px; }
 .studio-actions button { flex: 1; padding: 6px 10px; font-size: 12.5px; }
 .studio-del { background: linear-gradient(180deg, #c04638, #93291e); border-color: #a53d2f; color: #fff; }
-/* Ancho fijo para que las piezas salgan en dos columnas y el menú no se haga
-   una tira de un palmo. */
-.studio-add-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
-  gap: 6px; width: min(292px, 84vw);
-}
-.studio-add-grid .studio-piece {
-  justify-content: flex-start; padding: 10px; font-size: 13px;
-  /* Que parta en dos líneas: "Tejado a cuatro aguas" no cabe de una. */
-  white-space: normal; text-align: left; line-height: 1.25;
-}
 .studio-template { display: block; width: 100%; text-align: left; margin-bottom: 6px; padding: 9px 12px; }
 .studio-template b { display: block; color: var(--gold-l); font-size: 14px; margin-bottom: 2px; }
 .studio-template small { color: #75654a; font-size: 11.5px; line-height: 1.4; }
@@ -861,6 +845,67 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   }
 }
 
+/*
+ * Hoja de piezas: sube desde abajo, al modo de iOS. Fondo velado, esquinas de
+ * arriba redondeadas, asa para que se vea de dónde viene y cada pieza con su
+ * dibujo, que es lo que se mira para decidir. En pantalla ancha se queda
+ * centrada, que estirarla de lado a lado no la haría más útil.
+ */
+.sheet {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: flex-end; justify-content: center;
+  background: rgba(70, 56, 28, .3);
+  animation: velar .2s ease-out;
+}
+.sheet-panel {
+  width: min(560px, 100%); max-height: min(78vh, 620px);
+  display: flex; flex-direction: column;
+  background: var(--papel);
+  border: 1px solid var(--borde); border-bottom: 0;
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -10px 40px rgba(90, 70, 30, .2);
+  padding: 8px 14px calc(14px + var(--sa-bottom));
+  animation: subir .26s cubic-bezier(.22, .8, .3, 1);
+}
+.sheet-grab {
+  width: 38px; height: 5px; margin: 0 auto 8px;
+  border-radius: 3px; background: #d8cbae;
+  flex: none;
+}
+.sheet-top {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin-bottom: 10px; flex: none;
+}
+.sheet-top h3 { margin: 0; font-size: 17px; color: var(--gold-l); }
+.sheet-close {
+  padding: 6px 12px; font-size: 13.5px;
+  background: none; border: 0; color: var(--gold-l); font-weight: bold;
+}
+.sheet-close:hover { filter: none; text-decoration: underline; }
+
+.piece-grid {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px; align-content: start; padding: 2px;
+}
+.piece-card {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  width: 100%; margin: 0; padding: 8px 6px 10px;
+  background: rgba(150, 120, 55, .06);
+  border: 0; border-radius: 14px;
+  text-align: center;
+}
+.piece-card:hover { background: rgba(201,162,39,.13); filter: none; }
+.piece-card canvas { display: block; }
+.piece-card b { font-size: 12.5px; font-weight: normal; color: var(--tinta); line-height: 1.25; }
+
+@keyframes subir { from { transform: translateY(100%); } }
+@keyframes velar { from { opacity: 0; } }
+/* Quien pide menos movimiento no lo tiene: la hoja aparece y ya está. */
+@media (prefers-reduced-motion: reduce) {
+  .sheet, .sheet-panel { animation: none; }
+}
+
 /* Compartir un edificio: el diseño entero, en texto, para copiar o pegar. */
 .share-text {
   width: 100%; height: 130px; resize: vertical;
@@ -886,7 +931,8 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 /* Con el dedo todo tiene que ser más gordo de lo que basta con un ratón. */
 @media (pointer: coarse) {
   :root { --pad-h: 98px; }
-  .studio-piece, .studio-view-tools button, .studio-actions button, .studio-props .catalog-tabs button { min-height: 40px; }
+  .studio-view-tools button, .studio-actions button, .studio-props .catalog-tabs button { min-height: 40px; }
+  .piece-card { padding: 10px 6px 12px; }
   .studio-part { padding: 9px; font-size: 13.5px; }
   .studio-pad button { height: 42px; }
   .studio-pad svg { width: 23px; height: 23px; }

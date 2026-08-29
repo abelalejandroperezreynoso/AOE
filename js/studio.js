@@ -92,6 +92,9 @@ export class Studio {
     el('btn-studio').onclick = () => this.open();
     el('btn-studio-close').onclick = () => this.back();
     el('btn-share-close').onclick = () => el('studio-share').classList.add('hidden');
+    el('btn-piece-sheet-close').onclick = () => this.closePieceSheet();
+    // Tocar el velo la cierra, como cualquier hoja.
+    el('piece-sheet').onclick = (e) => { if (e.target === el('piece-sheet')) this.closePieceSheet(); };
     // Tocar el fondo del diálogo también lo cierra, como en cualquier ventana.
     el('studio-share').onclick = (e) => {
       if (e.target === el('studio-share')) el('studio-share').classList.add('hidden');
@@ -680,12 +683,7 @@ export class Studio {
 
     // Las piezas, en un desplegable: son diecisiete y en fila ocupaban tres
     // renglones de mesa que ahora se lleva el modelo.
-    view.appendChild(this.dropdown('＋ Añadir', 'Añadir una pieza al edificio', (pop) => {
-      const grid = document.createElement('div');
-      grid.className = 'studio-add-grid';
-      for (const b of this.paletteButtons()) grid.appendChild(b);
-      pop.appendChild(grid);
-    }));
+    view.appendChild(mkBtn('＋ Añadir', 'Añadir una pieza al edificio', () => this.openPieceSheet()));
 
     /*
      * Mover por el suelo o subir y bajar. Con ratón basta Mayús, pero con el
@@ -970,18 +968,58 @@ export class Studio {
   }
 
   /** Los botones que añaden pieza. Salen en la barra y en la pestaña Añadir. */
-  paletteButtons() {
-    return PART_KEYS.map((k) => {
+  /**
+   * El catálogo de piezas, en una hoja que sube desde abajo. Antes era un menú
+   * con el nombre y un glifo, y había que saberse de memoria qué era cada cosa;
+   * aquí cada pieza sale dibujada como se va a colocar, con los colores de este
+   * modelo, que es lo que se mira para decidir.
+   */
+  openPieceSheet() {
+    closeMenus();
+    const grid = el('piece-sheet-grid');
+    grid.innerHTML = '';
+    for (const k of PART_KEYS) {
       const spec = PARTS[k];
       const b = document.createElement('button');
-      b.className = 'studio-piece';
-      b.title = `${spec.label} — ${spec.hint}`;
-      b.innerHTML = '<span class="studio-glyph"></span><span class="studio-piece-name"></span>';
-      b.querySelector('.studio-glyph').textContent = spec.glyph;
-      b.querySelector('.studio-piece-name').textContent = spec.label;
-      b.onclick = () => { closeMenus(); this.addPart(k); };
-      return b;
-    });
+      b.className = 'piece-card';
+      b.title = spec.hint;
+      const thumb = this.pieceThumb(k, 68);
+      const name = document.createElement('b');
+      name.textContent = spec.label;
+      b.append(thumb, name);
+      b.onclick = () => { this.closePieceSheet(); this.addPart(k); };
+      grid.appendChild(b);
+    }
+    el('piece-sheet').classList.remove('hidden');
+  }
+
+  closePieceSheet() { el('piece-sheet').classList.add('hidden'); }
+
+  sheetOpen() { return !el('piece-sheet').classList.contains('hidden'); }
+
+  /**
+   * Cómo se ve una pieza suelta: la de serie, horneada igual que en la partida
+   * y con la paleta del modelo que se está haciendo, para que el dibujo del
+   * catálogo sea el mismo que va a aparecer en la mesa.
+   */
+  pieceThumb(kind, size) {
+    const c = document.createElement('canvas');
+    c.width = size; c.height = size;
+    const ctx = c.getContext('2d');
+    try {
+      const d = {
+        target: this.type,
+        size: this.viewSize(),
+        palette: this.design?.palette || { ...DEFAULT_PALETTE },
+        // La clave va aparte: `def` sólo trae los valores, no de qué es.
+        parts: [{ ...structuredClone(PARTS[kind].def), k: kind }],
+      };
+      const s = bake(designMesh(d, this.colorIdx, 2, true));
+      const sc = Math.min((size - 4) / s.w, (size - 4) / s.h);
+      ctx.imageSmoothingEnabled = false;
+      drawSprite(ctx, s, size / 2 - (s.w / 2 - s.ox) * sc, size - 2 - (s.h - s.oy) * sc, sc);
+    } catch { /* una pieza que no se deje dibujar no tumba el catálogo */ }
+    return c;
   }
 
   // --- Piezas -----------------------------------------------------------------
@@ -1636,7 +1674,8 @@ export class Studio {
   onKey(e) {
     if (!this.isOpen()) return;
     if (e.key === 'Escape') {
-      // Primero se cierra lo que esté por encima: el diálogo de compartir.
+      // Primero, lo que esté por encima: la hoja de piezas y el compartir.
+      if (this.sheetOpen()) { this.closePieceSheet(); return; }
       if (!el('studio-share').classList.contains('hidden')) {
         el('studio-share').classList.add('hidden');
         return;
@@ -1764,12 +1803,7 @@ export class Studio {
       'Rehacer [Ctrl+Mayús+Z]', () => this.redoLast());
 
     // Añadir abre la misma caja de piezas que la barra de herramientas.
-    const btnAdd = this.padMenu(bar, mk('<path d="M12 5v14M5 12h14"/>', 'Añadir una pieza', null), (pop) => {
-      const grid = document.createElement('div');
-      grid.className = 'studio-add-grid';
-      for (const b of this.paletteButtons()) grid.appendChild(b);
-      pop.appendChild(grid);
-    });
+    const btnAdd = mk('<path d="M12 5v14M5 12h14"/>', 'Añadir una pieza', () => this.openPieceSheet());
 
     this.btnDup = mk('<rect x="9" y="9" width="11" height="11" rx="3"/>'
       + '<path d="M15.5 9V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v5.5a3 3 0 0 0 3 3h2"/>',

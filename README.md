@@ -174,6 +174,13 @@ En la pestaña **Edificio** está lo que se puede hacer con el que hay puesto:
 **Restablecer** le devuelve la cara que tenía. Debajo, su ficha —huella, edad,
 coste, resistencia— y, plegado, empezar de nuevo por otra plantilla.
 
+Añadir una pieza abre una **hoja que sube desde abajo**, al modo de iOS: fondo
+velado, esquinas de arriba redondeadas y asa. Dentro, el catálogo entero con
+**cada pieza dibujada como va a colocarse** —horneada igual que en la partida y
+con la paleta del modelo que se está haciendo—, que es lo que se mira para
+decidir; antes era un menú con el nombre y un glifo y había que saberse de
+memoria qué era cada cosa. Se cierra eligiendo, tocando el velo o con Escape.
+
 Un modelo se arma con **piezas** —cajas, cilindros, cúpulas, tejados a dos y a
 cuatro aguas, faldones, vigas, ruedas, almenas, torreones, puertas, ventanas,
 estandartes, escalinatas, cercas, pilas de troncos y barriles— colocadas sobre
@@ -214,7 +221,7 @@ Para colocar:
   se vuelva cono, y se apaga en las que no lo tienen (un barril no se estira
   desde aquí). La barra es una rejilla de siete columnas, así que cabe igual en
   un teléfono pequeño que en uno grande.
-- **Arriba**: **deshacer y rehacer**, **añadir** —la misma caja de piezas— y
+- **Arriba**: **deshacer y rehacer**, **añadir** —abre el catálogo— y
   **duplicar**, y el **color de la pieza** y **borrarla**. El botón del color
   enseña el material que lleva y despliega los demás con su muestra, para
   cambiarlo de un toque. Sus botones miden lo mismo que los de abajo porque
