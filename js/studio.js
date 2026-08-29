@@ -54,6 +54,7 @@ export class Studio {
     this.design = null;      // copia de trabajo de su modelo (null: el del juego)
     this.selected = -1;      // índice de la pieza elegida
     this.tab = 'build';
+    this.vista = 'elegir';   // 'elegir' los edificios o 'editor' la mesa
     this.colorIdx = 0;
     this.viewYaw = 0;        // 0-3: giro de la vista, sólo para trabajar
     this.zoom = 4;
@@ -75,7 +76,7 @@ export class Studio {
 
   bind() {
     el('btn-studio').onclick = () => this.open();
-    el('btn-studio-close').onclick = () => this.close();
+    el('btn-studio-close').onclick = () => this.back();
     el('btn-studio-reset').onclick = (e) => this.confirmReset(e.currentTarget);
     el('btn-studio-share').onclick = () => this.openShare('export');
     el('btn-studio-import').onclick = () => this.openShare('import');
@@ -159,13 +160,34 @@ export class Studio {
     this.renderTools();
     this.restoreRef();
     this.renderList();
-    // Se vuelve al edificio que se estaba tocando; la primera vez, al primero
-    // de la barra de obra.
-    this.load(BUILDINGS[this.lastType] ? this.lastType : BUILDING_ORDER[0]);
+    // Lo primero es elegir a quién se le cambia la cara: sin edificio no hay
+    // nada que modelar, y entrar directo al último dejaba la mesa puesta con
+    // uno que a lo mejor no era el que se venía a tocar.
+    this.showPick();
     // Al abrir se mira qué hay en la nube: puede haber cambiado desde otro
     // dispositivo, o haberse quedado algo mío por enviar la última vez.
     this.showCloud(pendingCount() ? `sin enviar (${pendingCount()})` : 'comprobando...');
     this.cloudSync(true);
+  }
+
+  /** Un paso atrás: de la mesa a los edificios, y de los edificios al menú. */
+  back() {
+    if (this.vista === 'editor') this.showPick();
+    else this.close();
+  }
+
+  /** La pantalla de elegir edificio, que es por donde se entra. */
+  showPick() {
+    this.flush();
+    this.cancelReset();
+    this.setVista('elegir');
+    this.renderPick();
+  }
+
+  setVista(vista) {
+    this.vista = vista;
+    el('studio-card').dataset.vista = vista;
+    el('btn-studio-close').textContent = vista === 'editor' ? 'Elegir otro' : 'Volver al menú';
   }
 
   close() {
@@ -193,6 +215,7 @@ export class Studio {
    */
   load(type) {
     if (!BUILDINGS[type]) return;
+    this.setVista('editor');
     this.flush();
     if (this.cloudTimer) this.cloudSync(true);
     this.type = type;
@@ -296,6 +319,7 @@ export class Studio {
           // Si el taller ya está cerrado no hay nada que repintar: los sprites
           // los ha tirado `rebaseBuildingLooks` y la partida los rehará.
           if (!this.isOpen()) { /* nada que enseñar */ }
+          else if (this.vista === 'elegir') this.renderPick();
           else if (r.changed.includes(this.type)) this.load(this.type);
           else { this.renderList(); this.schedulePreview(); }
         }
@@ -311,7 +335,17 @@ export class Studio {
     const box = el('studio-cloud');
     if (!box) return;
     box.classList.toggle('hidden', !cloudEnabled());
-    box.textContent = cloudEnabled() ? `Taller compartido: ${text}` : '';
+    box.textContent = '';
+    if (cloudEnabled()) {
+      // El «Taller compartido» va aparte porque en el teléfono no cabe y se
+      // esconde: lo que importa del aviso es el estado, no el rótulo.
+      const pre = document.createElement('span');
+      pre.className = 'cloud-pre';
+      pre.textContent = 'Taller compartido: ';
+      const val = document.createElement('span');
+      val.textContent = text;
+      box.append(pre, val);
+    }
     box.title = title;
   }
 
@@ -395,6 +429,40 @@ export class Studio {
    * lista es la misma siempre: aquí no se añaden ni se quitan edificios, sólo
    * se les cambia el modelo.
    */
+  /** Con qué cara anda ahora mismo un edificio. */
+  lookOf(type) {
+    if (isCustom(type)) return 'Rehecho en el taller';
+    return isBuiltin(type) ? 'Modelo del juego' : 'Aspecto original';
+  }
+
+  /**
+   * La parrilla de la pantalla de elegir: los mismos edificios que la lista de
+   * la columna, pero con la cara grande, que es lo que se mira para decidir.
+   */
+  renderPick() {
+    const grid = el('studio-pick-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    for (const type of BUILDING_ORDER) {
+      const def = BUILDINGS[type];
+      const b = document.createElement('button');
+      b.className = 'pick-item'
+        + (isCustom(type) ? ' rehecho' : '')
+        + (type === this.type ? ' active' : '');
+      const thumb = this.thumb(type, 92);
+      thumb.className = 'pick-thumb';
+      const n = document.createElement('div');
+      n.className = 'pick-name';
+      n.textContent = def.name;
+      const sub = document.createElement('div');
+      sub.className = 'pick-sub';
+      sub.textContent = `${this.lookOf(type)}\n${def.size}×${def.size} · ${AGES[def.age].short}`;
+      b.append(thumb, n, sub);
+      b.onclick = () => this.load(type);
+      grid.appendChild(b);
+    }
+  }
+
   fillList(list) {
     if (!list) return;
     list.innerHTML = '';
@@ -411,10 +479,7 @@ export class Studio {
       n.textContent = def.name;
       const sub = document.createElement('div');
       sub.className = 'cat-sub';
-      const look = isCustom(type)
-        ? 'Rehecho en el taller'
-        : (isBuiltin(type) ? 'Modelo del juego' : 'Aspecto original');
-      sub.textContent = `${look} · ${def.size}×${def.size} · ${AGES[def.age].short}`;
+      sub.textContent = `${this.lookOf(type)} · ${def.size}×${def.size} · ${AGES[def.age].short}`;
       text.append(n, sub);
       li.append(thumb, text);
       li.onclick = () => this.load(type);
@@ -1509,7 +1574,7 @@ export class Studio {
         el('studio-share').classList.add('hidden');
         return;
       }
-      this.close();
+      this.back();
       return;
     }
     const tag = document.activeElement?.tagName;
