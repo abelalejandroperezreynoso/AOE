@@ -6,6 +6,24 @@
 <title>Age of Realms II · Estrategia medieval en tiempo real</title>
 <meta name="description" content="Juego de estrategia en tiempo real medieval, inspirado en los clásicos: recolecta recursos, avanza de edad y conquista a tus rivales. Funciona en el navegador, sin instalación.">
 <meta name="theme-color" content="#1a1410">
+
+<!-- Añadido a la pantalla de inicio, el juego se abre sin navegador y llega a
+     los cuatro bordes. En iOS hacen falta estas etiquetas: sin
+     `apple-mobile-web-app-capable` no hay modo aplicación, y sin
+     `status-bar-style` en `black-translucent` el sistema se reserva la franja
+     de la hora y la batería y la página empieza por debajo, cortada. Con ella
+     el contenido pasa por debajo de esa franja y son las zonas seguras del CSS
+     (`env(safe-area-inset-*)`) las que apartan la interfaz de la muesca y de la
+     barra de inicio. Lleva su precio, y está explicado en `--app-h`, en el CSS.
+     El manifiesto lo congela iOS al añadir el icono: un cambio aquí sólo se
+     aplica quitándolo de la pantalla de inicio y volviéndolo a añadir. -->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Age of Realms">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
 <link rel="stylesheet" href="css/style.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
 </head>
