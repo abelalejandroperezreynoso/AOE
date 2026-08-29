@@ -240,8 +240,15 @@ Para colocar:
 
 El taller cabe en un teléfono sin renunciar a nada:
 
-- El taller va **de borde a borde**, sin tarjeta ni marco: sólo respeta las
-  zonas seguras del aparato.
+- El taller va **de borde a borde**, sin tarjeta ni marco: deja el mismo hueco
+  por los cuatro lados —una sola ficha, `--marco`— y llega hasta el canto de
+  abajo. Arriba sí respeta la zona segura, que es donde está el reloj.
+- Las **esquinas de abajo copian las del teléfono**. No hay forma de
+  preguntarle al navegador cuánto redondea la pantalla, así que se reconoce el
+  modelo por lo que mide —del SE, con los cantos rectos, al 16 Pro Max— y la
+  curva sale concéntrica con la suya: el radio de la pantalla menos el marco.
+  Un modelo que no esté en la lista se lleva un valor intermedio, que un canto
+  de más o de menos no rompe nada.
 - **Los mandos, arriba; el modelo, abajo.** Bajo la cabecera van las pestañas
   —Pieza, Edificio, Colores y Edificios—, el panel que toque y las
   herramientas, y el modelo se lleva de una pieza todo lo que queda. Al pie del

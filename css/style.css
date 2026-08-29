@@ -43,7 +43,33 @@
      del lienzo, y crece con el dedo, así que vive aquí y no en un número
      suelto del JS. */
   --pad-h: 86px;
+
+  /* El hueco que el taller deja alrededor, el mismo por los cuatro lados. */
+  --marco: 8px;
+  /*
+   * Radio de las esquinas de la pantalla del aparato. No hay forma de
+   * preguntárselo al navegador, así que se reconoce el modelo por lo que mide
+   * su pantalla —abajo, uno por uno—. Este valor de partida es para lo que no
+   * reconozcamos: un canto de más o de menos no rompe nada.
+   */
+  --radio-pantalla: 44px;
+  /* Concéntrico con el de la pantalla: el mismo centro, menos el marco. */
+  --radio-marco: max(8px, calc(var(--radio-pantalla) - var(--marco)));
 }
+
+/*
+ * Las esquinas de cada iPhone, del mini al Max. La pantalla no cambia de medida
+ * al girar el aparato, así que basta con la pareja ancho por alto de pie.
+ */
+@media (device-width: 375px) and (device-height: 667px) { :root { --radio-pantalla: 0px; } }   /* SE y 8: cantos rectos */
+@media (device-width: 375px) and (device-height: 812px) { :root { --radio-pantalla: 40px; } }  /* X, XS, 11 Pro, 12 y 13 mini */
+@media (device-width: 390px) and (device-height: 844px) { :root { --radio-pantalla: 47px; } }  /* 12, 13 y 14 */
+@media (device-width: 393px) and (device-height: 852px) { :root { --radio-pantalla: 55px; } }  /* 14 Pro, 15, 15 Pro y 16 */
+@media (device-width: 402px) and (device-height: 874px) { :root { --radio-pantalla: 62px; } }  /* 16 Pro */
+@media (device-width: 414px) and (device-height: 896px) { :root { --radio-pantalla: 42px; } }  /* XR, 11, XS Max y 11 Pro Max */
+@media (device-width: 428px) and (device-height: 926px) { :root { --radio-pantalla: 53px; } }  /* 12 y 13 Pro Max, 14 Plus */
+@media (device-width: 430px) and (device-height: 932px) { :root { --radio-pantalla: 55px; } }  /* 14 Pro Max, 15 Plus y Pro Max, 16 Plus */
+@media (device-width: 440px) and (device-height: 956px) { :root { --radio-pantalla: 62px; } }  /* 16 Pro Max */
 
 * { box-sizing: border-box; }
 
@@ -677,14 +703,19 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 @media (max-width: 620px) {
   /* El taller aprovecha hasta el borde de verdad: sin tarjeta. El marco, su
      borde y su sombra se comían un dedo por cada lado, y aquí el sitio es
-     mesa de trabajo. Sólo se respetan las zonas seguras del aparato. */
+     mesa de trabajo. Abajo baja hasta el canto dejando el mismo hueco que a
+     los lados —la zona segura de ahí no se respeta a propósito, para que la
+     barra llegue al borde—; arriba sí, que es donde está el reloj. */
   #studio {
-    padding: var(--sa-top) var(--sa-right) var(--sa-bottom) var(--sa-left);
+    padding: var(--sa-top) var(--sa-right) 0 var(--sa-left);
   }
   .studio-card {
-    padding: 6px 8px 0;
+    padding: 6px var(--marco) var(--marco);
     border: 0; border-radius: 0; box-shadow: none;
   }
+  /* Arriba la mesa no toca nada, así que se queda con su canto de siempre;
+     abajo va contra el borde del teléfono y copia su curva. */
+  .studio-stage { border-radius: 8px 8px var(--radio-marco) var(--radio-marco); }
   /* La cabecera, en una sola línea: el título, el aviso recortado y el botón.
      Cada renglón que se ahorra aquí es lienzo. */
   .studio-card .catalog-top { flex-wrap: nowrap; margin-bottom: 5px; gap: 6px; }
@@ -741,11 +772,13 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * del lienzo en vez de debajo.
  */
 @media (max-height: 520px) and (max-width: 1040px) {
-  #studio { padding: var(--sa-top) var(--sa-right) var(--sa-bottom) var(--sa-left); }
+  /* Tumbado, igual que de pie: baja hasta el canto con el hueco de los lados. */
+  #studio { padding: var(--sa-top) var(--sa-right) 0 var(--sa-left); }
   .studio-card {
-    height: 100%; padding: 6px 8px 0;
+    height: 100%; padding: 6px var(--marco) var(--marco);
     border: 0; border-radius: 0; box-shadow: none;
   }
+  .studio-stage { border-radius: 8px 8px var(--radio-marco) var(--radio-marco); }
   .studio-card .catalog-foot { display: none; }
   .studio-body {
     flex-direction: row; flex-wrap: nowrap; align-items: stretch;
