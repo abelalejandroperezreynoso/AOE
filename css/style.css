@@ -546,7 +546,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  */
 .studio-pad-grid {
   flex: 1; max-width: 520px;
-  display: grid; grid-template-columns: 2fr 1fr 3fr 1fr; gap: 10px;
+  display: grid; grid-template-columns: 2fr 1fr 3fr; gap: 10px;
 }
 /*
  * Cada grupo es una pieza redondeada con sus botones dentro, separados por un
@@ -554,12 +554,50 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * generosas y el relleno plano. Las flechas van en cruz de dos por dos y subir
  * y bajar uno encima de otro, que es como se apunta con el pulgar sin mirar.
  */
-.studio-cross, .studio-lift, .studio-scale, .studio-pad-acts {
+.studio-cross, .studio-lift, .studio-scale, .studio-pad-acts,
+.studio-hist, .studio-make, .studio-look {
   display: grid; gap: 1px;
   background: #ded2b8;
   border-radius: 14px; overflow: hidden;
   box-shadow: 0 1px 2px rgba(90, 70, 30, .14);
 }
+/*
+ * La barra de arriba, con la misma hechura: se pega bajo la cinta de datos que
+ * pinta el lienzo y su raya cae hacia el modelo. Comparte la rejilla de siete
+ * columnas de la de abajo —de ahí las dos pistas de 2fr a los lados— para que
+ * sus botones midan exactamente lo mismo, y sus tres grupos van en el medio.
+ */
+.studio-pad-top {
+  top: 22px; bottom: auto;
+  border-top: 0; border-bottom: 1px solid var(--borde);
+}
+/* Tres grupos de una columna, con el ancho justo para que sus botones midan lo
+   mismo que los de abajo: allí seis columnas se reparten el hueco menos dos
+   huecos entre grupos, y aquí tres se reparten la mitad de eso más los dos
+   huecos que se ahorran. Sale la misma cuenta y el mismo botón. */
+.studio-pad-top .studio-pad-grid {
+  flex: none;
+  width: calc((min(100%, 520px) - 20px) / 2 + 20px);
+  grid-template-columns: repeat(3, 1fr);
+}
+.studio-hist, .studio-make, .studio-look { grid-template-columns: 1fr; }
+/* Los menús de estas barras cuelgan de la propia barra —los grupos recortan lo
+   que se sale de sus esquinas— y se colocan a mano bajo su botón. */
+.studio-pad > .studio-pop { max-width: min(300px, 78vw); }
+.studio-pad button.on {
+  background: linear-gradient(180deg, #b8912f, #7c5c17);
+  color: #241a08;
+}
+/* La muestra de color del botón, del tamaño de un icono. */
+.studio-swatch-big { width: 19px; height: 19px; border-radius: 5px; }
+.studio-mat-grid { display: flex; flex-direction: column; gap: 3px; }
+.studio-mat {
+  display: flex; align-items: center; gap: 9px;
+  justify-content: flex-start; text-align: left;
+  padding: 7px 9px; font-size: 13px;
+}
+.studio-mat.active { border-color: var(--gold); background: rgba(201,162,39,.28); }
+
 .studio-cross { grid-template-columns: repeat(2, 1fr); }
 .studio-scale { grid-template-columns: repeat(3, 1fr); }
 .studio-lift, .studio-pad-acts { grid-template-columns: 1fr; }
