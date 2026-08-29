@@ -532,10 +532,21 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  */
 .studio-pad {
   position: absolute; left: 0; right: 0; bottom: 0;
-  display: flex; justify-content: center; align-items: center; gap: 14px;
+  display: flex; justify-content: center;
   padding: 6px;
   background: var(--papel);
   border-top: 1px solid var(--borde);
+}
+/*
+ * Rejilla, no fila: cada grupo se lleva tantas columnas como botones tiene de
+ * ancho —mover 2, subir 1, escalar 3, acciones 1— y los siete reparten el
+ * hueco que haya. Así la barra cabe igual en un teléfono pequeño que en uno
+ * grande, sin anchos escritos a mano, y el tope la deja de un tamaño cómodo
+ * cuando sobra sitio.
+ */
+.studio-pad-grid {
+  flex: 1; max-width: 520px;
+  display: grid; grid-template-columns: 2fr 1fr 3fr 1fr; gap: 10px;
 }
 /*
  * Cada grupo es una pieza redondeada con sus botones dentro, separados por un
@@ -543,16 +554,17 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * generosas y el relleno plano. Las flechas van en cruz de dos por dos y subir
  * y bajar uno encima de otro, que es como se apunta con el pulgar sin mirar.
  */
-.studio-cross, .studio-lift, .studio-pad-acts {
+.studio-cross, .studio-lift, .studio-scale, .studio-pad-acts {
   display: grid; gap: 1px;
   background: #ded2b8;
   border-radius: 14px; overflow: hidden;
   box-shadow: 0 1px 2px rgba(90, 70, 30, .14);
 }
 .studio-cross { grid-template-columns: repeat(2, 1fr); }
+.studio-scale { grid-template-columns: repeat(3, 1fr); }
 .studio-lift, .studio-pad-acts { grid-template-columns: 1fr; }
 .studio-pad button {
-  width: 46px; height: 36px; padding: 0; margin: 0;
+  width: auto; height: 36px; min-width: 0; padding: 0; margin: 0;
   border: 0; border-radius: 0;
   background: #fbf8f1;
   color: var(--tinta);
@@ -567,6 +579,10 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .studio-pad .studio-del { background: #fbf8f1; color: #c0392b; }
 .studio-pad .studio-del:hover { background: #f8e9e6; }
 .studio-pad .studio-del:active { background: #f2d9d4; }
+/* Un lado que esta pieza no tiene: se apaga, no se esconde, para que la barra
+   no cambie de forma al saltar de una pieza a otra. */
+.studio-pad button:disabled { opacity: .3; cursor: default; }
+.studio-pad button:disabled:hover { background: #fbf8f1; }
 
 /* Número con sus botones de paso: sin ellos no hay forma de afinar con el dedo. */
 .studio-num { display: flex; align-items: center; gap: 4px; }
@@ -834,7 +850,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   :root { --pad-h: 98px; }
   .studio-piece, .studio-view-tools button, .studio-actions button, .studio-props .catalog-tabs button { min-height: 40px; }
   .studio-part { padding: 9px; font-size: 13.5px; }
-  .studio-pad button { width: 52px; height: 42px; }
+  .studio-pad button { height: 42px; }
   .studio-pad svg { width: 23px; height: 23px; }
   .studio-bump { width: 38px; height: 38px; }
   .studio-num input { width: 58px; }
@@ -851,7 +867,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  */
 @media (max-width: 620px) and (max-height: 640px) and (orientation: portrait) {
   :root { --pad-h: 86px; }
-  .studio-pad button { width: 46px; height: 36px; }
+  .studio-pad button { height: 36px; }
   .studio-pad svg { width: 21px; height: 21px; }
   .studio-panel { height: 26vh; }
 }
