@@ -30,7 +30,7 @@ import {
   cloudEnabled, syncDesigns, pendingCount, allDesigns,
 } from './data/designs.js';
 import {
-  allPieces, getPiece, savePiece, deletePiece, freeKey, syncPieces,
+  allPieces, getPiece, savePiece, deletePiece, freeKey, syncPieces, pendingPieces,
   MAX_PIECES, MAX_PIECE_PARTS,
 } from './data/pieces.js';
 import { drawSprite } from './sprites.js';
@@ -252,7 +252,8 @@ export class Studio {
     this.showPick();
     // Al abrir se mira qué hay en la nube: puede haber cambiado desde otro
     // dispositivo, o haberse quedado algo mío por enviar la última vez.
-    this.showCloud(pendingCount() ? `sin enviar (${pendingCount()})` : 'comprobando...');
+    const sinEnviar = pendingCount() + pendingPieces();
+    this.showCloud(sinEnviar ? `sin enviar (${sinEnviar})` : 'comprobando...');
     this.cloudSync(true);
   }
 
@@ -407,6 +408,42 @@ export class Studio {
     this.cloudSync();
   }
 
+  /**
+   * Lo mismo, pero sabiendo qué piezas han cambiado: es lo que llega de la
+   * nube, y ahí no hace falta tirar los sprites de todo el que lleve piezas
+   * propias, sólo los de quien lleve éstas.
+   */
+  afterPieceChange(keys) {
+    const tocadas = new Set(keys.map((k) => MINE + k));
+    const conLaPieza = allDesigns()
+      .filter((d) => d.parts.some((p) => tocadas.has(p.k)))
+      .map((d) => d.target);
+    if (conLaPieza.length) rebaseBuildingLooks(conLaPieza);
+  }
+
+  /**
+   * La pieza que hay en la mesa ha cambiado en la nube. Como con los edificios,
+   * se repone la copia de trabajo sin soltar la pieza elegida; y si lo que ha
+   * pasado es que la han borrado desde otro sitio, aquí ya no hay nada que
+   * modelar y se vuelve a la parrilla.
+   */
+  refreshPieceFromCloud() {
+    if (this.saveTimer) return;
+    const def = getPiece(this.pieza);
+    if (!def) {
+      this.showPick();
+      this.status('La pieza que había en la mesa se ha borrado desde otro sitio.');
+      return;
+    }
+    if (JSON.stringify(def.parts) === JSON.stringify(this.design?.parts ?? null)) return;
+    this.design.parts = structuredClone(def.parts);
+    this.selected = Math.min(this.selected, this.design.parts.length - 1);
+    this.baked = null;
+    this.renderPanel();
+    this.redraw();
+    this.schedulePreview();
+  }
+
   /** Le pone al edificio el modelo de una plantilla, ajustado a su huella. */
   newDesign(templateKey) {
     if (!this.type) return;
@@ -462,39 +499,55 @@ export class Studio {
     if (!cloudEnabled()) return;
     clearTimeout(this.cloudTimer);
     this.cloudTimer = 0;
-    const go = () => {
+    const go = async () => {
       this.cloudTimer = 0;
       this.showCloud('...');
-      syncDesigns().then((r) => {
-        if (r.state === 'error') {
-          // Lo hecho no se pierde: está guardado aquí y sale en cuanto se pueda.
-          // Decir *por qué* no ha podido ser ahorra media tarde: no es lo mismo
-          // que falte la tabla en el proyecto que que no haya cobertura.
-          const porQue = {
-            table: ['falta la tabla', 'El proyecto no tiene la tabla de los modelos: falta aplicar la migración de supabase/migrations/.'],
-            auth: ['clave rechazada', 'El proyecto no acepta la clave, o sus políticas no dejan pasar. Se revisa en js/data/cloud-config.js.'],
-          }[r.reason];
-          const guardado = r.pending
-            ? ` Lo tuyo (${r.pending}) está guardado en este navegador y sale en cuanto se pueda.`
-            : '';
-          this.showCloud(
-            porQue ? porQue[0] : (r.pending ? `sin enviar (${r.pending})` : 'sin conexión'),
-            (porQue ? porQue[1] : 'No se ha podido hablar con la nube. Se sigue trabajando aquí con normalidad.') + guardado,
-          );
-          return;
-        }
-        if (r.changed.length) {
-          rebaseBuildingLooks(r.changed);
-          // Lo que ha llegado de fuera puede ser el edificio que hay en la mesa.
-          // Si el taller ya está cerrado no hay nada que repintar: los sprites
-          // los ha tirado `rebaseBuildingLooks` y la partida los rehará.
-          if (!this.isOpen()) { /* nada que enseñar */ }
-          else if (this.vista === 'elegir') this.renderPick();
-          else if (r.changed.includes(this.type)) this.refreshFromCloud();
-          else this.schedulePreview();
-        }
-        this.showCloud('al día', 'Lo que hay aquí es lo que ve todo el mundo.');
-      });
+      // Las piezas van delante de los modelos, igual que al arrancar: si un
+      // edificio llega de la nube con una pieza propia que aquí todavía no
+      // está de alta, el validador se la quitaría por no existir.
+      const rp = await syncPieces();
+      const r = await syncDesigns();
+
+      const fallo = rp.state === 'error' ? rp : (r.state === 'error' ? r : null);
+      const sinEnviar = (rp.pending || 0) + (r.pending || 0);
+      if (fallo) {
+        // Lo hecho no se pierde: está guardado aquí y sale en cuanto se pueda.
+        // Decir *por qué* no ha podido ser ahorra media tarde: no es lo mismo
+        // que falte una tabla en el proyecto que que no haya cobertura.
+        const porQue = {
+          table: ['falta una tabla', 'Al proyecto le falta una de las tablas del taller: hay que aplicar las migraciones de supabase/migrations/.'],
+          auth: ['clave rechazada', 'El proyecto no acepta la clave, o sus políticas no dejan pasar. Se revisa en js/data/cloud-config.js.'],
+        }[fallo.reason];
+        const guardado = sinEnviar
+          ? ` Lo tuyo (${sinEnviar}) está guardado en este navegador y sale en cuanto se pueda.`
+          : '';
+        this.showCloud(
+          porQue ? porQue[0] : (sinEnviar ? `sin enviar (${sinEnviar})` : 'sin conexión'),
+          (porQue ? porQue[1] : 'No se ha podido hablar con la nube. Se sigue trabajando aquí con normalidad.') + guardado,
+        );
+        return;
+      }
+
+      // Una pieza que llega distinta cambia todos los edificios que la lleven,
+      // así que los sprites de ésos se tiran aunque su modelo no se haya
+      // tocado. Y si la que se está haciendo es una de ésas, se repone.
+      if (rp.changed.length) {
+        this.afterPieceChange(rp.changed);
+        if (this.isOpen() && this.enPieza() && rp.changed.includes(this.pieza)) this.refreshPieceFromCloud();
+      }
+      if (r.changed.length) {
+        rebaseBuildingLooks(r.changed);
+        // Lo que ha llegado de fuera puede ser el edificio que hay en la mesa.
+        // Si el taller ya está cerrado no hay nada que repintar: los sprites
+        // los ha tirado `rebaseBuildingLooks` y la partida los rehará.
+        if (!this.isOpen()) { /* nada que enseñar */ }
+        else if (this.vista === 'elegir') this.renderPick();
+        else if (r.changed.includes(this.type)) this.refreshFromCloud();
+        else this.schedulePreview();
+      } else if (rp.changed.length && this.isOpen() && this.vista === 'elegir') {
+        this.renderPick();
+      }
+      this.showCloud('al día', 'Lo que hay aquí es lo que ve todo el mundo.');
     };
     if (now) go();
     else this.cloudTimer = setTimeout(go, 1200);

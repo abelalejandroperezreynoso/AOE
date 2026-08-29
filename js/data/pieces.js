@@ -164,6 +164,9 @@ export function allPieces() {
 export function getPiece(key) { return pieces.get(key) || null; }
 export function hasPiece(key) { return pieces.has(key); }
 
+/** Cuántas piezas he tocado y la nube todavía no sabe. */
+export function pendingPieces() { return pending.size; }
+
 /** Guarda una pieza (nueva o rehecha) y la deja de alta en el catálogo. */
 export function savePiece(raw, key = null) {
   const def = cleanPiece(raw, key);
