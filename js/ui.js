@@ -975,7 +975,7 @@ export class UI {
         stats += `<div class="carry">En construcción: ${Math.round(e.progress * 100)}%</div>`;
       }
       box.innerHTML = `<div class="sel-name">${def.name}</div>
-        <div class="sel-owner" style="color:${PLAYER_COLORS[p.colorIdx].light}">${p.name}</div>
+        <div class="sel-owner" style="color:${PLAYER_COLORS[p.colorIdx].dark}">${p.name}</div>
         ${stats}<div class="sel-desc">${def.desc || ''}</div>`;
       info.appendChild(box);
     } else {
@@ -1005,8 +1005,8 @@ export class UI {
     box.className = 'sel-text';
     const owner = n.owner === null || n.owner === undefined ? null : g.players[n.owner];
     const ownerLine = owner
-      ? `<div class="sel-owner" style="color:${PLAYER_COLORS[owner.colorIdx].light}">${owner.name}</div>`
-      : '<div class="sel-owner" style="color:#9c8a68">Sin dueño</div>';
+      ? `<div class="sel-owner" style="color:${PLAYER_COLORS[owner.colorIdx].dark}">${owner.name}</div>`
+      : '<div class="sel-owner" style="color:var(--tinta-3)">Sin dueño</div>';
     box.innerHTML = `<div class="sel-name">${NODE_NAMES[n.kind] || n.kind}</div>
       ${ownerLine}
       <div class="stat-row"><span>${RES_NAME[n.res]}: ${Math.ceil(n.amount)}</span></div>

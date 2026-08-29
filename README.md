@@ -391,7 +391,7 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
 
 ```
 index.html          Estructura de la página y el HUD
-css/style.css       Interfaz, incluida la adaptación a móvil
+css/style.css       Interfaz, incluida la adaptación a móvil y la paleta clara
 js/config.js        Datos de juego: edades, unidades, edificios, tecnologías
 js/main.js          Menú, arranque y bucle principal
 js/game.js          Estado de la partida, simulación, combate y órdenes
@@ -435,6 +435,17 @@ Para depurar, el objeto de la partida está disponible en la consola como
 
 ## Notas técnicas
 
+- La interfaz va en **claro**: papel de fondo, tinta para las letras y el
+  dorado de siempre para lo que manda. Los tonos que se repiten están en las
+  fichas de `:root` (`--papel`, `--tinta`, `--tinta-2`, `--tinta-3`, `--borde`,
+  `--gold`, `--gold-l`), así que se repinta todo desde ahí. Cada letra llega a
+  4,5:1 contra su fondo y el borde de los controles a 3:1, que es lo que hace
+  falta para que un tema claro se lea. El arte del juego —el mapa, los sprites
+  y el lienzo verde del taller— no es interfaz y no cambia.
+- `theme-color` en blanco tiñe las barras del navegador y, con ellas, la franja
+  del reloj y la batería del teléfono. Es sólo el tinte del navegador: no toca
+  la pantalla completa ni las zonas seguras, que tienen su propia historia en
+  `CLAUDE.md`.
 - El terreno se dibuja una sola vez en un lienzo fuera de pantalla y se compone
   con transformaciones; la niebla se calcula a un quinto de resolución y sólo se
   rehace cuando cambian la cámara o la visibilidad.
