@@ -502,11 +502,13 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * borde de abajo del lienzo, no en un bloque flotante: en un teléfono la mesa
  * mide cuatro dedos y un bloque en una esquina se comería media pieza.
  */
+/* Pegada al borde de arriba del lienzo, con los demás mandos: el velo cae
+   hacia el modelo para que los botones se lean sobre cualquier fondo. */
 .studio-pad {
-  position: absolute; left: 0; right: 0; bottom: 0;
+  position: absolute; left: 0; right: 0; top: 22px;
   display: flex; justify-content: center; gap: 10px;
   padding: 4px 6px;
-  background: linear-gradient(180deg, rgba(255, 253, 247, 0), rgba(255, 253, 247, .8) 45%);
+  background: linear-gradient(0deg, rgba(255, 253, 247, 0), rgba(255, 253, 247, .8) 45%);
 }
 .studio-cross, .studio-lift, .studio-pad-acts { display: flex; gap: 3px; }
 .studio-pad button {
@@ -632,20 +634,24 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 }
 
 /*
- * Teléfono: nada de desplazar la pantalla entera para llegar a un control. La
- * mesa se queda arriba con todo el hueco que sobra y los paneles pasan a una
- * hoja de abajo con pestañas, de la que sólo se ve una cosa a la vez —la
- * paleta, la pieza, la ficha, los colores o la lista de edificios— y que se
- * puede plegar para mirar el modelo a pantalla completa.
+ * Teléfono: nada de desplazar la pantalla entera para llegar a un control, y
+ * nada de marco. El taller ocupa el aparato de borde a borde, los mandos se
+ * juntan arriba —pestañas, panel, herramientas y la cruceta, en ese orden— y
+ * el modelo se lleva todo lo que queda por debajo, de una pieza. De los
+ * paneles sólo se ve uno a la vez —la paleta, la pieza, la ficha, los colores
+ * o la lista de edificios—, y se pliegan para mirar el modelo entero.
  */
 @media (max-width: 620px) {
-  /* El taller aprovecha hasta el borde: cada píxel es mesa de trabajo. */
+  /* El taller aprovecha hasta el borde de verdad: sin tarjeta. El marco, su
+     borde y su sombra se comían un dedo por cada lado, y aquí el sitio es
+     mesa de trabajo. Sólo se respetan las zonas seguras del aparato. */
   #studio {
-    padding:
-      calc(6px + var(--sa-top)) calc(6px + var(--sa-right))
-      calc(6px + var(--sa-bottom)) calc(6px + var(--sa-left));
+    padding: var(--sa-top) var(--sa-right) var(--sa-bottom) var(--sa-left);
   }
-  .studio-card { padding: 7px 8px 5px; }
+  .studio-card {
+    padding: 6px 8px 0;
+    border: 0; border-radius: 0; box-shadow: none;
+  }
   /* La cabecera, en una sola línea: el título, el aviso recortado y el botón.
      Cada renglón que se ahorra aquí es lienzo. */
   .studio-card .catalog-top { flex-wrap: nowrap; margin-bottom: 5px; gap: 6px; }
@@ -673,8 +679,10 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
     flex-direction: column; flex-wrap: nowrap; align-items: stretch;
     overflow: hidden; gap: 8px; margin-top: 0;
   }
-  .studio-main { order: 1; flex: 1 1 auto; min-height: 120px; }
-  .studio-props { order: 2; width: 100%; flex: none; }
+  /* Los mandos, arriba; el modelo, todo lo de abajo. Así se mira de un tirón,
+     sin filas de botones partiéndolo por el pie. */
+  .studio-props { order: 1; width: 100%; flex: none; }
+  .studio-main { order: 2; flex: 1 1 auto; min-height: 120px; }
   .studio-side { display: none; }
   .studio-stage { flex: 1; height: auto; min-height: 120px; }
 
@@ -700,7 +708,11 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * del lienzo en vez de debajo.
  */
 @media (max-height: 520px) and (max-width: 1040px) {
-  .studio-card { height: 100%; padding: 8px 10px 6px; }
+  #studio { padding: var(--sa-top) var(--sa-right) var(--sa-bottom) var(--sa-left); }
+  .studio-card {
+    height: 100%; padding: 6px 8px 0;
+    border: 0; border-radius: 0; box-shadow: none;
+  }
   .studio-card .catalog-foot { display: none; }
   .studio-body {
     flex-direction: row; flex-wrap: nowrap; align-items: stretch;
