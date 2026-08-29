@@ -165,10 +165,14 @@ una partida sin poder desequilibrarla. Y siempre se puede **restablecer**.
 juego, en el mismo orden de la barra de obra, cada uno con la cara que tenga
 ahora mismo y una línea que dice de quién es esa cara —la original del juego, la
 que trae hecha el juego o la que le has hecho tú—. Al elegir uno se pone en la
-mesa; **Elegir otro** vuelve a la parrilla, y desde ella se sale al menú. La
-misma lista queda en la columna de la izquierda para cambiar de edificio sin
-salir de la mesa (en el teléfono, en la pestaña «Edificios» de la hoja de
-abajo).
+mesa; **Elegir otro** vuelve a la parrilla, y desde ella se sale al menú. Esa
+parrilla es la única lista de edificios que hay: elegido uno, la mesa habla
+sólo de él.
+
+En la pestaña **Edificio** está lo que se puede hacer con el que hay puesto:
+**Compartir** lo saca como texto, **Importar** pega uno que te hayan pasado y
+**Restablecer** le devuelve la cara que tenía. Debajo, su ficha —huella, edad,
+coste, resistencia— y, plegado, empezar de nuevo por otra plantilla.
 
 Un modelo se arma con **piezas** —cajas, cilindros, cúpulas, tejados a dos y a
 cuatro aguas, faldones, vigas, ruedas, almenas, torreones, puertas, ventanas,
@@ -250,7 +254,7 @@ El taller cabe en un teléfono sin renunciar a nada:
   Un modelo que no esté en la lista se lleva un valor intermedio, que un canto
   de más o de menos no rompe nada.
 - **Los mandos, arriba; el modelo, abajo.** Bajo la cabecera van las pestañas
-  —Pieza, Edificio, Colores y Edificios—, el panel que toque y las
+  —Pieza, Edificio y Colores—, el panel que toque y las
   herramientas, y el modelo se lleva de una pieza todo lo que queda. Al pie del
   propio lienzo va la barra de la pieza elegida, cuando hay una. De los paneles sólo se ve uno a la vez, y
   se **pliegan** con el botón de la esquina o tocando otra vez la pestaña que
