@@ -174,6 +174,11 @@ En la pestaña **Edificio** está lo que se puede hacer con el que hay puesto:
 **Restablecer** le devuelve la cara que tenía. Debajo, su ficha —huella, edad,
 coste, resistencia— y, plegado, empezar de nuevo por otra plantilla.
 
+Las **piezas del modelo** también viven en una hoja, ésta **a media pantalla**:
+debajo se eligen, con cada una dibujada como está puesta y su color al lado, y
+encima se sigue viendo el modelo, que se recoloca solo en lo que la hoja deja
+libre. Se abre con **Pieza**, y elegir no la cierra, para poder ir mirando.
+
 Añadir una pieza abre una **hoja que sube desde abajo**, al modo de iOS: fondo
 velado, esquinas de arriba redondeadas y asa. Dentro, el catálogo entero con
 **cada pieza dibujada como va a colocarse** —horneada igual que en la partida y
@@ -221,7 +226,7 @@ Para colocar:
   se vuelva cono, y se apaga en las que no lo tienen (un barril no se estira
   desde aquí). La barra es una rejilla de siete columnas, así que cabe igual en
   un teléfono pequeño que en uno grande.
-- **Arriba**: **deshacer y rehacer**, **añadir** —abre el catálogo— y
+- **Arriba**: **deshacer y rehacer**, **añadir** —abre el catálogo de piezas— y
   **duplicar**, y el **color de la pieza** y **borrarla**. El botón del color
   enseña el material que lleva y despliega los demás con su muestra, para
   cambiarlo de un toque. Sus botones miden lo mismo que los de abajo porque
@@ -278,7 +283,7 @@ El taller cabe en un teléfono sin renunciar a nada:
   Un modelo que no esté en la lista se lleva un valor intermedio, que un canto
   de más o de menos no rompe nada.
 - **Los mandos, arriba; el modelo, abajo.** Bajo la cabecera van las pestañas
-  —Pieza, Edificio y Colores—, el panel que toque y las
+  —Pieza, que abre su hoja, y Edificio—, el panel y las
   herramientas, y el modelo se lleva de una pieza todo lo que queda. Al pie del
   propio lienzo va la barra de la pieza elegida, cuando hay una. De los paneles sólo se ve uno a la vez, y
   se **pliegan** con el botón de la esquina o tocando otra vez la pestaña que
