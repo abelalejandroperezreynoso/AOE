@@ -42,6 +42,7 @@ let game = null, renderer = null, ui = null, raf = 0;
  */
 function startGame(opts, net = null) {
   el('main-menu').classList.add('hidden');
+  el('setup').classList.add('hidden');
   el('loading').classList.remove('hidden');
   el('loading-text').textContent = net ? 'Sincronizando la partida...' : 'Generando el mundo...';
 
@@ -131,6 +132,23 @@ function loop(now) {
 // Evita el zoom por doble toque en móviles sin bloquear los controles.
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 
+/*
+ * Los ajustes de la partida ya no están en el menú: se piden al empezar una,
+ * que es cuando importan. El menú se queda con el título y las cuatro puertas.
+ */
+function openSetup() {
+  el('main-menu').classList.add('hidden');
+  el('setup').classList.remove('hidden');
+}
+
+function closeSetup() {
+  el('setup').classList.add('hidden');
+  el('main-menu').classList.remove('hidden');
+}
+
+el('btn-new').onclick = () => { audio.ensure(); openSetup(); };
+el('btn-setup-back').onclick = closeSetup;
+
 el('btn-start').onclick = () => {
   audio.ensure();
   const seedRaw = el('opt-seed').value.trim();
@@ -164,9 +182,14 @@ function hash(str) {
   return h >>> 0;
 }
 
-// Permite empezar con Enter desde el menú.
+// Con el teclado: Enter abre los ajustes desde el menú y empieza desde ellos;
+// Escape vuelve al menú sin empezar nada.
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !el('main-menu').classList.contains('hidden')) el('btn-start').click();
+  const enSetup = !el('setup').classList.contains('hidden');
+  const enMenu = !el('main-menu').classList.contains('hidden');
+  if (e.key === 'Enter' && enSetup) el('btn-start').click();
+  else if (e.key === 'Enter' && enMenu) el('btn-new').click();
+  else if (e.key === 'Escape' && enSetup) closeSetup();
 });
 
 window.__lobbyUi = lobbyUi; // útil para depurar la conexión desde la consola
