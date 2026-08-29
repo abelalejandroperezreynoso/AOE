@@ -44,6 +44,19 @@ const BUILDING_ORDER = [
 const REF_KEY = 'aor-studio-ref';
 /** Lado máximo con el que se guarda la guía: es para calcar, no para enmarcar. */
 const REF_MAX = 640;
+/*
+ * Qué campo de cada pieza hace de ancho, de largo y de alto. No todas los
+ * llevan con el mismo nombre: la caja tiene ancho y fondo, el cilindro radios,
+ * la viga largo y grueso y la cúpula un achatado que la estira a lo alto. Se
+ * coge el primero que la pieza traiga; si no trae ninguno, ese lado no se
+ * puede estirar desde la barra y su botón se apaga.
+ */
+const SCALE_FIELDS = {
+  w: ['w', 'r', 'r0', 'th'],
+  d: ['d', 'len'],
+  h: ['h', 'rise', 'flat'],
+};
+
 const SNAPS = [
   [0.05, 'fino (0,05)'], [0.1, 'medio (0,1)'], [0.25, 'cuarto (0,25)'], [0.5, 'media casilla'],
 ];
@@ -1637,6 +1650,27 @@ export class Studio {
       mk('<path d="m6 14 6-6 6 6"/>', 'Subir la pieza', () => this.nudge(0, 0, 1)),
       mk('<path d="m6 10 6 6 6-6"/>', 'Bajar la pieza', () => this.nudge(0, 0, -1)),
     );
+    /*
+     * Estirar y encoger, un lado por columna: ancho, largo y alto. Arriba
+     * crecen y abajo encogen, con las flechas apuntando por el mismo diagonal
+     * por el que se mueve ese lado en la mesa.
+     */
+    const escala = document.createElement('div');
+    escala.className = 'studio-scale';
+    const mkEscala = (eje, dibujo, title, dir) => {
+      const b = mk(dibujo, title, () => this.scale(eje, dir));
+      b.dataset.eje = eje;
+      return b;
+    };
+    escala.append(
+      mkEscala('w', '<path d="M4 4 20 20"/><path d="M4 10V4h6"/><path d="M14 20h6v-6"/>', 'Ensanchar', 1),
+      mkEscala('d', '<path d="M20 4 4 20"/><path d="M14 4h6v6"/><path d="M4 14v6h6"/>', 'Alargar', 1),
+      mkEscala('h', '<path d="M12 3v18"/><path d="m7 8 5-5 5 5"/><path d="m7 16 5 5 5-5"/>', 'Subir el alto', 1),
+      mkEscala('w', '<path d="M3 3 9 9"/><path d="M3 9h6V3"/><path d="M21 21 15 15"/><path d="M21 15h-6v6"/>', 'Estrechar', -1),
+      mkEscala('d', '<path d="M21 3 15 9"/><path d="M21 9h-6V3"/><path d="M3 21 9 15"/><path d="M3 15h6v6"/>', 'Acortar', -1),
+      mkEscala('h', '<path d="M12 3v6"/><path d="m8 5 4 4 4-4"/><path d="M12 21v-6"/><path d="m8 19 4-4 4 4"/>', 'Bajar el alto', -1),
+    );
+
     const acts = document.createElement('div');
     acts.className = 'studio-pad-acts';
     acts.append(
@@ -1648,7 +1682,34 @@ export class Studio {
         + '<path d="M10.2 11v5M13.8 11v5"/>',
         'Borrar la pieza', () => this.deletePart(), 'studio-del'),
     );
-    pad.append(cross, lift, acts);
+    // Una rejilla, no una fila: cada grupo se lleva tantas columnas como
+    // botones tiene de ancho, y así la barra cabe siempre, del teléfono
+    // pequeño al grande, sin números de ancho escritos a mano.
+    const rejilla = document.createElement('div');
+    rejilla.className = 'studio-pad-grid';
+    rejilla.append(cross, lift, escala, acts);
+    pad.append(rejilla);
+  }
+
+  /** Qué campo de esta pieza hace de ancho, de largo o de alto. */
+  scaleField(part, eje) {
+    const campos = PARTS[part.k]?.fields || [];
+    return SCALE_FIELDS[eje].find((k) => campos.includes(k)) || null;
+  }
+
+  /** Estira o encoge la pieza por uno de sus tres lados. */
+  scale(eje, dir) {
+    const part = this.design?.parts[this.selected];
+    if (!part) return;
+    const key = this.scaleField(part, eje);
+    if (!key) return;
+    const paso = FIELDS[key].step;
+    this.pushUndo();
+    part[key] = clampField(key, part[key] + dir * paso);
+    // El radio de arriba acompaña al de abajo: por separado el cilindro se
+    // convierte en cono, y eso se afina en la ficha, no aquí.
+    if (key === 'r0' && part.r1 !== undefined) part.r1 = clampField('r1', part.r1 + dir * paso);
+    this.afterChange();
   }
 
   /** Empuja la pieza un paso de rejilla en la dirección que se ve. */
@@ -1670,6 +1731,9 @@ export class Studio {
   updatePad() {
     const part = this.design?.parts[this.selected];
     el('studio-pad').classList.toggle('hidden', !part);
+    for (const b of document.querySelectorAll('.studio-scale button')) {
+      b.disabled = !part || !this.scaleField(part, b.dataset.eje);
+    }
     el('studio-view').classList.toggle('lifting', this.moveMode === 'z');
   }
 
