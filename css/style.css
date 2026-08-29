@@ -29,6 +29,61 @@
   --bottom-min: var(--bottom-h);
 
   --prod-h: 46px; /* alto total de la tira de producción, con bordes y relleno */
+
+  /*
+   * Cuánto mide de verdad lo que se ve. De aquí cuelgan la partida (`#app`) y
+   * las superposiciones (`.overlay`), que son las dos capas que tienen que
+   * llegar exactamente al filo de la pantalla y ni un píxel más.
+   *
+   * `vh` es la ventana grande —la de cuando el navegador ha recogido sus
+   * barras—, así que en un móvil con las barras puestas el juego se sale por
+   * abajo y lo que queda fuera está cortado. Sólo se deja de reserva para los
+   * navegadores muy viejos.
+   */
+  --app-h: 100vh;
+}
+@supports (height: 100dvh) {
+  /*
+   * `dvh` es lo que se ve ahora mismo, con las barras que el navegador tenga
+   * puestas en este momento, y las reajusta él solo al recogerlas o sacarlas. Y
+   * el teclado no lo toca: al abrirse encoge la ventana visual, no ésta.
+   *
+   * Se probó a medirlo a mano con `visualViewport` y salió peor: esa medida sí
+   * encoge con el teclado, había que ignorarla mientras se escribía, y en iOS
+   * el teclado se cierra sin soltar el campo. Se quedaba clavada en el alto de
+   * cuando estaba puesto y dejaba media pantalla en negro. Aquí no hay nada
+   * guardado que se pueda quedar viejo.
+   */
+  :root { --app-h: 100dvh; }
+}
+
+/*
+ * Y la excepción, que es el precio de `black-translucent` y de donde salía la
+ * franja negra de abajo que echó atrás el primer intento de app instalable.
+ *
+ * Instalado en la pantalla de inicio no hay barras de navegador que aparezcan y
+ * desaparezcan, así que `dvh` no tiene nada que descontar y debería dar la
+ * pantalla entera. En iOS no la da: descuenta la franja de la hora **pero
+ * empieza a pintar arriba del todo, por debajo de ella**, así que esos píxeles
+ * sobran por abajo. Ésa era la franja, y `100%`, `inset: 0` e `innerHeight`
+ * valen todos lo mismo, con lo que ninguno servía de arreglo.
+ *
+ * Medido en el iPhone donde fallaba, de 375×812 y con el juego instalado:
+ *
+ *     modo standalone · pantalla 375x812 · zonas 50/0/34/0
+ *     inner 762 · raiz 762 · inset:0 762
+ *     vh 812 · dvh 762 · svh 762 · lvh 812
+ *
+ * `vh` y `lvh` dan la pantalla entera; los demás, 812 menos los 50 de la zona
+ * segura de arriba. Aquí `vh` no tiene su inconveniente de siempre, porque en
+ * modo aplicación no hay barras que recoger: es la pantalla y punto. Y donde
+ * iOS no falla, `vh` y `dvh` valen lo mismo y esto no cambia nada.
+ *
+ * De la franja de la hora y de la barra de inicio siguen apartando las zonas
+ * seguras, que ya las llevaban las barras del HUD y las superposiciones.
+ */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  :root { --app-h: 100vh; }
 }
 
 * { box-sizing: border-box; }
@@ -57,7 +112,10 @@ html, body {
  * la tarjeta empieza arriba y se desplaza entera.
  */
 .overlay {
-  position: fixed; inset: 0;
+  /* Sin `inset: 0`: hay que llegar al filo de la pantalla, no al de la ventana
+     de maquetar, y en modo aplicación no son lo mismo. Ver `--app-h`. */
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--app-h);
   display: flex; align-items: flex-start; justify-content: center;
   background: radial-gradient(circle at 50% 30%, rgba(60,44,26,.55), rgba(8,6,4,.94));
   z-index: 50;
@@ -811,7 +869,8 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 /* ---------- Juego ---------- */
 
-#app { position: fixed; inset: 0; }
+/* Igual que `.overlay`: el alto lo manda `--app-h`, no `inset: 0`. */
+#app { position: fixed; top: 0; left: 0; right: 0; height: var(--app-h); }
 
 #game {
   position: absolute;
