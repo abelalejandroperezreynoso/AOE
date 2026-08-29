@@ -196,11 +196,14 @@ Para colocar:
 
 - **Se coloca arrastrando**: pulsa una pieza en el modelo y muévela por el
   suelo. La rueda acerca y aleja, y arrastrar el fondo mueve la vista.
-- Al elegir una pieza sale al pie del lienzo su **barra**, en tres grupos: las
-  cuatro flechas la empujan un paso de rejilla en la dirección que se ve, las
-  otras dos la suben y la bajan, y las últimas la duplican o la borran. Sin
-  pieza elegida no hay barra: al poner un edificio en la mesa se llega a
-  verlo, no con una pieza cogida de antemano.
+- Al elegir una pieza sale al pie del lienzo su **barra**, en tres piezas
+  redondeadas con los botones dentro separados por un pelo, al modo de los
+  mandos agrupados de iOS: las cuatro flechas **en cruz de dos por dos** la
+  empujan un paso de rejilla en la dirección que se ve, subir y bajar van **uno
+  encima de otro**, y duplicar y borrar igual. Los iconos están dibujados a
+  trazo, todos con el mismo grosor, y borrar se distingue por el color del
+  icono y no por un botón rojo entero. Sin pieza elegida no hay barra: al poner
+  un edificio en la mesa se llega a verlo, no con una pieza cogida de antemano.
 - Para **subir y bajar arrastrando**, el botón **Mover / Altura** (o mantener
   **Mayús**) cambia lo que hace el arrastre.
 - **Girar vista** enseña el modelo desde otro lado sin tocar el edificio, que
@@ -213,8 +216,8 @@ Para colocar:
   agranda). Mientras está suelta el arrastre es suyo y no toca las piezas;
   cuando esté en su sitio, **Bloquear la imagen** la deja fija y se vuelve a
   modelar con normalidad. Se guarda en ese navegador, achicada, hasta que se
-  quite. Las flechas y la cruceta giran con la
-  vista: siempre empujan hacia donde apuntan en la pantalla.
+  quite. Las flechas del teclado y las de la barra giran con la vista:
+  siempre empujan hacia donde apuntan en la pantalla.
 - Con **teclado**: flechas para mover (con **Alt**, arriba y abajo), **Mayús**
   para ir de cuatro en cuatro, **Supr** borra y **Ctrl+Z** deshace.
 - Mientras se arrastra, la mesa pinta las caras ordenadas de lejos a cerca, que

@@ -39,6 +39,10 @@
   --bottom-min: var(--bottom-h);
 
   --prod-h: 46px; /* alto total de la tira de producción, con bordes y relleno */
+  /* Alto de la barra de la pieza. Lo lee `fit()` para dejarle el hueco al pie
+     del lienzo, y crece con el dedo, así que vive aquí y no en un número
+     suelto del JS. */
+  --pad-h: 86px;
 }
 
 * { box-sizing: border-box; }
@@ -511,19 +515,41 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  */
 .studio-pad {
   position: absolute; left: 0; right: 0; bottom: 0;
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 5px 6px;
+  display: flex; justify-content: center; align-items: center; gap: 14px;
+  padding: 6px;
   background: var(--papel);
   border-top: 1px solid var(--borde);
 }
-.studio-cross, .studio-lift, .studio-pad-acts { display: flex; gap: 3px; }
-/* La raya entre grupos dice qué hace cada tanda sin escribirlo. */
-.studio-lift, .studio-pad-acts { padding-left: 7px; border-left: 1px solid #e0d4ba; }
-.studio-pad button {
-  width: 36px; height: 32px; padding: 0;
-  font-size: 14px; line-height: 1; border-radius: 7px;
+/*
+ * Cada grupo es una pieza redondeada con sus botones dentro, separados por un
+ * pelo, al modo de los mandos agrupados de iOS: sin borde por botón, esquinas
+ * generosas y el relleno plano. Las flechas van en cruz de dos por dos y subir
+ * y bajar uno encima de otro, que es como se apunta con el pulgar sin mirar.
+ */
+.studio-cross, .studio-lift, .studio-pad-acts {
+  display: grid; gap: 1px;
+  background: #ded2b8;
+  border-radius: 14px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(90, 70, 30, .14);
 }
-.studio-pad .studio-del { background: linear-gradient(180deg, rgba(192, 70, 56, .96), rgba(147, 41, 30, .96)); color: #fff; }
+.studio-cross { grid-template-columns: repeat(2, 1fr); }
+.studio-lift, .studio-pad-acts { grid-template-columns: 1fr; }
+.studio-pad button {
+  width: 46px; height: 36px; padding: 0; margin: 0;
+  border: 0; border-radius: 0;
+  background: #fbf8f1;
+  color: var(--tinta);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s;
+}
+/* El relleno cambia y el botón no se mueve: pulsar no desplaza nada. */
+.studio-pad button:hover { filter: none; background: #f3ecdc; }
+.studio-pad button:active { transform: none; background: #e6dbc0; }
+.studio-pad svg { width: 21px; height: 21px; display: block; }
+/* Borrar se distingue por el color del icono, no por un botón rojo entero. */
+.studio-pad .studio-del { background: #fbf8f1; color: #c0392b; }
+.studio-pad .studio-del:hover { background: #f8e9e6; }
+.studio-pad .studio-del:active { background: #f2d9d4; }
 
 /* Número con sus botones de paso: sin ellos no hay forma de afinar con el dedo. */
 .studio-num { display: flex; align-items: center; gap: 4px; }
@@ -787,15 +813,32 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 /* Con el dedo todo tiene que ser más gordo de lo que basta con un ratón. */
 @media (pointer: coarse) {
+  :root { --pad-h: 98px; }
   .studio-piece, .studio-view-tools button, .studio-side-actions button,
   .studio-actions button, .studio-props .catalog-tabs button { min-height: 40px; }
   .studio-part { padding: 9px; font-size: 13.5px; }
-  .studio-pad button { width: 40px; height: 40px; font-size: 16px; }
+  .studio-pad button { width: 52px; height: 42px; }
+  .studio-pad svg { width: 23px; height: 23px; }
   .studio-bump { width: 38px; height: 38px; }
   .studio-num input { width: 58px; }
   .cat-field input[type="color"] { height: 38px; width: 72px; }
   .cat-field input[type="checkbox"] { width: 22px; height: 22px; }
 }
+
+/*
+ * Teléfono pequeño y de pie: entre la hoja de propiedades y la barra de la
+ * pieza no le quedaba mesa al modelo, y se metía debajo de las dos. Aquí la
+ * hoja cede alto y la barra se queda en su tamaño de ratón, que sigue
+ * pulsándose bien. Sólo de pie: tumbado la hoja se pone al lado y no estorba.
+ * Va después del bloque del dedo, que es a quien le gana la ficha del alto.
+ */
+@media (max-width: 620px) and (max-height: 640px) and (orientation: portrait) {
+  :root { --pad-h: 86px; }
+  .studio-pad button { width: 46px; height: 36px; }
+  .studio-pad svg { width: 21px; height: 21px; }
+  .studio-panel { height: 26vh; }
+}
+
 
 /* ---------- Sala de espera ---------- */
 

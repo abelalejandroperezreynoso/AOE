@@ -90,6 +90,20 @@ export class Studio {
     el('btn-share-paste').onclick = () => this.pasteShare();
     el('btn-share-apply').onclick = () => this.applyShare();
 
+    /*
+     * El encaje automático sigue al lienzo: cualquier cosa que le cambie el
+     * tamaño —plegar la hoja, cambiar de pestaña, girar el teléfono, que salga
+     * el teclado— lo vuelve a encajar. Perseguir cada caso a mano dejaba
+     * siempre alguno fuera, y el modelo acababa metido debajo de la barra.
+     * Sólo mientras nadie haya tocado el zoom o el encuadre: entonces manda lo
+     * que haya puesto quien modela.
+     */
+    // Se guarda la referencia: un observador sin dueño puede acabar barrido.
+    this.obsMesa = new ResizeObserver(() => {
+      if (this.vista === 'editor' && this.encajado) { this.fit(); this.redraw(); }
+    });
+    this.obsMesa.observe(el('studio-stage'));
+
     for (const btn of document.querySelectorAll('#studio-tabs button')) {
       btn.onclick = () => this.showTab(btn.dataset.tab);
     }
@@ -1106,7 +1120,8 @@ export class Studio {
     // encaja entre las dos, para que no lo tapen. El hueco de abajo se reserva
     // aunque no haya pieza elegida, o el modelo daría un salto cada vez que la
     // barra aparece y desaparece.
-    const pad = 18, top = 24, bottom = 48;
+    const pad = 18, top = 24;
+    const bottom = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pad-h')) || 86;
     const usable = Math.max(60, H - top - bottom);
     // El suelo es sólo para que un modelo diminuto no quede invisible: por
     // encima de lo que cabe no puede ir, o el castillo se sale del lienzo en un
@@ -1648,10 +1663,20 @@ export class Studio {
    */
   buildPad() {
     const pad = el('studio-pad');
-    const mk = (glyph, title, fn, cls = '') => {
+    /*
+     * Iconos de trazo en vez de caracteres: ▲ y ↖ los pinta la tipografía con
+     * pesos distintos —uno macizo y el otro un hilo— y en fila no parecían la
+     * misma familia. Dibujados aquí, todos llevan el mismo grosor y las mismas
+     * puntas redondas.
+     */
+    const icono = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"`
+      + ` stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"`
+      + ` aria-hidden="true">${d}</svg>`;
+    const mk = (dibujo, title, fn, cls = '') => {
       const b = document.createElement('button');
-      b.textContent = glyph;
+      b.innerHTML = icono(dibujo);
       b.title = title;
+      b.setAttribute('aria-label', title);
       b.className = cls;
       b.onclick = fn;
       return b;
@@ -1659,22 +1684,27 @@ export class Studio {
     const cross = document.createElement('div');
     cross.className = 'studio-cross';
     cross.append(
-      mk('↖', 'Mover hacia arriba a la izquierda', () => this.nudge(-1, 0, 0)),
-      mk('↗', 'Mover hacia arriba a la derecha', () => this.nudge(0, -1, 0)),
-      mk('↙', 'Mover hacia abajo a la izquierda', () => this.nudge(0, 1, 0)),
-      mk('↘', 'Mover hacia abajo a la derecha', () => this.nudge(1, 0, 0)),
+      mk('<path d="M17 17 7 7"/><path d="M7 13.5V7h6.5"/>', 'Mover hacia arriba a la izquierda', () => this.nudge(-1, 0, 0)),
+      mk('<path d="M7 17 17 7"/><path d="M10.5 7H17v6.5"/>', 'Mover hacia arriba a la derecha', () => this.nudge(0, -1, 0)),
+      mk('<path d="M17 7 7 17"/><path d="M7 10.5V17h6.5"/>', 'Mover hacia abajo a la izquierda', () => this.nudge(0, 1, 0)),
+      mk('<path d="m7 7 10 10"/><path d="M10.5 17H17v-6.5"/>', 'Mover hacia abajo a la derecha', () => this.nudge(1, 0, 0)),
     );
     const lift = document.createElement('div');
     lift.className = 'studio-lift';
     lift.append(
-      mk('▲', 'Subir la pieza', () => this.nudge(0, 0, 1)),
-      mk('▼', 'Bajar la pieza', () => this.nudge(0, 0, -1)),
+      mk('<path d="m6 14 6-6 6 6"/>', 'Subir la pieza', () => this.nudge(0, 0, 1)),
+      mk('<path d="m6 10 6 6 6-6"/>', 'Bajar la pieza', () => this.nudge(0, 0, -1)),
     );
     const acts = document.createElement('div');
     acts.className = 'studio-pad-acts';
     acts.append(
-      mk('⧉', 'Duplicar la pieza', () => this.duplicatePart()),
-      mk('✕', 'Borrar la pieza', () => this.deletePart(), 'studio-del'),
+      mk('<rect x="9" y="9" width="11" height="11" rx="3"/>'
+        + '<path d="M15.5 9V7a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v5.5a3 3 0 0 0 3 3h2"/>',
+        'Duplicar la pieza', () => this.duplicatePart()),
+      mk('<path d="M4.5 7h15"/><path d="M9.5 7V5.5a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2V7"/>'
+        + '<path d="M6.5 7l.8 11a2 2 0 0 0 2 1.9h5.4a2 2 0 0 0 2-1.9L17.5 7"/>'
+        + '<path d="M10.2 11v5M13.8 11v5"/>',
+        'Borrar la pieza', () => this.deletePart(), 'studio-del'),
     );
     pad.append(cross, lift, acts);
   }
