@@ -144,12 +144,20 @@ export class Studio {
   }
 
   /** Pliega la hoja de los paneles para dejar el modelo a pantalla completa. */
+  /*
+   * Plegada la hoja no queda más que el modelo: en pantallas pequeñas se van
+   * con ella la barra de herramientas y la vista previa. Es lo que se quiere
+   * al entrar —ver el edificio— y cualquier pestaña lo trae todo de vuelta.
+   */
   foldSheet(folded) {
     el('studio-card').dataset.sheet = folded ? 'off' : 'on';
     el('btn-studio-sheet').textContent = folded ? '⌃' : '⌄';
     el('btn-studio-sheet').title = folded
-      ? 'Desplegar el panel'
-      : 'Plegar el panel y ver el modelo entero';
+      ? 'Sacar las herramientas y el panel'
+      : 'Dejar sólo el modelo';
+    // La mesa acaba de cambiar de alto. Encajado a ojo por el propio taller, se
+    // rehace; puesto a mano, no se toca lo que haya elegido quien modela.
+    if (this.vista === 'editor' && this.encajado) { this.fit(); this.redraw(); }
   }
 
   isOpen() { return !el('studio').classList.contains('hidden'); }
@@ -215,6 +223,10 @@ export class Studio {
    */
   load(type) {
     if (!BUILDINGS[type]) return;
+    // Al venir de la parrilla se llega a mirar, no a colocar vigas: la mesa se
+    // abre con todo plegado y el modelo ocupa la tarjeta entera. Cambiando de
+    // edificio desde la columna se respeta como lo tuviera puesto.
+    const desdeLaParrilla = this.vista !== 'editor';
     this.setVista('editor');
     this.flush();
     if (this.cloudTimer) this.cloudSync(true);
@@ -229,6 +241,12 @@ export class Studio {
     // Sin modelo propio no hay piezas ni colores: la pestaña que sirve es la
     // del edificio, que es donde están las plantillas.
     this.setTab(!this.design && this.tab !== 'list' ? 'build' : this.tab);
+    if (desdeLaParrilla) {
+      this.foldSheet(true);
+      if (window.matchMedia('(max-width: 620px), (max-height: 520px)').matches) this.foldPreview(true);
+    }
+    // El encaje va después de plegar: mide el hueco que le queda al lienzo, y
+    // plegando después se habría quedado con la medida de antes.
     this.fit();
     this.renderList();
     this.renderPanel();
@@ -930,6 +948,9 @@ export class Studio {
     this.foldedPreview = folded;
     el('studio-card').dataset.preview = folded ? 'off' : 'on';
     el('btn-studio-preview').textContent = folded ? '▸ Vista previa' : '▾ Vista previa';
+    // Como al plegar la hoja: la mesa cambia de alto y el encaje automático se
+    // rehace, el puesto a mano se respeta.
+    if (this.vista === 'editor' && this.encajado) { this.fit(); this.redraw(); }
     if (!folded) this.renderPreview();
   }
 
@@ -1083,10 +1104,21 @@ export class Studio {
     // lo que queda entre las dos, para que no lo tapen.
     const pad = 18, top = 24, bottom = 44;
     const usable = Math.max(60, H - top - bottom);
-    this.zoom = Math.max(1.5, Math.min(12,
+    // El suelo es sólo para que un modelo diminuto no quede invisible: por
+    // encima de lo que cabe no puede ir, o el castillo se sale del lienzo en un
+    // teléfono, que es justo lo contrario de encajarlo.
+    this.zoom = Math.max(0.75, Math.min(12,
       Math.min((W - pad * 2) / (x1 - x0 || 1), usable / (y1 - y0 || 1))));
     this.ox = W / 2 - ((x0 + x1) / 2) * this.zoom;
     this.oy = top + usable / 2 - ((y0 + y1) / 2) * this.zoom;
+    // Mientras nadie toque el zoom ni el encuadre, el modelo se vuelve a
+    // encajar solo cada vez que la mesa cambia de tamaño.
+    this.encajado = true;
+    // El encuadre ya está hecho para esta medida: si el lienzo se hubiera
+    // quedado con la anterior, `redraw()` lo volvería a correr media pantalla
+    // creyendo que hay que compensar el cambio de tamaño.
+    this.lastW = Math.max(120, Math.round(box.width));
+    this.lastH = Math.max(120, Math.round(box.height));
   }
 
   redraw() {
@@ -1452,7 +1484,8 @@ export class Studio {
       const [a, b] = [...this.pointers.values()];
       const dist = Math.max(1, Math.hypot(b[0] - a[0], b[1] - a[1]));
       const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-      const next = Math.max(1.5, Math.min(16, (this.pinch.zoom * dist) / this.pinch.dist));
+      const next = Math.max(0.75, Math.min(16, (this.pinch.zoom * dist) / this.pinch.dist));
+      this.encajado = false;
       this.zoom = next;
       this.ox = mid[0] - ((this.pinch.mid[0] - this.pinch.ox) / this.pinch.zoom) * next;
       this.oy = mid[1] - ((this.pinch.mid[1] - this.pinch.oy) / this.pinch.zoom) * next;
@@ -1472,6 +1505,7 @@ export class Studio {
     }
 
     if (this.drag.mode === 'pan') {
+      this.encajado = false;
       this.ox = this.drag.ox + dsx;
       this.oy = this.drag.oy + dsy;
       this.redraw();
@@ -1558,7 +1592,8 @@ export class Studio {
       this.saveRef();
       return;
     }
-    const next = Math.max(1.5, Math.min(16, this.zoom * k));
+    const next = Math.max(0.75, Math.min(16, this.zoom * k));
+    this.encajado = false;
     // Se amplía sobre el puntero, que es donde está mirando quien modela.
     this.ox = px - ((px - this.ox) * next) / this.zoom;
     this.oy = py - ((py - this.oy) * next) / this.zoom;
