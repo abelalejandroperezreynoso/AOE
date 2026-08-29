@@ -204,6 +204,20 @@
   </div>
 </div>
 
+<!-- ---------- Catálogo de piezas ---------- -->
+<!-- Sube desde abajo, al modo de las hojas de iOS: cada pieza con su dibujo,
+     que es lo que se mira para decidir cuál se coloca. -->
+<div id="piece-sheet" class="sheet hidden">
+  <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="piece-sheet-title">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <header class="sheet-top">
+      <h3 id="piece-sheet-title">Añadir una pieza</h3>
+      <button id="btn-piece-sheet-close" class="sheet-close" aria-label="Cerrar">Cerrar</button>
+    </header>
+    <div id="piece-sheet-grid" class="piece-grid"></div>
+  </div>
+</div>
+
 <!-- ---------- Compartir el modelo de un edificio ---------- -->
 <div id="studio-share" class="overlay hidden">
   <div class="menu-card small">
@@ -332,7 +346,7 @@
       <tr><td>F11 o el menú</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
       <tr><td>Multijugador</td><td>En Comenzar partida, modo «Con otra persona»: entra en la sala, elige a alguien e invítalo</td></tr>
       <tr><td>Catálogo</td><td>Desde el menú principal: consulta y edita los valores y el aspecto de todo el juego</td></tr>
-      <tr><td>Taller de edificios</td><td>Desde el menú principal: primero eliges el edificio de la parrilla y luego le modelas otra cara con piezas y constrúyelos en la partida como uno más. Con el ratón, arrastra para mover y Mayús para subir y bajar; con el dedo, uno arrastra la pieza y dos acercan y mueven la vista. Al elegir una pieza salen sus dos barras: abajo la mueve, la sube y la baja, y la estira o la encoge de ancho, largo y alto; arriba, deshacer y rehacer, añadir y duplicar, y el color de la pieza y borrarla. Sin pieza elegida no hay barras. Al elegir un edificio se llega con todo plegado, sólo el modelo; cualquier pestaña saca las herramientas y el panel, y el botón de la esquina los vuelve a plegar. Las piezas y los controles de vista están en menús desplegables. En la pestaña Edificio están Compartir e Importar, con los que un edificio se copia como texto y se lleva a otro dispositivo o a otra persona, y Restablecer. En Guía se pone una imagen de referencia debajo del modelo para calcarla</td></tr>
+      <tr><td>Taller de edificios</td><td>Desde el menú principal: primero eliges el edificio de la parrilla y luego le modelas otra cara con piezas y constrúyelos en la partida como uno más. Con el ratón, arrastra para mover y Mayús para subir y bajar; con el dedo, uno arrastra la pieza y dos acercan y mueven la vista. Al elegir una pieza salen sus dos barras: abajo la mueve, la sube y la baja, y la estira o la encoge de ancho, largo y alto; arriba, deshacer y rehacer, añadir y duplicar, y el color de la pieza y borrarla. Sin pieza elegida no hay barras. Al elegir un edificio se llega con todo plegado, sólo el modelo; cualquier pestaña saca las herramientas y el panel, y el botón de la esquina los vuelve a plegar. Las piezas se eligen en una hoja que sube desde abajo, con cada una dibujada como va a colocarse; los controles de vista, en menús desplegables. En la pestaña Edificio están Compartir e Importar, con los que un edificio se copia como texto y se lleva a otro dispositivo o a otra persona, y Restablecer. En Guía se pone una imagen de referencia debajo del modelo para calcarla</td></tr>
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
       <tr><td>Toque en el mapa</td><td>Manda la selección y nada más: coge lo que toques, cambia de unidad o suelta lo que tuvieras al tocar el suelo. Un toque nunca da órdenes, así que fallar el dedo no manda a nadie a ninguna parte</td></tr>
       <tr><td>Mantener pulsado</td><td>El clic derecho del dedo: por aquí van todas las órdenes —moverse, recolectar, atacar, descargar en el centro urbano o un campamento, y plantar el punto de reunión de un cuartel—, y ninguna toca lo que tengas seleccionado</td></tr>
