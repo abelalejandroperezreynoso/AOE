@@ -196,9 +196,11 @@ Para colocar:
 
 - **Se coloca arrastrando**: pulsa una pieza en el modelo y muévela por el
   suelo. La rueda acerca y aleja, y arrastrar el fondo mueve la vista.
-- Debajo del modelo hay una **cruceta**: sus cuatro flechas empujan la pieza un
-  paso de rejilla en la dirección que se ve, y las otras dos la suben y la
-  bajan. Al lado, duplicar y borrar.
+- Al elegir una pieza sale al pie del lienzo su **barra**, en tres grupos: las
+  cuatro flechas la empujan un paso de rejilla en la dirección que se ve, las
+  otras dos la suben y la bajan, y las últimas la duplican o la borran. Sin
+  pieza elegida no hay barra: al poner un edificio en la mesa se llega a
+  verlo, no con una pieza cogida de antemano.
 - Para **subir y bajar arrastrando**, el botón **Mover / Altura** (o mantener
   **Mayús**) cambia lo que hace el arrastre.
 - **Girar vista** enseña el modelo desde otro lado sin tocar el edificio, que
@@ -238,9 +240,9 @@ El taller cabe en un teléfono sin renunciar a nada:
 - El taller va **de borde a borde**, sin tarjeta ni marco: sólo respeta las
   zonas seguras del aparato.
 - **Los mandos, arriba; el modelo, abajo.** Bajo la cabecera van las pestañas
-  —Pieza, Edificio, Colores y Edificios—, el panel que toque, las herramientas
-  y la cruceta, y el modelo se lleva de una pieza todo lo que queda, sin filas
-  de botones partiéndolo por el pie. De los paneles sólo se ve uno a la vez, y
+  —Pieza, Edificio, Colores y Edificios—, el panel que toque y las
+  herramientas, y el modelo se lleva de una pieza todo lo que queda. Al pie del
+  propio lienzo va la barra de la pieza elegida, cuando hay una. De los paneles sólo se ve uno a la vez, y
   se **pliegan** con el botón de la esquina o tocando otra vez la pestaña que
   ya está puesta: entonces el modelo pasa del 43 % de la pantalla al 89 %. En
   apaisado la tira de pestañas se pone de pie a la derecha.

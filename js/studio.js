@@ -234,7 +234,9 @@ export class Studio {
     this.lastType = type;
     const base = getDesign(type);
     this.design = base ? structuredClone(base) : null;
-    this.selected = this.design && this.design.parts.length ? 0 : -1;
+    // Sin pieza elegida: se llega a ver el edificio, y la barra de mover una
+    // pieza sólo tiene sentido cuando hay una que mover.
+    this.selected = -1;
     this.undo = [];
     this.baked = null;
     this.cancelReset();
@@ -1100,11 +1102,11 @@ export class Studio {
     const box = el('studio-view').getBoundingClientRect();
     const W = Math.max(120, box.width), H = Math.max(120, box.height);
     const { x0, y0, x1, y1 } = this.modelBounds();
-    // Arriba están la cinta de datos y la cruceta, una debajo de otra: el
-    // modelo se encaja por debajo de las dos, para que no lo tapen. Se reserva
-    // el hueco aunque no haya pieza elegida, o el modelo daría un salto cada
-    // vez que la cruceta aparece y desaparece.
-    const pad = 18, top = 68, bottom = 18;
+    // Arriba la cinta de datos y abajo la barra de la pieza: el modelo se
+    // encaja entre las dos, para que no lo tapen. El hueco de abajo se reserva
+    // aunque no haya pieza elegida, o el modelo daría un salto cada vez que la
+    // barra aparece y desaparece.
+    const pad = 18, top = 24, bottom = 48;
     const usable = Math.max(60, H - top - bottom);
     // El suelo es sólo para que un modelo diminuto no quede invisible: por
     // encima de lo que cabe no puede ir, o el castillo se sale del lienzo en un
@@ -1692,7 +1694,7 @@ export class Studio {
     this.afterChange();
   }
 
-  /** La cruceta sólo está cuando hay algo que empujar. */
+  /** La barra de la pieza sólo está cuando hay una que empujar. */
   updatePad() {
     const part = this.design?.parts[this.selected];
     el('studio-pad').classList.toggle('hidden', !part);

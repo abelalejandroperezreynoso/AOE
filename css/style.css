@@ -502,20 +502,26 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * borde de abajo del lienzo, no en un bloque flotante: en un teléfono la mesa
  * mide cuatro dedos y un bloque en una esquina se comería media pieza.
  */
-/* Pegada al borde de arriba del lienzo, con los demás mandos: el velo cae
-   hacia el modelo para que los botones se lean sobre cualquier fondo. */
+/*
+ * Los mandos de la pieza, al pie del lienzo y como una barra de verdad: fondo
+ * macizo, una raya que la separa del modelo y los tres grupos —mover, subir y
+ * bajar, y duplicar o borrar— repartidos a lo ancho con su propia separación.
+ * Antes flotaba encima del modelo con un velo, y ni se leía bien ni se sabía
+ * dónde acababa. Sólo sale con una pieza elegida, que es lo único que mueve.
+ */
 .studio-pad {
-  position: absolute; left: 0; right: 0; top: 22px;
-  display: flex; justify-content: center; gap: 10px;
-  padding: 4px 6px;
-  background: linear-gradient(0deg, rgba(255, 253, 247, 0), rgba(255, 253, 247, .8) 45%);
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 6px;
+  background: var(--papel);
+  border-top: 1px solid var(--borde);
 }
 .studio-cross, .studio-lift, .studio-pad-acts { display: flex; gap: 3px; }
+/* La raya entre grupos dice qué hace cada tanda sin escribirlo. */
+.studio-lift, .studio-pad-acts { padding-left: 7px; border-left: 1px solid #e0d4ba; }
 .studio-pad button {
   width: 36px; height: 32px; padding: 0;
   font-size: 14px; line-height: 1; border-radius: 7px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(240, 232, 214, .96));
-  border-color: rgba(150, 124, 74, .8);
 }
 .studio-pad .studio-del { background: linear-gradient(180deg, rgba(192, 70, 56, .96), rgba(147, 41, 30, .96)); color: #fff; }
 
@@ -636,8 +642,9 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 /*
  * Teléfono: nada de desplazar la pantalla entera para llegar a un control, y
  * nada de marco. El taller ocupa el aparato de borde a borde, los mandos se
- * juntan arriba —pestañas, panel, herramientas y la cruceta, en ese orden— y
- * el modelo se lleva todo lo que queda por debajo, de una pieza. De los
+ * juntan arriba —pestañas, panel y herramientas, en ese orden— y el modelo se
+ * lleva todo lo que queda por debajo, con la barra de la pieza elegida al pie
+ * del propio lienzo. De los
  * paneles sólo se ve uno a la vez —la paleta, la pieza, la ficha, los colores
  * o la lista de edificios—, y se pliegan para mirar el modelo entero.
  */
