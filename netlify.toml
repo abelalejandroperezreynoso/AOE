@@ -26,6 +26,19 @@
     Referrer-Policy = "no-referrer"
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"
 
+# La página y el manifiesto, sin caché: instalado en la pantalla de inicio no
+# hay forma de forzar una recarga, así que una copia guardada de más deja el
+# juego en la versión de antes y cualquier arreglo parece que no ha servido.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
 # Los módulos y estilos cambian con cada despliegue: sin caché agresiva.
 [[headers]]
   for = "/js/*"

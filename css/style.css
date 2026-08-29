@@ -33,11 +33,42 @@
 
 * { box-sizing: border-box; }
 
+/*
+ * El fondo de las pantallas va aquí, en el elemento raíz, y no en cada capa.
+ *
+ * Es la diferencia entre una franja y ninguna. El fondo de la raíz no se pinta
+ * dentro de su caja: el navegador lo propaga al **lienzo de la ventana**, que
+ * cubre la pantalla física entera —por encima del reloj y por debajo del último
+ * píxel—, sin depender de que ninguna caja acierte con el alto.
+ *
+ * Y acertar, instalado en un iPhone, no se puede. Con `black-translucent` iOS
+ * le dice a la página que mide 762 en una pantalla de 812 —los 50 de la franja
+ * del reloj— pero la coloca empezando arriba del todo, así que esos 50 sobran
+ * por abajo. `inset: 0`, `height: 100%`, `innerHeight`, `dvh` y `svh` valen los
+ * mismos 762 y ninguno sirve. Un fondo puesto en una capa se queda corto y
+ * enseña lo que haya debajo; puesto aquí, no hay nada que se quede corto.
+ *
+ * `no-repeat` es imprescindible: sin él el degradado se dibuja para 762 y se
+ * repite en los 50 que faltan, empezando otra vez por su primer color, que es
+ * una costura mucho más visible que la franja. Lo que quede fuera de esos 762
+ * lo rellena `background-color`, y por eso vale el color en que acaba el
+ * degradado.
+ */
+html {
+  background-color: #0e0b07;
+  background-image:
+    radial-gradient(circle at 50% 18%, rgba(120,88,44,.5), transparent 60%),
+    linear-gradient(180deg, #241a10, #0e0b07);
+  background-repeat: no-repeat;
+}
+
 html, body {
   margin: 0; padding: 0;
-  height: 100%;
-  overflow: hidden;
-  background: #14100b;
+  min-height: 100%;
+  /* Sin `overflow: hidden` en vertical: lo que no cabe se desplaza como en
+     cualquier página. En horizontal sí, que ahí nada tiene que desplazarse.
+     Y sin fondo propio: taparía el del lienzo. */
+  overflow-x: hidden;
   color: var(--parch);
   font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
   user-select: none;
@@ -46,6 +77,11 @@ html, body {
 }
 
 .hidden { display: none !important; }
+
+/* Qué build se está ejecutando de verdad. En un móvil con la página guardada en
+   caché no hay otra forma de saberlo, y sin eso un «sigue igual» no distingue
+   entre que el arreglo no sirva y que no haya llegado. */
+.version { opacity: .55; }
 
 /* ---------- Superposiciones ---------- */
 
@@ -70,11 +106,17 @@ html, body {
 }
 .overlay > * { margin: auto; flex: none; }
 
-#main-menu {
-  background:
-    radial-gradient(circle at 50% 18%, rgba(120,88,44,.5), transparent 60%),
-    linear-gradient(180deg, #241a10, #0e0b07);
-}
+/*
+ * Una pantalla entera —el menú, el catálogo, el taller, la sala, la carga— no
+ * pinta su fondo: lo pinta el lienzo, arriba. Así ninguna puede dejar una franja
+ * por quedarse corta de alto.
+ *
+ * Las que siguen con fondo propio son las capas que se abren **encima** de otra
+ * cosa —pausa, fin de partida, invitación, compartir—: ahí el atenuado es lo que
+ * las separa de lo que tapan, y son pequeñas y centradas, así que un borde que
+ * no llegue al filo no se nota.
+ */
+.overlay.pantalla { background: none; }
 
 /* Al ancho de la caja de la superposición, que ya descuenta su relleno y las
    zonas seguras: con `96vw` la tarjeta más el relleno no cabían en un móvil. */
@@ -811,7 +853,17 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 /* ---------- Juego ---------- */
 
+/*
+ * La partida es la única capa que no se resuelve con el fondo del lienzo: el
+ * mapa, las dos barras y su reparto tienen que medir la pantalla de verdad. Lo
+ * que le falta a `100%` es exactamente lo que iOS descuenta por arriba y no
+ * devuelve por abajo, que es `--sa-top`; donde no pasa vale cero y esta regla
+ * no cambia nada.
+ */
 #app { position: fixed; inset: 0; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  #app { height: calc(100% + var(--sa-top)); }
+}
 
 #game {
   position: absolute;
