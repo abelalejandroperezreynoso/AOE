@@ -44,34 +44,46 @@ No hay suite de pruebas.
 
 ## Trampas conocidas
 
-- **La pantalla completa en el móvil se ha intentado dos veces y se ha
-  revertido dos veces.** No lo vuelvas a intentar por el mismo camino sin
-  medir antes en el teléfono.
+- **La pantalla completa en el móvil se ha intentado tres veces y las tres se
+  han revertido.** No lo intentes una cuarta sin una captura del teléfono
+  delante: los tres arreglos salieron bien en todas las pruebas y ninguno
+  funcionó en el aparato, así que probar a ciegas ya sólo gasta despliegues.
 
-  Con `apple-mobile-web-app-status-bar-style` en `black-translucent` el
-  contenido sí llega arriba —que es lo que se pide—, pero iOS descuenta la
-  franja de la hora del alto de la página y **empieza a pintar arriba del
-  todo**, así que esos píxeles sobran por abajo y aparece una franja muerta.
-  Medido en un iPhone de 375×812 con el juego instalado: `vh` y `lvh` dan 812;
-  `dvh`, `svh`, `innerHeight` e `inset: 0`, 762.
+  El efecto que se busca —el contenido pasando por debajo del reloj, como en la
+  aplicación de finanzas del usuario— lo da
+  `apple-mobile-web-app-status-bar-style` en `black-translucent`. Su precio es
+  que iOS le dice a la página que mide 762 en una pantalla de 812 —los 50 de la
+  franja del reloj— pero la coloca empezando arriba del todo: esos 50 sobran
+  por abajo. Medido en el aparato, en un iPhone de 375×812 instalado: `vh` y
+  `lvh` dan 812; `dvh`, `svh`, `innerHeight` e `inset: 0`, 762.
 
-  Descartado ya, y sin que la franja se fuera:
+  Gastados, y sin que la franja se fuera:
 
-  - medir la pantalla a mano con `visualViewport` (`1506810`): esa medida encoge
-    con el teclado, en iOS el teclado se cierra sin soltar el campo, y la medida
-    guardada se quedaba clavada dejando media pantalla en negro;
-  - maquetar contra `100vh` en modo aplicación en vez de `inset: 0` (`c9bf985`,
-    y otra vez en `da25624`): venía medido en el aparato y comprobado imitándolo
-    en un navegador, y en el teléfono la franja siguió ahí.
+  1. medir la pantalla a mano con `visualViewport` (`1506810`): la medida
+     encoge con el teclado, en iOS el teclado se cierra sin soltar el campo y
+     se quedaba clavada, dejando media pantalla en negro;
+  2. maquetar contra `100vh` en modo aplicación en vez de `inset: 0`
+     (`c9bf985`, y otra vez `da25624`): «solo moviste todo el contenido hacia
+     arriba, pero ahora el espaciado lo tengo abajo»;
+  3. no depender del alto: el fondo al lienzo de la ventana con el fondo de
+     `html`, que cubre la pantalla física entera, y las pantallas sin fondo
+     propio (`00b515e`): «no funciona».
 
-  Los dos revertidos son `db352fe` y el que deshizo `da25624`.
+  Los revertidos son `db352fe`, `f99d0da` y `7078b5e`.
 
-  Lo que **no** se ha probado es lo contrario: dejar que iOS se reserve la
-  franja —`status-bar-style` en `default` o `black`, sin `black-translucent`—.
-  Entonces no hay banda que sobre, y esa franja la pinta el sistema con el
-  fondo de `<html>`, así que se disimula haciendo que ese fondo sea el del
-  elemento que quede pegado arriba. El contenido no pasa por debajo del reloj,
-  que era la parte que gustaba.
+  **Lo que falta por saber, y sin ello no hay cuarto intento**: si el teléfono
+  llegó a ejecutar el código nuevo. Los despliegues de agosto se persiguieron
+  dos veces contra la copia guardada, y en los tres intentos el usuario ha
+  respondido sin poder confirmarlo. Lo que hay que reponer primero es lo que se
+  quitó con todo lo demás: el marcador de versión en la letra pequeña del menú
+  y `diag.html` (`5933907`), la página que mide en el propio aparato —sin
+  ninguna regla de estilo del juego, que cualquiera podría ser la culpable— y
+  dice qué vale cada unidad, las zonas seguras y el modo.
+
+  Queda además una vía sin probar, y es renunciar al efecto: `status-bar-style`
+  en `default` o `black`, dejando que iOS se reserve la franja. Entonces no
+  sobra nada por ningún lado y el juego se abre sin barras de navegador, pero
+  el contenido no pasa por debajo del reloj, que era la parte que gustaba.
 
 - **IDs y funciones en archivos grandes.** Un `getElementById` que apunta a un
   elemento que ya no está revienta con `TypeError` y aborta el resto de la
