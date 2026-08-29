@@ -344,9 +344,9 @@ conexión. Los modelos que trae el código (`builtin-designs.js`) son el suelo:
 por debajo de lo que diga la nube, y por encima el aspecto original.
 
 Se configura en dos pasos, y están explicados en
-[`supabase/README.md`](supabase/README.md): aplicar la migración de
-`supabase/migrations/` (si el proyecto está conectado a este repositorio, se
-aplica sola) y poner la dirección del proyecto y la clave *anon public* en
+[`supabase/README.md`](supabase/README.md): aplicar las migraciones de
+`supabase/migrations/` —una tabla para los modelos y otra para las piezas— (si
+el proyecto está conectado a este repositorio, se aplican solas) y poner la dirección del proyecto y la clave *anon public* en
 `js/data/cloud-config.js`. **Con esos dos valores en blanco el juego funciona
 exactamente como siempre**, guardando sólo en el navegador.
 
@@ -499,7 +499,7 @@ js/data/designs.js  Modelos del taller: validación, guardado y aplicación
 js/data/builtin-designs.js  Modelos de edificio que vienen con el juego
 js/data/cloud.js    El taller compartido: los modelos, contra la API de Supabase
 js/data/cloud-config.js  A qué proyecto de Supabase se conecta (o a ninguno)
-supabase/migrations/  La tabla de los modelos y sus permisos
+supabase/migrations/  Las tablas de modelos y piezas, y sus permisos
 js/lobby-ui.js      Pantalla de la sala de espera
 js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
 js/net/protocol.js  Codificación binaria del estado y de las órdenes
