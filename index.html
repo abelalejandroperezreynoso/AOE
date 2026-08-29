@@ -17,6 +17,28 @@
     <h1>Age of <span>Realms</span> II</h1>
     <p class="subtitle">Estrategia medieval en tiempo real · homenaje a los clásicos del género</p>
 
+    <button id="btn-new" class="primary">Comenzar partida</button>
+    <button id="btn-multi" class="secondary">Jugar con otra persona</button>
+    <button id="btn-catalog" class="secondary">Catálogo del juego</button>
+    <button id="btn-studio" class="secondary">Taller de edificios</button>
+    <button id="btn-fullscreen-menu" class="secondary fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
+      <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+        <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+      </svg>
+      <span class="fs-label">Pantalla completa</span>
+    </button>
+
+    <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios. Todo el arte se genera por código.</p>
+  </div>
+</div>
+
+<!-- ---------- Ajustes de la partida ---------- -->
+<div id="setup" class="overlay hidden">
+  <div class="menu-card">
+    <h2>Nueva partida</h2>
+    <p class="subtitle">Contra la máquina. Si no tocas nada, se juega con lo de siempre.</p>
+
     <div class="options">
       <label>
         <span>Rivales</span>
@@ -54,19 +76,8 @@
       </label>
     </div>
 
-    <button id="btn-start" class="primary">Comenzar partida</button>
-    <button id="btn-multi" class="secondary">Jugar con otra persona</button>
-    <button id="btn-catalog" class="secondary">Catálogo del juego</button>
-    <button id="btn-studio" class="secondary">Taller de edificios</button>
-    <button id="btn-fullscreen-menu" class="secondary fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
-      <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
-        <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
-      </svg>
-      <span class="fs-label">Pantalla completa</span>
-    </button>
-
-    <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios. Todo el arte se genera por código.</p>
+    <button id="btn-start" class="primary">Comenzar</button>
+    <button id="btn-setup-back" class="secondary">Volver al menú</button>
   </div>
 </div>
 
