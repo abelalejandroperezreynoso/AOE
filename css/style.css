@@ -534,6 +534,18 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 .studio-props { width: 306px; flex: none; display: flex; flex-direction: column; min-height: 0; }
 .studio-props .catalog-tabs { margin-bottom: 10px; }
+
+/* Plegado queda el modelo y la tira de pestañas: se van con el panel la
+   columna de edificios, la barra de herramientas y la vista previa. Es como se
+   entra al elegir un edificio —a verlo, no a colocar vigas— y tocar cualquier
+   pestaña lo trae todo de vuelta. */
+.studio-card[data-sheet="off"] .studio-side,
+.studio-card[data-sheet="off"] .studio-panel,
+.studio-card[data-sheet="off"] #studio-tools,
+.studio-card[data-sheet="off"] .catalog-foot,
+.studio-card[data-sheet="off"] .studio-bake { display: none; }
+.studio-card[data-sheet="off"] .studio-props { width: auto; }
+.studio-card[data-sheet="off"] .studio-props .catalog-tabs { flex-direction: column; margin-bottom: 0; }
 .studio-panel {
   flex: 1; overflow: auto; padding-right: 6px;
   background: rgba(0, 0, 0, .18);
@@ -579,7 +591,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   /* Que parta en dos líneas: "Tejado a cuatro aguas" no cabe de una. */
   white-space: normal; text-align: left; line-height: 1.25;
 }
-.studio-mtab, .studio-sheet-toggle { display: none; }
+.studio-mtab { display: none; }
 .studio-template { display: block; width: 100%; text-align: left; margin-bottom: 6px; padding: 9px 12px; }
 .studio-template b { display: block; color: var(--gold-l); font-size: 14px; margin-bottom: 2px; }
 .studio-template small { color: #a8926a; font-size: 11.5px; line-height: 1.4; }
@@ -691,16 +703,12 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   .studio-panel { flex: 1; height: auto; overflow: auto; }
   .studio-shot canvas { max-height: 46px; }
   .studio-list-panel { max-height: 30vh; }
-  /* Plegada, la hoja se queda en su tira de pestañas y el modelo se lo lleva todo. */
-  .studio-card[data-sheet="off"] .studio-props { width: auto; }
-  .studio-card[data-sheet="off"] .studio-panel { display: none; }
 }
 
 /* Con el móvil, la paleta y la lista viven en la hoja: no hay sitio para tener
    además una columna de edificios ni una fila de piezas encima del lienzo. */
 @media (max-width: 620px), (max-height: 520px) and (max-width: 1040px) {
   .studio-mtab { display: block; }
-  .studio-sheet-toggle { display: block; }
   /* Los botones de la barra, de una línea: partidos en dos hacen la fila el
      doble de alta y en apaisado eso es medio lienzo. */
   .studio-view-tools button { white-space: nowrap; }
@@ -714,7 +722,16 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
     padding: 8px 2px; font-size: 11.5px; min-width: 0;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .studio-card[data-sheet="off"] .studio-panel { display: none; }
+}
+
+/* Apaisado y plegado: sobra ancho y falta alto, así que la tira de pestañas se
+   pone de canto a un lado y el modelo se lleva el resto. En vertical se queda
+   en fila debajo, que es donde no estorba. Va después de la rejilla de cinco
+   columnas del bloque de arriba, que si no la pisaría. */
+@media (max-height: 520px) and (max-width: 1040px) {
+  .studio-card[data-sheet="off"] .studio-props .catalog-tabs {
+    display: flex; flex-direction: column; gap: 4px;
+  }
 }
 
 /* Compartir un edificio: el diseño entero, en texto, para copiar o pegar. */

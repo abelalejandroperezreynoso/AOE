@@ -184,9 +184,13 @@ ajusta sola a la huella del edificio, mida lo que mida.
 La mesa de trabajo va despejada a propósito: encima del modelo sólo hay cuatro
 controles, y lo demás sale en **menús desplegables** —**Añadir** abre la caja de
 piezas y **Vista** el giro, el encaje, la rejilla y el color del jugador—.
-La vista previa horneada, los grupos de valores y el panel entero **se pliegan**
-cuando estorban; volver a tocar la pestaña que ya está puesta deja el modelo a
-pantalla completa.
+Al elegir un edificio **se llega con todo plegado**: no hay más que el modelo, a
+toda la tarjeta, y una tira de pestañas al lado. Es como se entra a mirarlo.
+Tocar cualquier pestaña saca las herramientas, la vista previa, la columna de
+edificios y el panel; el botón de la esquina, o volver a tocar la pestaña que ya
+está puesta, lo pliega otra vez. Mientras no se toque el zoom ni el encuadre a
+mano, el modelo se vuelve a encajar solo cada vez que la mesa cambia de alto;
+en cuanto se toca, manda lo que haya puesto quien modela.
 
 Para colocar:
 
@@ -234,8 +238,8 @@ El taller cabe en un teléfono sin renunciar a nada:
 - La **mesa se lleva toda la pantalla** y los paneles pasan a una hoja de abajo
   con pestañas —Pieza, Edificio, Colores y Edificios—, de la que sólo se ve una
   cosa a la vez. Se **pliega** con el botón de la esquina o tocando otra vez la
-  pestaña que ya está puesta, y entonces el modelo ocupa casi el doble. En
-  apaisado la hoja se pone de pie a la derecha.
+  pestaña que ya está puesta, y entonces el modelo pasa del 43 % de la tarjeta
+  al 89 %. En apaisado la tira de pestañas se pone de pie a la derecha.
 - **Un dedo** elige y arrastra piezas; con el botón **Altura** puesto, ese mismo
   arrastre las sube y las baja. **Dos dedos** acercan, alejan y mueven la vista,
   y nunca descolocan la pieza: al apoyar el segundo dedo, lo que hubiera movido
