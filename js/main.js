@@ -134,9 +134,25 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 
 /*
  * Los ajustes de la partida ya no están en el menú: se piden al empezar una,
- * que es cuando importan. El menú se queda con el título y las cuatro puertas.
+ * que es cuando importan. Y contra quién se juega —la máquina u otra persona—
+ * es una opción más de esa misma pantalla, no una puerta aparte del menú.
  */
+const setupCard = el('setup-card');
+
+/*
+ * El foco sólo se pide al elegir el modo a mano: al reabrir la pantalla
+ * abriría el teclado del teléfono sin que nadie lo haya pedido.
+ */
+function setModo(modo, foco = false) {
+  setupCard.dataset.modo = modo;
+  for (const b of el('setup-modos').children) b.classList.toggle('active', b.dataset.elige === modo);
+  lobbyUi.error('');
+  if (modo === 'red') { lobbyUi.prefill(); if (foco) el('lobby-name').focus(); }
+}
+
+// Se vuelve al modo de la última vez: quien juega acompañado suele repetir.
 function openSetup() {
+  setModo(setupCard.dataset.modo);
   el('main-menu').classList.add('hidden');
   el('setup').classList.remove('hidden');
 }
@@ -148,6 +164,7 @@ function closeSetup() {
 
 el('btn-new').onclick = () => { audio.ensure(); openSetup(); };
 el('btn-setup-back').onclick = closeSetup;
+for (const b of el('setup-modos').children) b.onclick = () => setModo(b.dataset.elige, true);
 
 el('btn-start').onclick = () => {
   audio.ensure();
@@ -187,7 +204,7 @@ function hash(str) {
 window.addEventListener('keydown', (e) => {
   const enSetup = !el('setup').classList.contains('hidden');
   const enMenu = !el('main-menu').classList.contains('hidden');
-  if (e.key === 'Enter' && enSetup) el('btn-start').click();
+  if (e.key === 'Enter' && enSetup) el(setupCard.dataset.modo === 'red' ? 'btn-lobby-enter' : 'btn-start').click();
   else if (e.key === 'Enter' && enMenu) el('btn-new').click();
   else if (e.key === 'Escape' && enSetup) closeSetup();
 });

@@ -45,16 +45,12 @@ export class LobbyUI {
   }
 
   bind() {
-    el('btn-multi').onclick = () => this.open();
     el('btn-lobby-enter').onclick = () => this.enter();
     el('btn-lobby-leave').onclick = () => this.close();
     el('btn-lobby-start').onclick = () => this.startParty();
     el('btn-lobby-cancel').onclick = () => this.cancelParty();
     el('btn-invite-accept').onclick = () => this.respond(true);
     el('btn-invite-decline').onclick = () => this.respond(false);
-    el('lobby-name').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.enter();
-    });
 
     this.lobby.addEventListener('players', (e) => this.onPlayers(e.detail));
     this.lobby.addEventListener('invite', (e) => this.showInvite(e.detail));
@@ -67,18 +63,24 @@ export class LobbyUI {
     });
   }
 
-  open() {
-    el('main-menu').classList.add('hidden');
-    el('lobby').classList.remove('hidden');
-    const saved = localStorage.getItem('aor-name') || '';
-    el('lobby-name').value = saved;
-    el('lobby-name').focus();
+  /** Repone el nombre de la última vez al abrir los ajustes. */
+  prefill() {
+    if (!el('lobby-name').value) el('lobby-name').value = localStorage.getItem('aor-name') || '';
   }
 
+  /*
+   * El aviso sale en la pantalla que se esté viendo: al pedir el nombre, en los
+   * ajustes; ya dentro, en la sala. Se limpian las dos para que no quede
+   * colgado el de la anterior.
+   */
   error(msg) {
-    const box = el('lobby-error');
-    box.textContent = msg;
-    box.classList.toggle('hidden', !msg);
+    const enSala = !el('lobby').classList.contains('hidden');
+    for (const id of ['setup-error', 'lobby-error']) {
+      const box = el(id);
+      const suyo = msg && (id === 'lobby-error') === enSala;
+      box.textContent = suyo ? msg : '';
+      box.classList.toggle('hidden', !suyo);
+    }
   }
 
   status(msg) {
@@ -110,8 +112,8 @@ export class LobbyUI {
     try {
       const me = await this.lobby.join(name);
       el('lobby-me').textContent = me.name;
-      el('lobby-join').classList.add('hidden');
-      el('lobby-room').classList.remove('hidden');
+      el('setup').classList.add('hidden');
+      el('lobby').classList.remove('hidden');
       this.renderPlayers([]);
       this.renderParty();
     } catch (err) {
@@ -127,10 +129,9 @@ export class LobbyUI {
     if (this.dialog) { this.refuse(this.dialog.inv); this.closeDialog(); }
     this.cancelParty(true);
     await this.lobby.leave();
+    this.error('');
     el('lobby').classList.add('hidden');
     el('main-menu').classList.remove('hidden');
-    el('lobby-join').classList.remove('hidden');
-    el('lobby-room').classList.add('hidden');
   }
 
   // --- Lista de la sala ------------------------------------------------------
@@ -361,7 +362,7 @@ export class LobbyUI {
     ready.forEach((m, i) => { m.slot = i + 1; });
 
     const seed = (Math.random() * 4294967295) >>> 0;
-    const mapSize = parseInt(el('lobby-size').value, 10);
+    const mapSize = parseInt(el('opt-size').value, 10);
     const names = [this.lobby.name, ...ready.map((m) => m.name)];
     this.gameOpts = { seed, mapSize, names };
     this.status(waiting.length
