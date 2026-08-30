@@ -62,6 +62,16 @@ const SCALE_FIELDS = {
   h: ['h', 'rise', 'flat'],
 };
 
+/*
+ * Girar. La mayoría de las piezas llevan un ángulo (`yaw`); las que no, se
+ * ponen a lo largo de un eje o miran a una cara, y ahí girar es cambiar de eje,
+ * que es un cuarto de vuelta. Un toque son 45°: el cuarto de vuelta sale en dos
+ * y la diagonal en uno, que es lo que se pide en un edificio; los ángulos
+ * intermedios, de cinco en cinco, están en la ficha de la pieza.
+ */
+const ROT_FIELDS = ['yaw', 'axis', 'face'];
+const ROT_STEP = 45;
+
 const SNAPS = [
   [0.05, 'fino (0,05)'], [0.1, 'medio (0,1)'], [0.25, 'cuarto (0,25)'], [0.5, 'media casilla'],
 ];
@@ -2134,6 +2144,18 @@ export class Studio {
       mk('<path d="m6 14 6-6 6 6"/>', 'Subir la pieza', () => this.nudge(0, 0, 1)),
       mk('<path d="m6 10 6 6 6-6"/>', 'Bajar la pieza', () => this.nudge(0, 0, -1)),
     );
+
+    // Girar, una vuelta por cada lado, en su propia columna entre subir y
+    // estirar: lo de en medio es dónde mira la pieza, no cuánto mide.
+    const giro = document.createElement('div');
+    giro.className = 'studio-turn';
+    giro.append(
+      mk('<path d="M4 12a8 8 0 1 1 2.6 5.9"/><path d="M4 6.5V12h5.5"/>',
+        'Girar a la izquierda', () => this.rotate(-1)),
+      mk('<path d="M20 12a8 8 0 1 0-2.6 5.9"/><path d="M20 6.5V12h-5.5"/>',
+        'Girar a la derecha', () => this.rotate(1)),
+    );
+    this.btnGiro = [...giro.children];
     /*
      * Estirar y encoger, un lado por columna: ancho, largo y alto. Arriba
      * crecen y abajo encogen, con las flechas apuntando por el mismo diagonal
@@ -2160,7 +2182,7 @@ export class Studio {
     // pequeño al grande, sin números de ancho escritos a mano.
     const rejilla = document.createElement('div');
     rejilla.className = 'studio-pad-grid';
-    rejilla.append(cross, lift, escala);
+    rejilla.append(cross, lift, giro, escala);
     pad.append(rejilla);
   }
 
@@ -2304,6 +2326,34 @@ export class Studio {
     this.afterChange();
   }
 
+  /**
+   * Por dónde gira esta pieza: su ángulo si lo tiene y, si no, el eje o la cara
+   * a la que mira. Una pieza que no lleve ninguno de los tres no gira.
+   */
+  rotField(part) {
+    const campos = PARTS[part.k]?.fields || (isMineKey(part.k) ? PIECE_FIELDS : []);
+    return ROT_FIELDS.find((k) => campos.includes(k)) || null;
+  }
+
+  /**
+   * Gira la pieza elegida. Con ángulo se va de 45 en 45 y se cae en el múltiplo
+   * más cercano, como las flechas caen en la rejilla; con eje o cara sólo hay
+   * dos posturas, así que los dos botones hacen lo mismo: cambiar de una a otra.
+   */
+  rotate(dir) {
+    const part = this.design?.parts[this.selected];
+    if (!part) return;
+    const key = this.rotField(part);
+    if (!key) return;
+    this.pushUndo();
+    if (key === 'yaw') {
+      part.yaw = (snapTo((part.yaw || 0) + dir * ROT_STEP, ROT_STEP) + 360) % 360;
+    } else {
+      part[key] = part[key] === 'x' ? 'y' : 'x';
+    }
+    this.afterChange();
+  }
+
   /** Empuja la pieza un paso de rejilla en la dirección que se ve. */
   nudge(dxr, dyr, dz) {
     const part = this.design?.parts[this.selected];
@@ -2348,6 +2398,8 @@ export class Studio {
     for (const b of document.querySelectorAll('.studio-scale button')) {
       b.disabled = !part || !this.scaleField(part, b.dataset.eje);
     }
+    // Una bandera o una esfera no giran: sus dos botones se apagan, no se van.
+    for (const b of this.btnGiro || []) b.disabled = !part || !this.rotField(part);
     if (this.btnUndo) {
       this.btnUndo.disabled = !this.undo.length;
       this.btnRedo.disabled = !this.redo.length;

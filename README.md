@@ -325,16 +325,25 @@ Para colocar:
   redondeados de dos filas, al modo de los mandos agrupados de iOS—: **abajo,
   dónde se pone**; **arriba, qué se le hace**.
 - **Abajo**: las cuatro flechas **en cruz de dos por dos** la empujan un paso de
-  rejilla en la dirección que se ve; subir y bajar van **uno encima de otro**; y
-  **estirar y encoger** tiene una columna por lado —ancho, largo y alto—, con
-  las flechas dobles apuntando por el mismo diagonal por el que crece ese lado
-  en la mesa. Las
+  rejilla en la dirección que se ve; subir y bajar van **uno encima de otro**;
+  **girar** a un lado y a otro va en su propia columna; y **estirar y encoger**
+  tiene una columna por lado —ancho, largo y alto—, con las flechas dobles
+  apuntando por el mismo diagonal por el que crece ese lado en la mesa. Las
   piezas no llaman igual a sus lados —la caja tiene ancho y fondo, el cilindro
   radios, la viga largo y grueso—, así que cada botón toca el campo que a esa
   pieza le hace de ese lado, los dos radios del cilindro a la vez para que no
   se vuelva cono, y se apaga en las que no lo tienen (un barril no se estira
   desde aquí). La barra es una rejilla de siete columnas, así que cabe igual en
   un teléfono pequeño que en uno grande.
+- **Girar** vuelve la pieza **45° por toque** —la diagonal en un toque, el
+  cuarto de vuelta en dos— y cae siempre en el múltiplo más cercano, como las
+  flechas caen en la rejilla. Las piezas que no llevan ángulo sino un eje o una
+  cara a la que miran —tejado a dos aguas, bóveda, escalinata, puerta,
+  ventana— sólo tienen dos posturas, así que ahí los dos botones hacen lo
+  mismo: cambiar de una a la otra. Y las simétricas —el tejado a cuatro aguas,
+  la esfera, el estandarte—, a las que girar no les cambiaría nada, los llevan
+  apagados. Los ángulos
+  intermedios, de cinco en cinco, se ponen en la ficha de la pieza.
 - **Arriba**: **deshacer y rehacer**, **añadir** —abre el catálogo de piezas— y
   **duplicar**, y el **color de la pieza** y **borrarla**. El botón del color
   enseña el material que lleva y despliega los demás con su muestra, para
