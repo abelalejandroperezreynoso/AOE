@@ -571,7 +571,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * y bajar uno encima de otro, que es como se apunta con el pulgar sin mirar.
  */
 .studio-cross, .studio-lift, .studio-turn, .studio-scale, .studio-pad-acts,
-.studio-hist, .studio-make, .studio-look {
+.studio-hist, .studio-make, .studio-look, .studio-guia {
   display: grid; gap: 1px;
   background: #ded2b8;
   border-radius: 14px; overflow: hidden;
@@ -586,16 +586,16 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   top: 22px; bottom: auto;
   border-top: 0; border-bottom: 1px solid var(--borde);
 }
-/* Tres grupos de una columna, con el ancho justo para que sus botones midan lo
-   mismo que los de abajo: allí siete columnas se reparten el hueco menos los
-   tres huecos entre grupos, y aquí tres columnas han de medir eso mismo, más
-   los dos huecos que les quedan. Sale la misma cuenta y el mismo botón. */
+/* Cuatro grupos de una columna, con el ancho justo para que sus botones midan
+   lo mismo que los de abajo: allí siete columnas se reparten el hueco menos
+   los tres huecos entre grupos, y aquí cuatro columnas han de medir eso mismo,
+   más los tres huecos que les quedan. Sale la misma cuenta y el mismo botón. */
 .studio-pad-top .studio-pad-grid {
   flex: none;
-  width: calc((min(100%, 520px) - 30px) * 3 / 7 + 20px);
-  grid-template-columns: repeat(3, 1fr);
+  width: calc((min(100%, 520px) - 30px) * 4 / 7 + 30px);
+  grid-template-columns: repeat(4, 1fr);
 }
-.studio-hist, .studio-make, .studio-look { grid-template-columns: 1fr; }
+.studio-hist, .studio-make, .studio-look, .studio-guia { grid-template-columns: 1fr; }
 /* Los menús de estas barras cuelgan de la propia barra —los grupos recortan lo
    que se sale de sus esquinas— y se colocan a mano bajo su botón. */
 .studio-pad > .studio-pop { max-width: min(300px, 78vw); }
@@ -628,6 +628,9 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .studio-pad button:hover { filter: none; background: #f3ecdc; }
 .studio-pad button:active { transform: none; background: #e6dbc0; }
 .studio-pad svg { width: 21px; height: 21px; display: block; }
+/* La guía va sola en su grupo y su botón se lleva las dos filas: es de la
+   mesa, no de la pieza, y así no se lee como pareja de ninguno. */
+.studio-pad .studio-guia button { height: 100%; }
 /* Borrar se distingue por el color del icono, no por un botón rojo entero. */
 .studio-pad .studio-del { background: #fbf8f1; color: #c0392b; }
 .studio-pad .studio-del:hover { background: #f8e9e6; }
