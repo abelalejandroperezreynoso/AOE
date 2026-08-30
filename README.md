@@ -303,7 +303,7 @@ cobertizo o casa grande) y desde ahí queda como se quiera. La plantilla se
 ajusta sola a la huella del edificio, mida lo que mida.
 
 La mesa de trabajo va despejada a propósito: encima del modelo sólo hay cuatro
-controles, y lo demás sale en **menús desplegables** —**Añadir** abre la caja de
+controles —Añadir, deshacer, Vista y Guía—, y lo demás sale en **menús desplegables** —**Añadir** abre la caja de
 piezas y **Vista** el giro, el encaje, la rejilla y el color del jugador—.
 Al elegir un edificio **se llega con todo plegado**: no hay más que el modelo, a
 toda la tarjeta, y una tira de pestañas al lado. Es como se entra a mirarlo.
@@ -315,8 +315,12 @@ en cuanto se toca, manda lo que haya puesto quien modela.
 
 Para colocar:
 
-- **Se coloca arrastrando**: pulsa una pieza en el modelo y muévela por el
-  suelo. La rueda acerca y aleja, y arrastrar el fondo mueve la vista.
+- **Se coloca con los botones**: tocar una pieza en el modelo la elige y nada
+  más —arrastrarla no la mueve—, y las flechas de su barra la empujan un paso
+  de rejilla. Así el modelo no se descoloca de un roce al mirarlo, y un paso
+  siempre cae en la rejilla. El arrastre es siempre de la vista: arrastrar
+  mueve el encuadre y la rueda acerca y aleja, se empiece encima de una pieza o
+  del fondo.
 - Al elegir una pieza salen sus **dos barras**, con la misma hechura —grupos
   redondeados de dos filas, al modo de los mandos agrupados de iOS—: **abajo,
   dónde se pone**; **arriba, qué se le hace**.
@@ -342,8 +346,6 @@ Para colocar:
   trazo, todos con el mismo grosor, y borrar se distingue por el color del
   icono y no por un botón rojo entero. Sin pieza elegida no hay barra: al poner
   un edificio en la mesa se llega a verlo, no con una pieza cogida de antemano.
-- Para **subir y bajar arrastrando**, el botón **Mover / Altura** (o mantener
-  **Mayús**) cambia lo que hace el arrastre.
 - **Girar vista** enseña el modelo desde otro lado sin tocar el edificio, que
   para eso la cámara del juego es fija.
 - **Guía** pone una imagen de referencia —una foto, un dibujo, un boceto con
@@ -358,9 +360,9 @@ Para colocar:
   siempre empujan hacia donde apuntan en la pantalla.
 - Con **teclado**: flechas para mover (con **Alt**, arriba y abajo), **Mayús**
   para ir de cuatro en cuatro, **Supr** borra y **Ctrl+Z** deshace.
-- Mientras se arrastra, la mesa pinta las caras ordenadas de lejos a cerca, que
-  es rápido y responde al dedo al instante; **en cuanto se suelta, hornea el
-  modelo de verdad** y enseña ese sprite. Lo que se ve con la vista quieta es,
+- Mientras la vista se mueve o la pieza va cambiando, la mesa pinta las caras
+  ordenadas de lejos a cerca, que es rápido y responde al dedo al instante; **en
+  cuanto se queda quieta, hornea el modelo de verdad** y enseña ese sprite. Lo que se ve con la vista quieta es,
   píxel a píxel, lo que se verá en la partida —sombra y contorno incluidos—, así
   que no hay sorpresas al construirlo. Debajo están además las **tres etapas de
   obra horneadas** a tamaño de partida: cimientos, en obra y terminado. Las de
@@ -394,10 +396,9 @@ El taller cabe en un teléfono sin renunciar a nada:
   se **pliegan** con el botón de la esquina o tocando otra vez la pestaña que
   ya está puesta: entonces el modelo pasa del 43 % de la pantalla al 89 %. En
   apaisado la tira de pestañas se pone de pie a la derecha.
-- **Un dedo** elige y arrastra piezas; con el botón **Altura** puesto, ese mismo
-  arrastre las sube y las baja. **Dos dedos** acercan, alejan y mueven la vista,
-  y nunca descolocan la pieza: al apoyar el segundo dedo, lo que hubiera movido
-  el primero se deshace.
+- **Un dedo** elige la pieza que toca y, arrastrando, mueve la vista; para
+  colocarla están las flechas de su barra. **Dos dedos** acercan, alejan y
+  mueven la vista.
 - Los toques tienen **margen**: si no aciertas de lleno en una pieza se coge la
   que tengas más cerca, que un dedo tapa más de lo que apunta. El margen es de
   toda su silueta, no sólo de su punto de anclaje, y dentro de él **manda la
