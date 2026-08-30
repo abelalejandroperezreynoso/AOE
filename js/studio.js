@@ -102,6 +102,15 @@ const EJES_PIEZA = {
   ring: { d: 'r', h: 'th' },
   logs: { h: 'n' },
   beam: { h: 'len' },
+  /*
+   * Y dos que llevan el alto en dos campos: la teja y la escama son un bombeo
+   * montado sobre una plancha, así que aplanar el bombeo del todo deja la
+   * plancha, que sigue teniendo su grueso. Con los dos en el mismo botón, el
+   * alto baja hasta que la pieza es papel: primero se le quita la curva y
+   * después el canto.
+   */
+  teja: { h: ['rise', 'th'] },
+  escama: { h: ['rise', 'th'] },
 };
 
 /*
@@ -129,17 +138,25 @@ const EJE_NOTA = {
 const ROT_STEP = 45;
 
 /*
- * Estirar y encoger va a dos velocidades. El paso del campo (medio dedo de
+ * Estirar y encoger va a tres velocidades. El paso del campo (medio dedo de
  * casilla) es cómodo mientras la pieza es grande, pero cerca de cero se lo
  * come todo: de 0,10 el mismo toque se lleva la mitad de la pieza y al
- * siguiente ya no hay pieza. Por debajo de este tamaño manda el paso fino, y
+ * siguiente ya no hay pieza. Por debajo de `ESCALA_FINA` manda el paso fino, y
  * así un listón o un marco se afinan desde la barra sin abrir la ficha.
+ *
+ * Y por debajo de `ESCALA_PELO` —una centésima, donde el fino volvía a ser el
+ * paso que se lo lleva todo— manda el de pelo, con el que una pieza sigue
+ * bajando hasta la milésima de casilla. Ahí es donde acaban las láminas: el
+ * agua de un pilón, la sombra de un toldo, la chapa de un cartel, una cúpula
+ * aplastada hasta hacer de charco. Antes el suelo estaba en la centésima y una
+ * pieza que ya la tocaba no bajaba más aunque siguiera viéndose gorda.
  *
  * Sólo lo que mide. Una posición cerca del cero no es una posición pequeña
  * —el origen está en una esquina de la huella—, así que la X y la Y siguen
  * yendo a pasos iguales por todo el tablero.
  */
 const ESCALA_FINA = 0.2;
+const ESCALA_PELO = 0.01;
 const CAMPOS_TAMANO = new Set(['w', 'd', 'h', 'r', 'r0', 'r1', 'len', 'th', 'rise', 'over', 'flat']);
 
 /** El escalón con el que crece o mengua un campo, según lo que valga ya. */
@@ -147,7 +164,9 @@ function pasoDe(key, valor) {
   const f = FIELDS[key];
   if (!f) return 1;
   if (!f.fino || !CAMPOS_TAMANO.has(key)) return f.step;
-  return Math.abs(valor) <= ESCALA_FINA + 1e-9 ? f.fino : f.step;
+  const v = Math.abs(valor);
+  if (f.pelo && v <= ESCALA_PELO + 1e-9) return f.pelo;
+  return v <= ESCALA_FINA + 1e-9 ? f.fino : f.step;
 }
 
 /** Los tamaños de partida que haya guardados en este navegador. */
@@ -2610,11 +2629,23 @@ export class Studio {
    * modelo, no de la pieza, así que se mueve y se estira igual aunque todavía
    * no se vea.
    */
-  scaleField(part, eje) {
+  scaleField(part, eje, dir = 0) {
     const campos = PARTS[part.k]?.fields || (isMineKey(part.k) ? PIECE_FIELDS : []);
     const suyo = EJES_PIEZA[part.k]?.[eje];
-    if (suyo && campos.includes(suyo)) return suyo;
-    return SCALE_FIELDS[eje].find((k) => campos.includes(k)) || null;
+    const lista = (Array.isArray(suyo) ? suyo : [suyo || SCALE_FIELDS[eje].find((k) => campos.includes(k))])
+      .filter((k) => k && campos.includes(k));
+    if (!lista.length) return null;
+    /*
+     * Con más de un campo, el que todavía pueda moverse hacia donde se pulsa:
+     * al tocar el suelo uno, el botón sigue por el siguiente y sólo se apaga
+     * cuando no queda ninguno. Sin dirección —cuando lo que se pregunta es qué
+     * lado es éste y no qué va a pasar— vale el primero.
+     */
+    if (!dir) return lista[0];
+    const libre = lista.find((k) => (dir > 0
+      ? part[k] < FIELDS[k].max - 1e-9
+      : part[k] > FIELDS[k].min + 1e-9));
+    return libre || lista[lista.length - 1];
   }
 
   /**
@@ -2662,7 +2693,7 @@ export class Studio {
     if (this.colocandoGuia()) { if (eje === 'w') this.scaleRef(dir); return; }
     const part = this.design?.parts[this.selected];
     if (!part) return;
-    const key = this.scaleField(part, eje);
+    const key = this.scaleField(part, eje, dir);
     if (!key) return;
     const paso = pasoDe(key, part[key]);
     this.pushUndo();
@@ -2792,7 +2823,7 @@ export class Studio {
         b.disabled = !suyo || (crece ? this.ref.scale >= 6 - 1e-9 : this.ref.scale <= 0.05 + 1e-9);
         continue;
       }
-      const key = pieza && this.scaleField(pieza, b.dataset.eje);
+      const key = pieza && this.scaleField(pieza, b.dataset.eje, crece ? 1 : -1);
       const f = key && FIELDS[key];
       b.disabled = !f || (crece ? pieza[key] >= f.max - 1e-9 : pieza[key] <= f.min + 1e-9);
     }
@@ -3327,7 +3358,7 @@ function numberStepper(value, f, key, apply) {
   const input = document.createElement('input');
   input.type = 'number';
   input.inputMode = 'decimal';
-  input.min = f.min; input.max = f.max; input.step = f.fino || f.step;
+  input.min = f.min; input.max = f.max; input.step = f.pelo || f.fino || f.step;
   input.value = round(value);
   const set = (v) => { input.value = round(apply(v)); };
   const bump = (dir) => {

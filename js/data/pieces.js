@@ -77,13 +77,13 @@ function cleanSub(raw) {
       const ok = f.options.some(([v]) => v === raw[key]);
       p[key] = ok ? raw[key] : spec.def[key];
     } else {
-      p[key] = num(raw[key], f.min, f.max, spec.def[key], f.fino || f.step);
+      p[key] = num(raw[key], f.min, f.max, spec.def[key], f.pelo || f.fino || f.step);
     }
   }
   // Los giros de fuera valen para todas, y sólo se guardan si giran.
   for (const key of TILT_FIELDS) {
     const f = FIELDS[key];
-    const v = num(raw[key], f.min, f.max, 0, f.fino || f.step);
+    const v = num(raw[key], f.min, f.max, 0, f.pelo || f.fino || f.step);
     if (v) p[key] = v;
   }
   p.m = MATERIAL_KEYS.includes(raw.m) ? raw.m : spec.def.m;

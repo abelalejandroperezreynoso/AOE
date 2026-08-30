@@ -84,28 +84,32 @@ export function renderSize(design) {
  * esto y el validador recorta con esto mismo, de modo que no hay forma de
  * guardar un modelo con una viga de mil casillas.
  *
- * Dos escalones por campo: `step` es el que dan los botones —lo que se avanza
- * de un toque— y `fino` es la rejilla a la que se redondea al guardar. Antes
- * eran el mismo, y una pieza afinada a mano en la ficha volvía al escalón
- * gordo en cuanto se guardaba: un detalle de 0,03 se despertaba midiendo 0,05.
- * Con el fino aparte, los botones siguen yendo a pasos cómodos y lo pequeño se
- * puede dejar pequeño. Los campos que cuentan cosas —lados, peldaños, grados—
- * no tienen fino: su escalón ya es lo menudo que pueden ser.
+ * Tres escalones por campo, de más a menos: `step` es el que dan los botones
+ * mientras la pieza es grande, `fino` el de cerca del cero y `pelo` el del
+ * último tramo, por debajo de una centésima, que es además la rejilla a la que
+ * se redondea al guardar. Antes el paso de los botones y la rejilla eran el
+ * mismo, y una pieza afinada a mano en la ficha volvía al escalón gordo en
+ * cuanto se guardaba: un detalle de 0,03 se despertaba midiendo 0,05. Con la
+ * rejilla aparte, los botones siguen yendo a pasos cómodos y lo pequeño se
+ * puede dejar pequeño: una pieza baja hasta la milésima de casilla, que es
+ * donde una lámina deja de tener grosor. Los campos que cuentan cosas —lados,
+ * peldaños, grados— no tienen ni fino ni pelo: su escalón ya es lo menudo que
+ * pueden ser.
  */
 export const FIELDS = {
   x: { label: 'Posición X', min: -3, max: 11, step: 0.05, fino: 0.01 },
   y: { label: 'Posición Y', min: -3, max: 11, step: 0.05, fino: 0.01 },
   z: { label: 'Altura del suelo', min: 0, max: 9, step: 0.05, fino: 0.01 },
-  w: { label: 'Ancho (x)', min: 0.01, max: 10, step: 0.05, fino: 0.01 },
-  d: { label: 'Fondo (y)', min: 0.01, max: 10, step: 0.05, fino: 0.01 },
-  h: { label: 'Alto', min: 0.01, max: 8, step: 0.05, fino: 0.01 },
-  r: { label: 'Radio', min: 0.01, max: 5, step: 0.02, fino: 0.01 },
-  r0: { label: 'Radio abajo', min: 0, max: 5, step: 0.02, fino: 0.01 },
-  r1: { label: 'Radio arriba', min: 0, max: 5, step: 0.02, fino: 0.01 },
-  rise: { label: 'Pendiente', min: 0.01, max: 4, step: 0.05, fino: 0.01 },
-  over: { label: 'Alero', min: 0, max: 0.8, step: 0.02, fino: 0.01 },
-  len: { label: 'Largo', min: 0.01, max: 10, step: 0.05, fino: 0.01 },
-  th: { label: 'Grueso', min: 0.01, max: 1, step: 0.02, fino: 0.01 },
+  w: { label: 'Ancho (x)', min: 0.001, max: 10, step: 0.05, fino: 0.01, pelo: 0.001 },
+  d: { label: 'Fondo (y)', min: 0.001, max: 10, step: 0.05, fino: 0.01, pelo: 0.001 },
+  h: { label: 'Alto', min: 0.001, max: 8, step: 0.05, fino: 0.01, pelo: 0.001 },
+  r: { label: 'Radio', min: 0.001, max: 5, step: 0.02, fino: 0.01, pelo: 0.001 },
+  r0: { label: 'Radio abajo', min: 0, max: 5, step: 0.02, fino: 0.01, pelo: 0.001 },
+  r1: { label: 'Radio arriba', min: 0, max: 5, step: 0.02, fino: 0.01, pelo: 0.001 },
+  rise: { label: 'Pendiente', min: 0.001, max: 4, step: 0.05, fino: 0.01, pelo: 0.001 },
+  over: { label: 'Alero', min: 0, max: 0.8, step: 0.02, fino: 0.01, pelo: 0.001 },
+  len: { label: 'Largo', min: 0.001, max: 10, step: 0.05, fino: 0.01, pelo: 0.001 },
+  th: { label: 'Grueso', min: 0.001, max: 1, step: 0.02, fino: 0.01, pelo: 0.001 },
   yaw: { label: 'Giro', min: 0, max: 355, step: 5, unit: '°' },
   // Los tres giros de fuera: se le dan a la malla ya construida, alrededor del
   // ancla de la pieza, así que valen para todas por igual. La Z sólo se usa en
@@ -115,7 +119,7 @@ export const FIELDS = {
   ry: { label: 'Giro Y', min: 0, max: 355, step: 5, unit: '°' },
   pitch: { label: 'Inclinación', min: -90, max: 90, step: 5, unit: '°' },
   seg: { label: 'Lados', min: 3, max: 16, step: 1 },
-  flat: { label: 'Achatado', min: 0.01, max: 2, step: 0.05, fino: 0.01 },
+  flat: { label: 'Achatado', min: 0.001, max: 2, step: 0.05, fino: 0.01, pelo: 0.001 },
   steps: { label: 'Peldaños', min: 2, max: 12, step: 1 },
   n: { label: 'Cantidad', min: 1, max: 12, step: 1 },
   axis: {

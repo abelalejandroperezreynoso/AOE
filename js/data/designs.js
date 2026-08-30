@@ -126,7 +126,7 @@ function cleanPart(raw) {
       const ok = f.options.some(([v]) => v === raw[key]);
       p[key] = ok ? raw[key] : def[key];
     } else {
-      p[key] = num(raw[key], f.min, f.max, def[key], f.fino || f.step);
+      p[key] = num(raw[key], f.min, f.max, def[key], f.pelo || f.fino || f.step);
     }
   }
   /*
@@ -136,7 +136,7 @@ function cleanPart(raw) {
    */
   for (const key of TILT_FIELDS) {
     const f = FIELDS[key];
-    const v = num(raw[key], f.min, f.max, 0, f.fino || f.step);
+    const v = num(raw[key], f.min, f.max, 0, f.pelo || f.fino || f.step);
     if (v) p[key] = v;
   }
   p.m = MATERIAL_KEYS.includes(raw.m) ? raw.m : def.m;
@@ -224,7 +224,7 @@ function resizeDesign(design, size, fromSize = null) {
     for (const key of SCALED_FIELDS) {
       if (p[key] === undefined) continue;
       const f = FIELDS[key];
-      p[key] = num(p[key] * k, f.min, f.max, p[key], f.fino || f.step);
+      p[key] = num(p[key] * k, f.min, f.max, p[key], f.pelo || f.fino || f.step);
     }
   }
   return scaled;

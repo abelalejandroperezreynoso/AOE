@@ -356,15 +356,20 @@ Para colocar:
   que se toca a cada rato. La barra es una
   rejilla de ocho columnas, así que cabe igual en un teléfono pequeño que en
   uno grande.
-- **Estirar y encoger van a dos velocidades**: mientras el lado mide más de
-  0,2 cada toque es de 0,05, y de ahí para abajo, de 0,01, que es hasta donde
-  llegan las piezas. Así un muro se recorta a zancadas y un listón o el marco
-  de una ventana se afinan desde la misma barra, sin que el paso gordo se lleve
-  media pieza de un golpe. Los botones de la ficha dan ese mismo paso, y
-  escribir el número a mano vale para cualquier valor de la rejilla fina: lo
-  afinado se guarda tal cual, no se redondea al volver. Cuando un lado toca su
-  tope —el suelo de 0,01 o el techo del campo— su botón se apaga, para que se
-  vea que por ahí ya no hay más.
+- **Estirar y encoger van a tres velocidades**: mientras el lado mide más de
+  0,2 cada toque es de 0,05; de ahí para abajo, de 0,01; y por debajo de 0,01,
+  de una milésima, que es hasta donde llegan las piezas. Así un muro se recorta
+  a zancadas, un listón o el marco de una ventana se afinan desde la misma
+  barra sin que el paso gordo se lleve media pieza de un golpe, y una lámina
+  —el agua de un pilón, la sombra de un toldo, una cúpula aplastada hasta hacer
+  de charco— sigue adelgazando cuando ya no se ve el escalón. Los botones de la
+  ficha dan ese mismo paso, y escribir el número a mano vale para cualquier
+  valor de la rejilla: lo afinado se guarda tal cual, no se redondea al volver.
+  Cuando un lado toca su tope —el suelo de 0,001 o el techo del campo— su botón
+  se apaga, para que se vea que por ahí ya no hay más. **La teja y la escama
+  llevan el alto en dos campos** —el bombeo montado sobre la plancha—, así que
+  ahí el botón del alto se pasa al grueso en cuanto aplana el bombeo: primero
+  le quita la curva y después el canto, hasta dejarla en papel.
 - **Girar** vuelve la pieza **45° por toque** —la diagonal en un toque, el
   cuarto de vuelta en dos— y cae siempre en el múltiplo más cercano, como las
   flechas caen en la rejilla. El botón del lado dice **sobre qué eje**, y se
