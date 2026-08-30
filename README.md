@@ -319,8 +319,8 @@ Para colocar:
   más —arrastrarla no la mueve—, y las flechas de su barra la empujan un paso
   de rejilla. Así el modelo no se descoloca de un roce al mirarlo, y un paso
   siempre cae en la rejilla. El arrastre es siempre de la vista: arrastrar
-  mueve el encuadre y la rueda acerca y aleja, se empiece encima de una pieza o
-  del fondo.
+  mueve el encuadre y la rueda acerca y aleja, se empiece encima de una pieza,
+  de la imagen guía o del fondo.
 - Al elegir una pieza salen sus **dos barras**, con la misma hechura —grupos
   redondeados de dos filas, al modo de los mandos agrupados de iOS—: **abajo,
   dónde se pone**; **arriba, qué se le hace**.
@@ -378,12 +378,19 @@ Para colocar:
   transparencia— para copiarla: aparece **de pie sobre la huella**, al ancho de
   las casillas del edificio, y por delante del modelo a media opacidad, para
   que no la tapen las piezas. Se le regula la opacidad y el tamaño, se puede
-  mandar detrás para calcar encima, y se coloca arrastrándola (con la rueda se
-  agranda). Mientras está suelta el arrastre es suyo y no toca las piezas;
-  cuando esté en su sitio, **Bloquear la imagen** la deja fija y se vuelve a
-  modelar con normalidad. Se guarda en ese navegador, achicada, hasta que se
-  quite. Las flechas del teclado y las de la barra giran con la vista:
-  siempre empujan hacia donde apuntan en la pantalla.
+  mandar detrás para calcar encima, y **se coloca con los mismos botones que
+  las piezas**: mientras está suelta, la barra de abajo es suya, con pieza
+  elegida o sin ella. La cruceta y subir y bajar la empujan por la pantalla lo
+  mismo que empujarían una pieza —un paso de rejilla, así que la rejilla de
+  **Vista** también manda aquí: fina para ajustarla, media casilla para
+  llevarla de un lado a otro—, y el primer par de estirar la **agranda y la
+  achica** un tanto por ciento cada toque, que una imagen crece entera. Los
+  otros dos lados y el giro se apagan: no son suyos. Cuando esté en su sitio,
+  **Bloquear la imagen** la deja fija y los botones vuelven a la pieza. Se
+  guarda en ese navegador, achicada, hasta que se quite. Las flechas del
+  teclado y las de la barra giran con la vista: siempre empujan hacia donde
+  apuntan en la pantalla, y a la guía, que no está sobre el suelo sino de pie
+  delante, la empujan hacia donde apunta el icono sin más vuelta.
 - Con **teclado**: flechas para mover (con **Alt**, arriba y abajo), **Mayús**
   para ir de cuatro en cuatro, **Supr** borra y **Ctrl+Z** deshace.
 - Mientras la vista se mueve o la pieza va cambiando, la mesa pinta las caras

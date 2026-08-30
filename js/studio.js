@@ -1129,14 +1129,13 @@ export class Studio {
       this.saveRef();
     }));
     /*
-     * Con la guía suelta, el arrastre es suyo: mueve la imagen en vez de las
-     * piezas, que es la única forma de ajustarla con el dedo sin descolocar el
-     * modelo. Bloqueada, deja de estorbar y se vuelve a modelar con normalidad
-     * sin miedo a moverla de un roce.
+     * Con la guía suelta, la barra de abajo es suya: mueve y agranda la imagen
+     * en vez de la pieza, que es de lo que se trata mientras se coloca.
+     * Bloqueada, los botones vuelven a la pieza y se modela con normalidad.
      */
     pop.appendChild(checkRow('Bloquear la imagen', !!this.ref.locked, (on) => {
       this.ref.locked = on;
-      this.status(on ? 'Guía bloqueada: ya no se mueve.' : 'Guía suelta: arrastra para colocarla.');
+      this.status(on ? 'Guía bloqueada: ya no se mueve.' : 'Guía suelta: los botones de abajo la colocan.');
       this.redraw();
       this.saveRef();
     }));
@@ -1170,7 +1169,7 @@ export class Studio {
         this.fitRef();
         this.saveRef();
         this.redraw();
-        this.status('Guía puesta. Arrastra para colocarla; en «Guía» se ajusta y se quita.');
+        this.status('Guía puesta. Los botones de abajo la colocan; en «Guía» se ajusta y se quita.');
       };
       img.onerror = () => this.status('No se ha podido leer esa imagen.');
       img.src = reader.result;
@@ -1910,7 +1909,7 @@ export class Studio {
       : 'Nada elegido';
     const placing = this.ref && !this.ref.locked;
     const how = placing
-      ? 'colocando la guía: arrastra para moverla · bloquéala al terminar'
+      ? 'colocando la guía: la mueven los botones · bloquéala al terminar'
       : 'toca para elegir · la colocan los botones · arrastra o pellizca para mover la vista';
     ctx.fillText(W < 420 && !placing ? pos : `${pos} · ${how}`, 10, 15);
   }
@@ -1964,12 +1963,6 @@ export class Studio {
     el('studio-view').setPointerCapture(e.pointerId);
     if (this.pointers.size >= 2) { this.startPinch(); return; }
 
-    // Con la guía en modo de colocar, el arrastre es suyo: mueve la imagen y no
-    // toca ni las piezas ni la vista.
-    if (this.ref && !this.ref.locked && e.button !== 2) {
-      this.drag = { mode: 'ref', px, py, moved: false, start: { px: this.ref.px, py: this.ref.py } };
-      return;
-    }
     /*
      * Tocar una pieza sólo la elige: colocarla es cosa de los botones. Se
      * arrastraba, y era demasiado fácil descolocar de un roce lo que ya estaba
@@ -2023,13 +2016,6 @@ export class Studio {
     const dsx = px - this.drag.px, dsy = py - this.drag.py;
     if (Math.abs(dsx) > 3 || Math.abs(dsy) > 3) this.drag.moved = true;
 
-    if (this.drag.mode === 'ref') {
-      this.ref.px = this.drag.start.px + dsx / this.zoom;
-      this.ref.py = this.drag.start.py + dsy / this.zoom;
-      this.redraw();
-      return;
-    }
-
     this.encajado = false;
     this.ox = this.drag.ox + dsx;
     this.oy = this.drag.oy + dsy;
@@ -2051,11 +2037,6 @@ export class Studio {
       return;
     }
     if (!this.drag) return;
-    if (this.drag.mode === 'ref') {
-      this.drag = null;
-      this.saveRef();
-      return;
-    }
     const { moved, sobrePieza } = this.drag;
     this.drag = null;
     // Un toque limpio en el suelo suelta la selección; arrastrar sólo movía la
@@ -2072,18 +2053,8 @@ export class Studio {
     e.preventDefault();
     const [px, py] = this.pointerAt(e);
     const k = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    // Colocando la guía, la rueda la agranda o la achica a ella.
-    if (this.ref && !this.ref.locked) {
-      const next = Math.max(0.05, Math.min(6, this.ref.scale * k));
-      const { img } = this.ref;
-      // Se agranda desde el puntero, para no perder de vista lo que se mira.
-      this.ref.px = (px - this.ox) / this.zoom - ((px - this.ox) / this.zoom - this.ref.px) * (next / this.ref.scale);
-      this.ref.py = (py - this.oy) / this.zoom - ((py - this.oy) / this.zoom - this.ref.py) * (next / this.ref.scale);
-      this.ref.scale = next;
-      this.redraw();
-      this.saveRef();
-      return;
-    }
+    // La rueda es siempre de la vista, esté la guía suelta o no: a la imagen la
+    // agrandan sus botones, igual que a las piezas.
     const next = Math.max(0.75, Math.min(16, this.zoom * k));
     this.encajado = false;
     // Se amplía sobre el puntero, que es donde está mirando quien modela.
@@ -2189,6 +2160,9 @@ export class Studio {
       const b = mk(dibujo, title, () => this.scale(eje, dir));
       b.dataset.eje = eje;
       b.dataset.dir = String(dir);
+      // El rótulo de la pieza, guardado: colocando la guía se cambia por el
+      // suyo —una imagen no se ensancha, se agranda— y luego se repone.
+      b.dataset.rotulo = title;
       return b;
     };
     escala.append(
@@ -2348,8 +2322,35 @@ export class Studio {
     return SCALE_FIELDS[eje].find((k) => campos.includes(k)) || null;
   }
 
+  /**
+   * ¿Está la guía puesta y suelta? Entonces los botones son suyos: mueven y
+   * agrandan la imagen en vez de la pieza, que es de lo que se trata mientras
+   * se coloca. Al bloquearla vuelven a la pieza.
+   */
+  colocandoGuia() {
+    return !!(this.ref && !this.ref.locked);
+  }
+
+  /**
+   * Agranda o achica la guía, un tanto por ciento por toque: en una imagen no
+   * hay ancho, largo y alto que valgan —crece entera— y un paso fijo se queda
+   * corto arriba y se lo lleva todo abajo.
+   */
+  scaleRef(dir) {
+    const r = this.ref;
+    const next = Math.min(6, Math.max(0.05, Math.round(r.scale * (dir > 0 ? 1.05 : 1 / 1.05) * 1000) / 1000));
+    // Con la imagen muy pequeña el 5 % no llega a moverse: al menos una milésima.
+    r.scale = next === r.scale ? Math.min(6, Math.max(0.05, r.scale + dir * 0.001)) : next;
+    this.redraw();
+    this.saveRef();
+  }
+
   /** Estira o encoge la pieza por uno de sus tres lados. */
   scale(eje, dir) {
+    // La imagen tiene un solo tamaño, así que sólo se agranda por el primer
+    // par; los otros dos lados están apagados, como en una pieza que no los
+    // tiene.
+    if (this.colocandoGuia()) { if (eje === 'w') this.scaleRef(dir); return; }
     const part = this.design?.parts[this.selected];
     if (!part) return;
     const key = this.scaleField(part, eje);
@@ -2382,6 +2383,7 @@ export class Studio {
    * dos posturas, así que los dos botones hacen lo mismo: cambiar de una a otra.
    */
   rotate(dir) {
+    if (this.colocandoGuia()) return;
     const part = this.design?.parts[this.selected];
     if (!part) return;
     const key = this.rotField(part);
@@ -2395,8 +2397,25 @@ export class Studio {
     this.afterChange();
   }
 
+  /**
+   * Empuja la guía por la pantalla lo mismo que la cruceta empujaría una pieza:
+   * un paso de rejilla, proyectado. La imagen no está sobre el suelo sino de
+   * pie delante de la vista, así que su sitio va en el espacio de la pantalla y
+   * no gira con el giro de la vista; lo que se busca es que el botón la mueva
+   * hacia donde apunta, y eso es lo que sale.
+   */
+  nudgeRef(dxr, dyr, dz) {
+    const step = this.snap || 0.05;
+    const [dpx, dpy] = project([dxr * step, dyr * step, dz * step]);
+    this.ref.px += dpx;
+    this.ref.py += dpy;
+    this.redraw();
+    this.saveRef();
+  }
+
   /** Empuja la pieza un paso de rejilla en la dirección que se ve. */
   nudge(dxr, dyr, dz) {
+    if (this.colocandoGuia()) { this.nudgeRef(dxr, dyr, dz); return; }
     const part = this.design?.parts[this.selected];
     if (!part) return;
     const step = this.snap || 0.05;
@@ -2426,10 +2445,18 @@ export class Studio {
     return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pad-h')) || 86;
   }
 
-  /** Las barras de la pieza sólo están cuando hay una pieza. */
+  /**
+   * Las barras de la pieza sólo están cuando hay una pieza... o cuando hay una
+   * guía que colocar, que se coloca con estos mismos botones y con la pieza
+   * elegida o sin ella.
+   */
   updatePad() {
+    const guia = this.colocandoGuia();
     const part = this.design?.parts[this.selected];
-    el('studio-pad').classList.toggle('hidden', !part);
+    // A quién obedece la barra de abajo: a la guía mientras se coloca y a la
+    // pieza el resto del tiempo. La de arriba es siempre de la pieza.
+    const pieza = guia ? null : part;
+    el('studio-pad').classList.toggle('hidden', !pieza && !guia);
     /*
      * La de arriba no espera a que haya pieza elegida: deshacer y añadir hacen
      * falta antes de que la haya —una pieza propia recién empezada está vacía y
@@ -2439,17 +2466,26 @@ export class Studio {
     /*
      * Un lado se apaga si esta pieza no lo tiene y también si ya está en su
      * tope: pulsar y que no pase nada no dice nada, y el botón apagado dice
-     * que por ahí ya no se puede ir más.
+     * que por ahí ya no se puede ir más. La guía tiene un solo tamaño —crece
+     * entera—, así que se queda con el primer par y apaga los otros dos.
      */
     for (const b of document.querySelectorAll('.studio-scale button')) {
-      const key = part && this.scaleField(part, b.dataset.eje);
+      const crece = b.dataset.dir === '1';
+      const suyo = guia && b.dataset.eje === 'w';
+      const rotulo = suyo ? (crece ? 'Agrandar la imagen' : 'Achicar la imagen') : b.dataset.rotulo;
+      b.title = rotulo;
+      b.setAttribute('aria-label', rotulo);
+      if (guia) {
+        b.disabled = !suyo || (crece ? this.ref.scale >= 6 - 1e-9 : this.ref.scale <= 0.05 + 1e-9);
+        continue;
+      }
+      const key = pieza && this.scaleField(pieza, b.dataset.eje);
       const f = key && FIELDS[key];
-      b.disabled = !f || (b.dataset.dir === '1'
-        ? part[key] >= f.max - 1e-9
-        : part[key] <= f.min + 1e-9);
+      b.disabled = !f || (crece ? pieza[key] >= f.max - 1e-9 : pieza[key] <= f.min + 1e-9);
     }
-    // Una bandera o una esfera no giran: sus dos botones se apagan, no se van.
-    for (const b of this.btnGiro || []) b.disabled = !part || !this.rotField(part);
+    // Una bandera o una esfera no giran, y la guía tampoco: sus dos botones se
+    // apagan, no se van.
+    for (const b of this.btnGiro || []) b.disabled = guia || !pieza || !this.rotField(pieza);
     if (this.btnUndo) {
       this.btnUndo.disabled = !this.undo.length;
       this.btnRedo.disabled = !this.redo.length;
