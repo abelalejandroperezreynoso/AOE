@@ -386,18 +386,22 @@ Para colocar:
   las casillas del edificio, y por delante del modelo a media opacidad, para
   que no la tapen las piezas. Se le regula la opacidad y el tamaño, se puede
   mandar detrás para calcar encima, y **se coloca con los mismos botones que
-  las piezas**: mientras está suelta, la barra de abajo es suya, con pieza
-  elegida o sin ella. La cruceta y subir y bajar la empujan por la pantalla lo
+  las piezas**, y se elige igual que ellas: **tocándola**. Elegida, la barra de
+  abajo es suya, con pieza elegida o sin ella; **tocar el suelo la suelta**, y
+  tocar una pieza también, que entonces los botones son de la pieza. Se toca
+  después de las piezas, no antes: ocupa media mesa y si no taparía todo lo que
+  hay debajo. La cruceta y subir y bajar la empujan por la pantalla lo
   mismo que empujarían una pieza —un paso de rejilla, así que la rejilla de
   **Vista** también manda aquí: fina para ajustarla, media casilla para
   llevarla de un lado a otro—, y el primer par de estirar la **agranda y la
   achica** un tanto por ciento cada toque, que una imagen crece entera. Los
-  otros dos lados y el giro se apagan: no son suyos. Mientras es suya la barra,
+  otros dos lados y el giro se apagan: no son suyos. Mientras está elegida,
   la imagen lleva **un contorno** —de puntos, con las cuatro esquinas en trazo
   seguido y del mismo color con que se resalta la pieza elegida— por encima del
   modelo, aunque la guía esté detrás: es lo que dice, sin leer nada, quién se
-  lleva los botones. Cuando esté en su sitio,
-  **Bloquear la imagen** la deja fija y los botones vuelven a la pieza.
+  lleva los botones. Cuando esté en su sitio, **Bloquear la imagen** hace por
+  su nombre lo mismo que tocar el suelo: la deja fija y devuelve los botones a
+  la pieza.
   **Ocultarla** —el ojo de la barra de arriba, o su casilla en el menú— la
   aparta de la vista sin quitarla: no se dibuja, no se lleva los botones y
   sigue guardada con su sitio y su tamaño, esperando al mismo botón. Se

@@ -1153,7 +1153,9 @@ export class Studio {
     }));
     pop.appendChild(checkRow('Bloquear la imagen', !!this.ref.locked, (on) => {
       this.ref.locked = on;
-      this.status(on ? 'Guía bloqueada: ya no se mueve.' : 'Guía suelta: los botones de abajo la colocan.');
+      this.status(on
+        ? 'Guía bloqueada: ya no se mueve. Tócala para volver a cogerla.'
+        : 'Guía elegida: los botones de abajo la colocan.');
       this.redraw();
       this.saveRef();
     }));
@@ -1187,7 +1189,7 @@ export class Studio {
         this.fitRef();
         this.saveRef();
         this.redraw();
-        this.status('Guía puesta. Los botones de abajo la colocan; en «Guía» se ajusta y se quita.');
+        this.status('Guía puesta: la colocan los botones de abajo; toca el suelo para soltarla.');
       };
       img.onerror = () => this.status('No se ha podido leer esa imagen.');
       img.src = reader.result;
@@ -1231,6 +1233,28 @@ export class Studio {
       this.ox + r.px * this.zoom, this.oy + r.py * this.zoom,
       r.img.width * r.scale * this.zoom, r.img.height * r.scale * this.zoom);
     ctx.restore();
+  }
+
+  /** ¿Cae el puntero dentro de la imagen guía, tal y como se ve ahora? */
+  enGuia(px, py) {
+    const r = this.ref;
+    if (!r || !r.img || r.oculta) return false;
+    const x = this.ox + r.px * this.zoom, y = this.oy + r.py * this.zoom;
+    const w = r.img.width * r.scale * this.zoom, h = r.img.height * r.scale * this.zoom;
+    return px >= x && px <= x + w && py >= y && py <= y + h;
+  }
+
+  /**
+   * Elige o suelta la guía. Elegida es la que se coloca con los botones —lo
+   * que hasta ahora era «suelta»—, y suelta es la que se queda quieta mientras
+   * se modela. Se toca ella para cogerla y el suelo para dejarla, igual que una
+   * pieza; el candado del menú hace lo mismo por su nombre.
+   */
+  elegirGuia(on) {
+    if (!this.ref || this.ref.oculta || this.ref.locked === !on) return;
+    this.ref.locked = !on;
+    this.saveRef();
+    this.redraw();
   }
 
   /**
@@ -1964,7 +1988,7 @@ export class Studio {
       : 'Nada elegido';
     const placing = this.colocandoGuia();
     const how = placing
-      ? 'colocando la guía: la mueven los botones · bloquéala al terminar'
+      ? 'guía elegida: la mueven los botones · toca el suelo para soltarla'
       : 'toca para elegir · la colocan los botones · arrastra o pellizca para mover la vista';
     ctx.fillText(W < 420 && !placing ? pos : `${pos} · ${how}`, 10, 15);
   }
@@ -2025,8 +2049,17 @@ export class Studio {
      */
     const hit = e.button === 2 ? -1 : this.pick(px, py, this.slackFor(e));
     const sobrePieza = hit >= 0 && !!this.design.parts[hit];
-    if (sobrePieza && hit !== this.selected) this.selectPart(hit);
-    this.drag = { mode: 'pan', px, py, moved: false, sobrePieza, ox: this.ox, oy: this.oy };
+    // La guía se elige como una pieza más: tocándola. Detrás de las piezas, que
+    // ocupa media mesa y taparía todo lo que hay debajo.
+    const sobreGuia = !sobrePieza && e.button !== 2 && this.enGuia(px, py);
+    if (sobrePieza) {
+      if (hit !== this.selected) this.selectPart(hit);
+      // Y elegir una pieza le quita los botones a la guía.
+      this.elegirGuia(false);
+    } else if (sobreGuia) {
+      this.elegirGuia(true);
+    }
+    this.drag = { mode: 'pan', px, py, moved: false, sobrePieza, sobreGuia, ox: this.ox, oy: this.oy };
     this.redraw();
   }
 
@@ -2092,14 +2125,18 @@ export class Studio {
       return;
     }
     if (!this.drag) return;
-    const { moved, sobrePieza } = this.drag;
+    const { moved, sobrePieza, sobreGuia } = this.drag;
     this.drag = null;
-    // Un toque limpio en el suelo suelta la selección; arrastrar sólo movía la
-    // vista, y un toque en una pieza ya la eligió al bajar el dedo.
-    if (!moved && !sobrePieza && e.button !== 2 && this.selected >= 0) {
-      this.selected = -1;
-      this.renderPanel();
-      this.redraw();
+    // Un toque limpio en el suelo suelta lo que estuviera elegido, la guía
+    // incluida; arrastrar sólo movía la vista, y un toque en una pieza o en la
+    // guía ya las eligió al bajar el dedo.
+    if (!moved && !sobrePieza && !sobreGuia && e.button !== 2) {
+      this.elegirGuia(false);
+      if (this.selected >= 0) {
+        this.selected = -1;
+        this.renderPanel();
+        this.redraw();
+      }
     }
   }
 
