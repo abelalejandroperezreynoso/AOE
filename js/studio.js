@@ -20,9 +20,9 @@
 import { PLAYER_COLORS, AGES, UNITS, BUILDINGS, BUILD_ORDER, RESOURCES, RES_NAME } from './config.js';
 import { project, depth, faceLight, rotZ, bake, HW, HH, VZ } from './gfx3d/engine.js';
 import {
-  PARTS, PART_KEYS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
+  PARTS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
   DEFAULT_PALETTE, designParts, designMesh, MINE, isMine, minePartKeys, canExplode,
-  PIECE_FIELDS, isMineKey,
+  PIECE_FIELDS, isMineKey, BASIC_KEYS, COMPOSITE_KEYS,
 } from './gfx3d/parts.js';
 import { buildingMesh } from './gfx3d/buildings.js';
 import {
@@ -811,17 +811,28 @@ export class Studio {
     const caja = el('studio-pick-base');
     if (!caja) return;
     caja.innerHTML = '';
-    for (const k of PART_KEYS) {
-      const spec = PARTS[k];
-      const b = document.createElement('button');
-      b.className = 'piece-card';
-      b.title = `Empezar una pieza del taller con ${spec.label.toLowerCase()} dentro`;
-      const thumb = this.pieceThumb(k, 68);
-      const name = document.createElement('b');
-      name.textContent = spec.label;
-      b.append(thumb, name);
-      b.onclick = () => this.newPiece(k);
-      caja.appendChild(b);
+    // Partido igual que la hoja de añadir, y por lo mismo: las de un solo
+    // cuerpo delante, que son con las que se hace lo demás.
+    for (const [titulo, claves] of [
+      ['Básicas · un solo cuerpo', BASIC_KEYS],
+      ['Compuestas · varias en una', COMPOSITE_KEYS],
+    ]) {
+      const h = document.createElement('h4');
+      h.className = 'piece-grid-h';
+      h.textContent = titulo;
+      caja.appendChild(h);
+      for (const k of claves) {
+        const spec = PARTS[k];
+        const b = document.createElement('button');
+        b.className = 'piece-card';
+        b.title = `Empezar una pieza del taller con ${spec.label.toLowerCase()} dentro`;
+        const thumb = this.pieceThumb(k, 68);
+        const name = document.createElement('b');
+        name.textContent = spec.label;
+        b.append(thumb, name);
+        b.onclick = () => this.newPiece(k);
+        caja.appendChild(b);
+      }
     }
   }
 
@@ -1263,21 +1274,39 @@ export class Studio {
       b.onclick = () => { this.closePieceSheet(); this.addPart(k); };
       return b;
     };
-    for (const k of PART_KEYS) grid.appendChild(ficha(k));
-
-    /*
-     * Las del taller van detrás y bajo su rótulo: son las mismas de la parrilla
-     * de entrada, ya dadas de alta en el catálogo del dibujante. Dentro de una
-     * pieza no salen, que las piezas propias no se anidan.
-     */
-    const mias = this.enPieza() ? [] : minePartKeys();
-    if (mias.length) {
+    const seccion = (titulo, claves, nota = '') => {
+      if (!claves.length) return;
       const h = document.createElement('h4');
       h.className = 'piece-grid-h';
-      h.textContent = 'Mis piezas';
+      h.textContent = titulo;
       grid.appendChild(h);
-      for (const k of mias) grid.appendChild(ficha(k));
-    }
+      if (nota) {
+        const p = document.createElement('p');
+        p.className = 'piece-grid-note';
+        p.textContent = nota;
+        grid.appendChild(p);
+      }
+      for (const k of claves) grid.appendChild(ficha(k));
+    };
+
+    /*
+     * El catálogo va partido, y las de un solo cuerpo delante. Haciendo una
+     * pieza del taller se busca el detalle, y el detalle sale de formas sueltas:
+     * tener por delante unas almenas enteras cuando lo que se quiere es un cubo
+     * de dos centímetros no ayuda. Las compuestas siguen estando, detrás, que a
+     * veces son justo el atajo que hace falta.
+     */
+    seccion('Básicas · un solo cuerpo', BASIC_KEYS);
+    seccion('Compuestas · varias en una', COMPOSITE_KEYS, this.enPieza()
+      ? 'Vienen ya armadas. Para el detalle fino tira de las básicas, o mete una compuesta y descomponla.'
+      : '');
+
+    /*
+     * Las del taller van al final y bajo su rótulo: son las mismas de la
+     * parrilla de entrada, ya dadas de alta en el catálogo del dibujante.
+     * Dentro de una pieza no salen, que las piezas propias no se anidan.
+     */
+    seccion('Mis piezas', this.enPieza() ? [] : minePartKeys());
     el('piece-sheet').classList.remove('hidden');
   }
 

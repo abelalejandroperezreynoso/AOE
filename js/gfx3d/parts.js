@@ -521,6 +521,27 @@ export const PARTS = {
 /** Las que trae el juego. Las propias van aparte, que se hacen y se deshacen. */
 export const PART_KEYS = Object.keys(PARTS);
 
+/*
+ * El catálogo, partido en dos.
+ *
+ * **Básicas** son las de un solo cuerpo: una caja, un cilindro, una viga. Con
+ * ellas se hace todo lo demás, y son las que se quieren delante cuando lo que
+ * se está haciendo es una pieza del taller: ahí se busca el detalle, y el
+ * detalle se saca de formas sueltas.
+ *
+ * **Compuestas** son las que ya traen varias en una —unas almenas, una cerca,
+ * un torreón—. Puestas en un edificio ahorran media tarde; dentro de una pieza
+ * del taller son un atajo que a veces viene bien, pero no es por donde se
+ * empieza. Casi todas se pueden deshacer en sus partes (`explode`).
+ */
+const BASICAS = new Set(['box', 'cyl', 'dome', 'gable', 'hip', 'panel', 'beam', 'wheel', 'barrel']);
+
+/** ¿Es una pieza de un solo cuerpo? */
+export function isBasic(k) { return BASICAS.has(k); }
+
+export const BASIC_KEYS = PART_KEYS.filter(isBasic);
+export const COMPOSITE_KEYS = PART_KEYS.filter((k) => !isBasic(k));
+
 // --- Piezas propias ----------------------------------------------------------
 
 /*

@@ -925,7 +925,12 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   gap: 8px; align-content: start; padding: 2px;
 }
-/* El rótulo que parte el catálogo en dos: las del juego y las del taller. */
+/* La línea que acompaña a un rótulo del catálogo cuando hace falta explicarlo. */
+.piece-grid-note {
+  grid-column: 1 / -1; margin: 2px 0 0;
+  font-size: 12px; color: #63533a; line-height: 1.45;
+}
+/* El rótulo que parte el catálogo: básicas, compuestas y las del taller. */
 .piece-grid-h {
   grid-column: 1 / -1; margin: 10px 0 0;
   font-size: 12px; color: var(--gold-l);

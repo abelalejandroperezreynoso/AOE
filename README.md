@@ -254,6 +254,15 @@ código—, pero tocar una empieza una pieza del taller con ella dentro, que es 
 más parecido a editarlas y por donde se empieza casi siempre: se parte de la
 caja o del tejado y se le añade lo que haga falta.
 
+Ese catálogo va partido en dos, y la hoja de **Añadir** lo repite: **básicas**
+—las de un solo cuerpo: caja, cilindro, cúpula, tejados, faldón, viga, rueda,
+barril— y **compuestas** —las que ya traen varias en una: almenas, torreón,
+puerta, ventana, estandarte, escalinata, cerca, pila de troncos—. Las básicas
+van delante porque son con las que se hace lo demás: haciendo una pieza del
+taller se busca el detalle, y el detalle sale de formas sueltas. Las compuestas
+siguen ahí detrás, que a veces son justo el atajo que hace falta, y cualquiera
+de ellas se puede meter y descomponer para quedarse con sus trozos.
+
 Lo que las hace útiles es que quedan **enlazadas**: una pieza puesta en un
 edificio no es una copia, es la pieza. Cambiarla cambia de golpe todos los
 edificios que la lleven —y, con el taller compartido, para todo el que juegue—.
