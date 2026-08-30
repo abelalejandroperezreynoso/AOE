@@ -354,11 +354,14 @@ Para colocar:
   apagados. Los ángulos
   intermedios, de cinco en cinco, se ponen en la ficha de la pieza.
 - **Arriba**: **deshacer y rehacer**, **añadir** —abre el catálogo de piezas— y
-  **duplicar**, el **color de la pieza** y **borrarla**, y en la punta, sola en
-  su columna y de un solo botón alto, la **imagen guía**. Es lo único de esta
-  barra que no es de la pieza sino de la mesa, y está aquí porque es lo que se
-  busca con el modelo delante: se calca con la hoja plegada, para ver la imagen
-  a lo grande, y entonces el desplegable de las herramientas no está. El botón
+  **duplicar**, el **color de la pieza** y **borrarla**, y en la punta, en su
+  propia columna, la **imagen guía**: arriba sus ajustes y abajo **ocultarla y
+  volver a verla**, que es lo que se hace a cada rato mientras se calca —mirar
+  cómo va el modelo sin la imagen encima— y no puede costar abrir un menú. Es
+  lo único de esta barra que no es de la pieza sino de la mesa, y está aquí
+  porque es lo que se busca con el modelo delante: se calca con la hoja
+  plegada, para ver la imagen a lo grande, y entonces el desplegable de las
+  herramientas no está. El botón
   del color enseña el material que lleva y despliega los demás con su muestra,
   para cambiarlo de un toque. Sus botones miden lo mismo que los de abajo porque
   comparten su rejilla. Con la mesa muy corta —la hoja desplegada en un
@@ -386,7 +389,10 @@ Para colocar:
   llevarla de un lado a otro—, y el primer par de estirar la **agranda y la
   achica** un tanto por ciento cada toque, que una imagen crece entera. Los
   otros dos lados y el giro se apagan: no son suyos. Cuando esté en su sitio,
-  **Bloquear la imagen** la deja fija y los botones vuelven a la pieza. Se
+  **Bloquear la imagen** la deja fija y los botones vuelven a la pieza.
+  **Ocultarla** —el ojo de la barra de arriba, o su casilla en el menú— la
+  aparta de la vista sin quitarla: no se dibuja, no se lleva los botones y
+  sigue guardada con su sitio y su tamaño, esperando al mismo botón. Se
   guarda en ese navegador, achicada, hasta que se quite. Las flechas del
   teclado y las de la barra giran con la vista: siempre empujan hacia donde
   apuntan en la pantalla, y a la guía, que no está sobre el suelo sino de pie
