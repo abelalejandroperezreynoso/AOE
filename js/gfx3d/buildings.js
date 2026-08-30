@@ -217,8 +217,18 @@ export function logPile(out, cx, cy, len, n, wood) {
   }
 }
 
-export function barrel(out, cx, cy, wood) {
-  lathe(out, cx, cy, [[0.07, 0], [0.09, 0.09], [0.07, 0.18]], wood, { seg: 7 });
+/*
+ * Un tonel: la panza de radio `r`, las tapas un poco más estrechas y `h` de
+ * alto. Las medidas vienen de fuera —antes estaban clavadas aquí y por eso el
+ * barril era la única pieza del taller que no se podía estirar— y los valores
+ * por defecto son los de siempre, para que los edificios de serie que lo ponen
+ * sin decir nada salgan igual que salían.
+ */
+const TAPA = 7 / 9; // el radio de las tapas frente al de la panza
+
+export function barrel(out, cx, cy, wood, o = {}) {
+  const { r = 0.09, h = 0.18, seg = 7, ...cara } = o;
+  lathe(out, cx, cy, [[r * TAPA, 0], [r, h / 2], [r * TAPA, h]], wood, { ...cara, seg });
 }
 
 // --- Los edificios -----------------------------------------------------------

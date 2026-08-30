@@ -832,11 +832,12 @@ export const PARTS = {
 
   barrel: {
     label: 'Barril', glyph: '◍',
-    hint: 'Un tonel; repítelo para llenar un almacén o un mercado.',
-    fields: ['x', 'y', 'z'],
-    def: { x: 1, y: 1, z: 0, m: 'wood' },
+    hint: 'Un tonel; repítelo para llenar un almacén o un mercado. Estíralo y sale una cuba, un bidón o un tonelete.',
+    fields: ['x', 'y', 'z', 'r', 'h', 'seg'],
+    def: { x: 1, y: 1, z: 0, r: 0.09, h: 0.18, seg: 7, m: 'wood' },
     build(out, p, c) {
-      lifted(out, p.z, (o) => barrel(o, p.x, p.y, matColor(p, c)));
+      lifted(out, p.z, (o) => barrel(o, p.x, p.y, matColor(p, c),
+        { ...matOpts(p), r: p.r, h: p.h, seg: p.seg }));
     },
   },
 };
