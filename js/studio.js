@@ -20,8 +20,8 @@
 import { PLAYER_COLORS, AGES, UNITS, BUILDINGS, BUILD_ORDER, RESOURCES, RES_NAME } from './config.js';
 import { project, depth, faceLight, rotZ, bake } from './gfx3d/engine.js';
 import {
-  PARTS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
-  DEFAULT_PALETTE, designParts, designMesh, MINE, isMine, minePartKeys, canExplode,
+  PARTS, FIELDS, TILT_FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
+  DEFAULT_PALETTE, designParts, designMesh, MINE, isMine, minePartKeys, canExplode, tiltMesh,
   PIECE_FIELDS, isMineKey, BASIC_KEYS, COMPOSITE_KEYS,
 } from './gfx3d/parts.js';
 import { buildingMesh } from './gfx3d/buildings.js';
@@ -78,7 +78,12 @@ const OJO_TAPADO = '<path d="m4 4 16 16"/>'
   + '<path d="M6.6 7.9A16.6 16.6 0 0 0 2.5 12S6 18.2 12 18.2c1.1 0 2.2-.2 3.1-.5"/>'
   + '<path d="M9.9 10.1a2.9 2.9 0 0 0 4 4"/>';
 
-const ROT_FIELDS = ['yaw', 'axis', 'face'];
+const ROT_AXES = ['z', 'x', 'y'];
+const EJE_NOTA = {
+  z: 'la pieza da vueltas de pie',
+  x: 'se tumba hacia los lados',
+  y: 'se tumba hacia delante y atrás',
+};
 const ROT_STEP = 45;
 
 /*
@@ -121,6 +126,7 @@ export class Studio {
     this.zoom = 4;
     this.ox = 0; this.oy = 0;
     this.snap = 0.05;
+    this.rotAxis = 'z';      // sobre qué eje giran los botones de girar
     this.undo = [];
     this.picks = [];         // triángulos ya proyectados, para saber qué se pulsa
     this.anchors = [];       // el ancla de cada pieza en pantalla, para el dedo
@@ -2152,17 +2158,23 @@ export class Studio {
       mk('<path d="m6 10 6 6 6-6"/>', 'Bajar la pieza', () => this.nudge(0, 0, -1)),
     );
 
-    // Girar, una vuelta por cada lado, en su propia columna entre subir y
-    // estirar: lo de en medio es dónde mira la pieza, no cuánto mide.
+    /*
+     * Girar, entre subir y estirar: lo de en medio es cómo se pone la pieza, no
+     * cuánto mide. Una vuelta por cada lado y, al lado, sobre qué eje: la pieza
+     * da vueltas de pie (Z) o se tumba hacia un lado (X) o hacia el otro (Y),
+     * y el botón del eje va pegado a los suyos porque es lo que los cambia.
+     */
     const giro = document.createElement('div');
     giro.className = 'studio-turn';
-    giro.append(
+    this.btnGiro = [
       mk('<path d="M4 12a8 8 0 1 1 2.6 5.9"/><path d="M4 6.5V12h5.5"/>',
         'Girar a la izquierda', () => this.rotate(-1)),
       mk('<path d="M20 12a8 8 0 1 0-2.6 5.9"/><path d="M20 6.5V12h-5.5"/>',
         'Girar a la derecha', () => this.rotate(1)),
-    );
-    this.btnGiro = [...giro.children];
+    ];
+    this.btnEje = mk('', 'Eje de giro', () => this.cycleRotAxis());
+    this.btnEje.className = 'studio-eje';
+    giro.append(this.btnGiro[0], this.btnGiro[1], this.btnEje);
     /*
      * Estirar y encoger, un lado por columna: ancho, largo y alto. Arriba
      * crecen y abajo encogen, con las flechas apuntando por el mismo diagonal
@@ -2398,32 +2410,36 @@ export class Studio {
     this.afterChange();
   }
 
-  /**
-   * Por dónde gira esta pieza: su ángulo si lo tiene y, si no, el eje o la cara
-   * a la que mira. Una pieza que no lleve ninguno de los tres no gira.
-   */
-  rotField(part) {
-    const campos = PARTS[part.k]?.fields || (isMineKey(part.k) ? PIECE_FIELDS : []);
-    return ROT_FIELDS.find((k) => campos.includes(k)) || null;
+  /** Pasa al siguiente eje: de pie, tumbada hacia un lado, hacia el otro. */
+  cycleRotAxis() {
+    this.rotAxis = ROT_AXES[(ROT_AXES.indexOf(this.rotAxis) + 1) % ROT_AXES.length];
+    this.updatePad();
+    this.status(`Girando sobre el eje ${this.rotAxis.toUpperCase()}: ${EJE_NOTA[this.rotAxis]}.`);
   }
 
   /**
-   * Gira la pieza elegida. Con ángulo se va de 45 en 45 y se cae en el múltiplo
-   * más cercano, como las flechas caen en la rejilla; con eje o cara sólo hay
-   * dos posturas, así que los dos botones hacen lo mismo: cambiar de una a otra.
+   * Qué campo gira esta pieza en el eje elegido. Sobre X e Y, los dos giros que
+   * llevan todas por fuera. Sobre Z, el ángulo propio de la pieza si lo tiene
+   * —así una caja sigue girando por donde giraba— y, si no, el de fuera.
+   */
+  rotField(part, eje = this.rotAxis) {
+    if (eje !== 'z') return eje === 'x' ? 'rx' : 'ry';
+    const campos = PARTS[part.k]?.fields || (isMineKey(part.k) ? PIECE_FIELDS : []);
+    return campos.includes('yaw') ? 'yaw' : 'rz';
+  }
+
+  /**
+   * Gira la pieza elegida sobre el eje elegido: de 45 en 45 y cayendo en el
+   * múltiplo más cercano, como las flechas caen en la rejilla. Da la vuelta
+   * entera, que 315 y −45 son el mismo sitio.
    */
   rotate(dir) {
     if (this.colocandoGuia()) return;
     const part = this.design?.parts[this.selected];
     if (!part) return;
     const key = this.rotField(part);
-    if (!key) return;
     this.pushUndo();
-    if (key === 'yaw') {
-      part.yaw = (snapTo((part.yaw || 0) + dir * ROT_STEP, ROT_STEP) + 360) % 360;
-    } else {
-      part[key] = part[key] === 'x' ? 'y' : 'x';
-    }
+    part[key] = (snapTo((part[key] || 0) + dir * ROT_STEP, ROT_STEP) + 360) % 360;
     this.afterChange();
   }
 
@@ -2513,9 +2529,19 @@ export class Studio {
       const f = key && FIELDS[key];
       b.disabled = !f || (crece ? pieza[key] >= f.max - 1e-9 : pieza[key] <= f.min + 1e-9);
     }
-    // Una bandera o una esfera no giran, y la guía tampoco: sus dos botones se
-    // apagan, no se van.
-    for (const b of this.btnGiro || []) b.disabled = guia || !pieza || !this.rotField(pieza);
+    // Girar vale para cualquier pieza y en los tres ejes; sólo se apaga sin
+    // pieza y mientras se coloca la guía, que no gira.
+    for (const b of this.btnGiro || []) b.disabled = guia || !pieza;
+    if (this.btnEje) {
+      const eje = this.rotAxis.toUpperCase();
+      const rotulo = `Eje de giro: ${eje} · ${EJE_NOTA[this.rotAxis]}. Toca para cambiarlo`;
+      this.btnEje.disabled = guia || !pieza;
+      this.btnEje.innerHTML = icono('<rect x="3.5" y="3.5" width="17" height="17" rx="5"/>'
+        + `<text x="12" y="16.8" text-anchor="middle" font-size="13" font-weight="700"`
+        + ` fill="currentColor" stroke="none" font-family="system-ui, sans-serif">${eje}</text>`);
+      this.btnEje.title = rotulo;
+      this.btnEje.setAttribute('aria-label', rotulo);
+    }
     if (this.btnOculta) {
       const oculta = !!this.ref?.oculta;
       const rotulo = oculta ? 'Mostrar la imagen guía' : 'Ocultar la imagen guía';
@@ -2712,6 +2738,15 @@ export class Studio {
 
     const rows = [];
     for (const key of spec.fields) rows.push(this.partField(part, key));
+    /*
+     * Los giros de fuera van detrás de lo suyo: son de todas las piezas y no
+     * de ésta. El de la Z sólo sale en las que no traen ángulo propio, para no
+     * poner dos mandos que hacen lo mismo.
+     */
+    for (const key of TILT_FIELDS) {
+      if (key === 'rz' && spec.fields.includes('yaw')) continue;
+      rows.push(this.partField(part, key));
+    }
     rows.push(this.materialField(part));
     for (const f of FLAGS) rows.push(this.flagField(part, f));
     wrap.appendChild(group(spec.label, rows));
@@ -2744,6 +2779,7 @@ export class Studio {
     let sueltas = [];
     try { sueltas = spec.explode(part) || []; } catch { sueltas = []; }
     if (!sueltas.length) return;
+    for (const suelta of sueltas) this.heredaGiro(suelta, part);
     const tope = this.enPieza() ? MAX_PIECE_PARTS : MAX_PARTS;
     if (this.design.parts.length - 1 + sueltas.length > tope) {
       this.status(`No caben: ${spec.label} son ${sueltas.length} piezas sueltas y el tope es ${tope}.`);
@@ -2757,8 +2793,33 @@ export class Studio {
       + (spec.explodeNota ? ` ${spec.explodeNota}` : ''));
   }
 
+  /**
+   * Le pasa a una pieza suelta el giro de la compuesta de la que sale. Una
+   * compuesta gira entera, alrededor de su ancla, y cada trozo por separado
+   * gira alrededor de la suya: para que quede donde estaba hay que llevarle
+   * también el ancla a donde el giro de la compuesta la mandaba. Sale exacto,
+   * que girar y mover son lo mismo hecho en otro orden.
+   */
+  heredaGiro(suelta, part) {
+    if (!TILT_FIELDS.some((k) => part[k])) return;
+    // Un triángulo de mentira con el ancla en sus tres vértices: así el mismo
+    // giro que se le da a una malla vale para un punto suelto.
+    const a = [suelta.x || 0, suelta.y || 0, suelta.z || 0];
+    const punto = [{ p: [[...a], [...a], [...a]] }];
+    tiltMesh(punto, part);
+    const [x, y, z] = punto[0].p[0];
+    suelta.x = clampField('x', x);
+    suelta.y = clampField('y', y);
+    suelta.z = clampField('z', z);
+    for (const k of TILT_FIELDS) if (part[k]) suelta[k] = part[k];
+  }
+
   partField(part, key) {
     const f = FIELDS[key];
+    // Un giro que no se ha tocado no está guardado. Para la ficha vale cero, y
+    // no se le escribe a la pieza hasta que se toque: un modelo de piezas
+    // derechas no tiene por qué cargar con tres ceros por pieza.
+    const valor = part[key] === undefined ? 0 : part[key];
     const row = document.createElement('label');
     row.className = 'cat-field';
     const name = document.createElement('span');
@@ -2767,12 +2828,12 @@ export class Studio {
     if (f.type === 'choice') {
       const input = document.createElement('select');
       for (const [v, label] of f.options) input.add(new Option(label, v));
-      input.value = part[key];
+      input.value = valor;
       input.onchange = () => { this.pushUndo(); part[key] = input.value; this.afterChange(); };
       row.append(name, input);
       return row;
     }
-    const stepper = numberStepper(part[key], f, key, (v) => {
+    const stepper = numberStepper(valor, f, key, (v) => {
       this.pushUndo();
       part[key] = clampField(key, v);
       this.afterChange();

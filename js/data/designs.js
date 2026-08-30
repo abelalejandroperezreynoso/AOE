@@ -19,7 +19,7 @@
 import { BUILDINGS } from '../config.js';
 import { LOOK } from './appearance.js';
 import {
-  PARTS, FIELDS, MATERIAL_KEYS, DEFAULT_PALETTE, PIECE_FIELDS, PIECE_DEF, isMineKey,
+  PARTS, FIELDS, TILT_FIELDS, MATERIAL_KEYS, DEFAULT_PALETTE, PIECE_FIELDS, PIECE_DEF, isMineKey,
 } from '../gfx3d/parts.js';
 import { BUILTIN_DESIGNS } from './builtin-designs.js';
 import { cloudEnabled, pullModels, pushModel, removeModel } from './cloud.js';
@@ -128,6 +128,16 @@ function cleanPart(raw) {
     } else {
       p[key] = num(raw[key], f.min, f.max, def[key], f.fino || f.step);
     }
+  }
+  /*
+   * Los giros de fuera son de todas las piezas, así que no están en la lista
+   * de campos de ninguna; y sólo se guardan si giran, para que un modelo lleno
+   * de piezas derechas no cargue con tres ceros por pieza.
+   */
+  for (const key of TILT_FIELDS) {
+    const f = FIELDS[key];
+    const v = num(raw[key], f.min, f.max, 0, f.fino || f.step);
+    if (v) p[key] = v;
   }
   p.m = MATERIAL_KEYS.includes(raw.m) ? raw.m : def.m;
   if (raw.rough) p.rough = true;

@@ -562,7 +562,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  */
 .studio-pad-grid {
   flex: 1; max-width: 520px;
-  display: grid; grid-template-columns: 2fr 1fr 1fr 3fr; gap: 10px;
+  display: grid; grid-template-columns: 2fr 1fr 2fr 3fr; gap: 10px;
 }
 /*
  * Cada grupo es una pieza redondeada con sus botones dentro, separados por un
@@ -587,12 +587,12 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   border-top: 0; border-bottom: 1px solid var(--borde);
 }
 /* Cuatro grupos de una columna, con el ancho justo para que sus botones midan
-   lo mismo que los de abajo: allí siete columnas se reparten el hueco menos
-   los tres huecos entre grupos, y aquí cuatro columnas han de medir eso mismo,
-   más los tres huecos que les quedan. Sale la misma cuenta y el mismo botón. */
+   lo mismo que los de abajo: allí ocho columnas se reparten el hueco menos los
+   tres huecos entre grupos, y aquí cuatro columnas han de medir eso mismo, más
+   los tres huecos que les quedan. Sale la misma cuenta y el mismo botón. */
 .studio-pad-top .studio-pad-grid {
   flex: none;
-  width: calc((min(100%, 520px) - 30px) * 4 / 7 + 30px);
+  width: calc((min(100%, 520px) - 30px) / 2 + 30px);
   grid-template-columns: repeat(4, 1fr);
 }
 .studio-hist, .studio-make, .studio-look, .studio-guia { grid-template-columns: 1fr; }
@@ -615,7 +615,13 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 .studio-cross { grid-template-columns: repeat(2, 1fr); }
 .studio-scale { grid-template-columns: repeat(3, 1fr); }
-.studio-lift, .studio-turn, .studio-pad-acts { grid-template-columns: 1fr; }
+.studio-lift, .studio-pad-acts { grid-template-columns: 1fr; }
+/* Girar: los dos sentidos en una columna y el eje al lado, de dos filas, que
+   es lo que manda sobre los dos. */
+.studio-turn { grid-template-columns: repeat(2, 1fr); }
+.studio-turn button:nth-child(1) { grid-area: 1 / 1; }
+.studio-turn button:nth-child(2) { grid-area: 2 / 1; }
+.studio-pad .studio-eje { grid-area: 1 / 2 / span 2; height: 100%; }
 .studio-pad button {
   width: auto; height: 36px; min-width: 0; padding: 0; margin: 0;
   border: 0; border-radius: 0;

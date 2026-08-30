@@ -17,7 +17,7 @@ import { PLAYER_COLORS, BUILDINGS } from '../config.js';
 import { LOOK } from '../data/appearance.js';
 import {
   tri, quad, box, cyl, sphere, limb, wheel, tone, srand, translate, scaleMesh,
-  mapVerts, rotZ,
+  mapVerts, rotZ, rotX, rotY,
 } from './engine.js';
 import {
   gableRoof, hipRoof, battlements, roundTower, flag, scaffold, foundation,
@@ -106,6 +106,12 @@ export const FIELDS = {
   len: { label: 'Largo', min: 0.01, max: 10, step: 0.05, fino: 0.01 },
   th: { label: 'Grueso', min: 0.01, max: 1, step: 0.02, fino: 0.01 },
   yaw: { label: 'Giro', min: 0, max: 355, step: 5, unit: '°' },
+  // Los tres giros de fuera: se le dan a la malla ya construida, alrededor del
+  // ancla de la pieza, así que valen para todas por igual. La Z sólo se usa en
+  // las que no traen `yaw` propio, para no tener dos mandos para lo mismo.
+  rz: { label: 'Giro Z', min: 0, max: 355, step: 5, unit: '°' },
+  rx: { label: 'Giro X', min: 0, max: 355, step: 5, unit: '°' },
+  ry: { label: 'Giro Y', min: 0, max: 355, step: 5, unit: '°' },
   pitch: { label: 'Inclinación', min: -90, max: 90, step: 5, unit: '°' },
   seg: { label: 'Lados', min: 3, max: 16, step: 1 },
   flat: { label: 'Achatado', min: 0.05, max: 2, step: 0.05, fino: 0.01 },
@@ -120,6 +126,24 @@ export const FIELDS = {
     options: [['x', 'Derecha (+X)'], ['y', 'Izquierda (+Y)']],
   },
 };
+
+/*
+ * Los giros que puede llevar cualquier pieza, en el orden en que se aplican:
+ * primero la vuelta sobre su eje vertical y después los dos vuelcos. Van sobre
+ * la malla ya construida y alrededor del ancla —donde la pieza dice estar—, de
+ * modo que una pieza se tumba sobre su base y no se va a otro sitio. No están
+ * en la lista de campos de ninguna pieza porque son de todas.
+ */
+export const TILT_FIELDS = ['rz', 'rx', 'ry'];
+
+/** Le da a una malla ya construida los giros de fuera de su pieza. */
+export function tiltMesh(tris, p) {
+  if (!tris.length) return;
+  const x = p.x || 0, y = p.y || 0, z = p.z || 0;
+  if (p.rz) rotZ(tris, rad(p.rz), x, y);
+  if (p.rx) rotX(tris, rad(p.rx), y, z);
+  if (p.ry) rotY(tris, rad(p.ry), x, z);
+}
 
 /** Banderas que puede llevar cualquier pieza. */
 export const FLAGS = [
@@ -766,7 +790,12 @@ export function pieceMesh(def, c) {
     const spec = PARTS[sub.k];
     // Ni piezas que no existen ni piezas propias dentro de otra.
     if (!spec || spec.mine) continue;
-    try { spec.build(tris, sub, c); } catch { /* una rota no tumba a las demás */ }
+    // Cada una en su montón, que los giros de fuera son suyos y no de la de al
+    // lado; luego se juntan.
+    const suyos = [];
+    try { spec.build(suyos, sub, c); } catch { /* una rota no tumba a las demás */ }
+    tiltMesh(suyos, sub);
+    for (const t of suyos) tris.push(t);
   }
   return tris;
 }
@@ -891,6 +920,7 @@ export function designParts(design, colorIdx = 0, stage = 2, live = false) {
     const tris = [];
     try {
       spec.build(tris, part, c);
+      tiltMesh(tris, part);
       if (k !== 1) scaleMesh(tris, k);
     } catch {
       // Una pieza con valores imposibles no puede tumbar el edificio entero.

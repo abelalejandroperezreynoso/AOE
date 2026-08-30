@@ -17,7 +17,7 @@
 // tiraría por no existir.
 
 import {
-  PARTS, FIELDS, MATERIAL_KEYS, MINE, isMine,
+  PARTS, FIELDS, TILT_FIELDS, MATERIAL_KEYS, MINE, isMine,
   registerPiece, unregisterPiece, pieceMesh, meshBounds,
 } from '../gfx3d/parts.js';
 import { cloudEnabled, pullParts, pushPart, removePart } from './cloud.js';
@@ -79,6 +79,12 @@ function cleanSub(raw) {
     } else {
       p[key] = num(raw[key], f.min, f.max, spec.def[key], f.fino || f.step);
     }
+  }
+  // Los giros de fuera valen para todas, y sólo se guardan si giran.
+  for (const key of TILT_FIELDS) {
+    const f = FIELDS[key];
+    const v = num(raw[key], f.min, f.max, 0, f.fino || f.step);
+    if (v) p[key] = v;
   }
   p.m = MATERIAL_KEYS.includes(raw.m) ? raw.m : spec.def.m;
   if (raw.rough) p.rough = true;

@@ -86,7 +86,10 @@ horneado sea repetible).
   campos y su `build()`; el editor monta sus controles y el validador la recorta
   solo, a partir de la tabla `FIELDS`, donde cada campo lleva dos escalones:
   `step`, el que dan los botones, y `fino`, la rejilla a la que se redondea al
-  guardar —así lo afinado a mano no vuelve al escalón gordo—. El catálogo va partido en **básicas** —un
+  guardar —así lo afinado a mano no vuelve al escalón gordo—. Los tres giros de
+  `TILT_FIELDS` (`rz`, `rx`, `ry`) no hay que declararlos: son de todas las
+  piezas y se los da `tiltMesh` a la malla ya construida, alrededor del ancla,
+  así que una pieza nueva se puede tumbar sin escribir una línea para ello. El catálogo va partido en **básicas** —un
   solo cuerpo, `BASICAS`— y **compuestas** —varias en una—; las básicas salen
   delante en el taller, porque son con las que se hace el detalle. Los cuerpos
   que el kit de obra no traía (cuña, tubo, bóveda, arco, aro) se arman aquí
