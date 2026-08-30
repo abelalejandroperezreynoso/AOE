@@ -22,6 +22,7 @@ import { project, depth, faceLight, rotZ, bake, HW, HH, VZ } from './gfx3d/engin
 import {
   PARTS, PART_KEYS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
   DEFAULT_PALETTE, designParts, designMesh, MINE, isMine, minePartKeys, canExplode,
+  PIECE_FIELDS, isMineKey,
 } from './gfx3d/parts.js';
 import { buildingMesh } from './gfx3d/buildings.js';
 import {
@@ -1926,7 +1927,7 @@ export class Studio {
     }
     const hit = e.button === 2 ? -1 : this.pick(px, py, this.slackFor(e));
     if (hit >= 0 && this.design.parts[hit]) {
-      if (hit !== this.selected) { this.selected = hit; this.renderPanel(); }
+      if (hit !== this.selected) this.selectPart(hit);
       const part = this.design.parts[hit];
       this.drag = {
         mode: e.shiftKey || this.moveMode === 'z' ? 'z' : 'xy',
@@ -2307,9 +2308,14 @@ export class Studio {
     return this.design?.palette?.[key] || DEFAULT_PALETTE[key] || '#888';
   }
 
-  /** Qué campo de esta pieza hace de ancho, de largo o de alto. */
+  /**
+   * Qué campo de esta pieza hace de ancho, de largo o de alto. Una pieza del
+   * taller que no esté de alta aquí también se coloca: cómo se pone es del
+   * modelo, no de la pieza, así que se mueve y se estira igual aunque todavía
+   * no se vea.
+   */
   scaleField(part, eje) {
-    const campos = PARTS[part.k]?.fields || [];
+    const campos = PARTS[part.k]?.fields || (isMineKey(part.k) ? PIECE_FIELDS : []);
     return SCALE_FIELDS[eje].find((k) => campos.includes(k)) || null;
   }
 
@@ -2465,6 +2471,20 @@ export class Studio {
     return wrap;
   }
 
+  /**
+   * Elegir una pieza. Va por aquí y no a mano porque son tres cosas las que la
+   * enseñan —el panel, la hoja de piezas y la mesa— y dejarse una es lo que
+   * pasaba: se tocaba una pieza en la lista, quedaba elegida y la hoja seguía
+   * diciendo «elige una pieza», con sus controles sin aparecer.
+   */
+  selectPart(i) {
+    if (this.selected === i) return;
+    this.selected = i;
+    this.renderPanel();
+    this.renderPartSheet();
+    this.redraw();
+  }
+
   /** Lista de piezas y los valores de la elegida. */
   partPanel() {
     const wrap = document.createElement('div');
@@ -2479,9 +2499,12 @@ export class Studio {
       swatch.className = 'studio-swatch';
       swatch.style.background = this.matColor(p.m);
       const name = document.createElement('span');
-      name.textContent = PARTS[p.k].label;
+      // Una pieza del taller que aún no está de alta se ve, pero no se dibuja:
+      // se dice qué falta en vez de dejar un hueco sin explicación.
+      name.textContent = PARTS[p.k] ? PARTS[p.k].label : `Pieza que falta (${p.k.replace(MINE, '')})`;
+      if (!PARTS[p.k]) li.classList.add('studio-part-falta');
       li.append(thumb, swatch, name);
-      li.onclick = () => { this.selected = i; this.renderPanel(); this.redraw(); };
+      li.onclick = () => this.selectPart(i);
       list.appendChild(li);
     });
     if (!this.design.parts.length) {
@@ -2499,6 +2522,30 @@ export class Studio {
     }
 
     const spec = PARTS[part.k];
+    /*
+     * Sin la pieza no hay nada que ajustar: no se sabe qué lleva dentro ni cómo
+     * se ve. Se explica lo que pasa —y que se arregla sola en cuanto la pieza
+     * vuelva— y se deja quitarla, que es lo único que tiene sentido hacerle. El
+     * modelo la conserva mientras tanto: tirarla aquí sería perderla de verdad.
+     */
+    if (!spec) {
+      const falta = document.createElement('p');
+      falta.className = 'studio-hint-text';
+      falta.textContent = `Aquí va «${part.k.replace(MINE, '')}», una pieza del taller que ahora mismo no está `
+        + 'en este dispositivo. El modelo la conserva y vuelve a verse en cuanto la pieza llegue; '
+        + 'si la borraron para siempre, quítala.';
+      wrap.appendChild(falta);
+      const fila = document.createElement('div');
+      fila.className = 'studio-actions';
+      const del = document.createElement('button');
+      del.className = 'studio-del';
+      del.textContent = 'Quitarla del modelo';
+      del.onclick = () => this.deletePart();
+      fila.appendChild(del);
+      wrap.appendChild(fila);
+      return wrap;
+    }
+
     const hint = document.createElement('p');
     hint.className = 'studio-hint-text';
     hint.textContent = spec.hint;

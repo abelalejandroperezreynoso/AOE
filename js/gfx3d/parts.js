@@ -568,6 +568,25 @@ export function pieceMesh(def, c) {
   return tris;
 }
 
+/*
+ * Cómo se coloca una pieza propia dentro de un modelo: dónde va, en qué caja
+ * cabe y cuánto se gira. Es el mismo juego de mandos para todas —lo que cambia
+ * de una a otra es lo que llevan dentro, no cómo se ponen—, y por eso se pueden
+ * nombrar aquí, sueltos de ninguna pieza en concreto: con ellos, un modelo que
+ * mencione una pieza que todavía no ha llegado se sigue entendiendo entero.
+ */
+export const PIECE_FIELDS = ['x', 'y', 'z', 'w', 'd', 'h', 'yaw'];
+export const PIECE_DEF = { x: 1, y: 1, z: 0, w: 1, d: 1, h: 1, yaw: 0, m: 'wall' };
+
+/**
+ * Una clave de pieza propia con la forma que debe tener. Sirve para reconocer
+ * una referencia sin resolver —`mia:reja` en un modelo cuya pieza aún no está
+ * de alta— y distinguirla de un `mia:` cualquiera colado a mano.
+ */
+export function isMineKey(k) {
+  return isMine(k) && /^[a-z][a-z0-9-]{2,31}$/.test(k.slice(MINE.length));
+}
+
 /**
  * Da de alta una pieza propia, o la rehace si ya estaba. Al colocarla se la
  * lleva a la caja que se le pida —ancho, fondo y alto—, centrada en su sitio y
@@ -580,8 +599,8 @@ export function registerPiece(def) {
     glyph: '◆',
     hint: 'Pieza hecha en el taller. Cambiarla cambia todo lo que la lleve.',
     mine: true,
-    fields: ['x', 'y', 'z', 'w', 'd', 'h', 'yaw'],
-    def: { x: 1, y: 1, z: 0, w: talla.w, d: talla.d, h: talla.h, yaw: 0, m: 'wall' },
+    fields: PIECE_FIELDS,
+    def: { ...PIECE_DEF, w: talla.w, d: talla.d, h: talla.h },
     build(out, p, c) {
       const tris = pieceMesh(def, c);
       if (!tris.length) return;

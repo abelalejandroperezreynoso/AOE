@@ -722,6 +722,9 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
    explica la pieza, y ancho: es la respuesta a «esto no lo puedo tocar por
    partes» y hay que verlo sin desplazar la hoja. */
 .studio-explode { display: block; width: 100%; margin: 0 0 10px; padding: 8px 10px; font-size: 12.5px; }
+/* Una pieza del taller que el modelo menciona y aquí no está: se ve en la
+   lista, apagada, para saber que el hueco tiene dueño y no se ha perdido. */
+.studio-part-falta { opacity: .6; font-style: italic; }
 .studio-template { display: block; width: 100%; text-align: left; margin-bottom: 6px; padding: 9px 12px; }
 .studio-template b { display: block; color: var(--gold-l); font-size: 14px; margin-bottom: 2px; }
 .studio-template small { color: #75654a; font-size: 11.5px; line-height: 1.4; }

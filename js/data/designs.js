@@ -18,7 +18,9 @@
 
 import { BUILDINGS } from '../config.js';
 import { LOOK } from './appearance.js';
-import { PARTS, FIELDS, MATERIAL_KEYS, DEFAULT_PALETTE } from '../gfx3d/parts.js';
+import {
+  PARTS, FIELDS, MATERIAL_KEYS, DEFAULT_PALETTE, PIECE_FIELDS, PIECE_DEF, isMineKey,
+} from '../gfx3d/parts.js';
 import { BUILTIN_DESIGNS } from './builtin-designs.js';
 import { cloudEnabled, pullModels, pushModel, removeModel } from './cloud.js';
 
@@ -97,19 +99,35 @@ function num(v, min, max, fallback, step) {
 function cleanPart(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const spec = PARTS[raw.k];
-  if (!spec) return null;
+  /*
+   * Una pieza del taller que todavía no está de alta **no es un modelo roto**:
+   * es una referencia sin resolver. Puede que las piezas aún no hayan llegado de
+   * la nube, o que este navegador se haya quedado sin ellas; la pieza sigue
+   * existiendo, y volverá. Si aquí se tirara, el modelo se guardaría pelado y al
+   * subir se llevaría la pieza por delante en el edificio de todo el mundo, que
+   * es una pérdida de verdad y silenciosa. Así que se conserva: no se dibuja
+   * mientras falte —eso lo resuelve `designParts` saltándosela— y vuelve a verse
+   * en cuanto la pieza esté.
+   *
+   * Cómo se pone una pieza propia se sabe sin tenerla: es el mismo juego de
+   * mandos para todas (`PIECE_FIELDS`). Lo que no se acepta es un `mia:` con
+   * cualquier cosa detrás, que ése sí es basura.
+   */
+  if (!spec && !isMineKey(raw.k)) return null;
+  const fields = spec ? spec.fields : PIECE_FIELDS;
+  const def = spec ? spec.def : PIECE_DEF;
   const p = { k: raw.k };
-  for (const key of spec.fields) {
+  for (const key of fields) {
     const f = FIELDS[key];
     if (!f) continue;
     if (f.type === 'choice') {
       const ok = f.options.some(([v]) => v === raw[key]);
-      p[key] = ok ? raw[key] : spec.def[key];
+      p[key] = ok ? raw[key] : def[key];
     } else {
-      p[key] = num(raw[key], f.min, f.max, spec.def[key], f.step);
+      p[key] = num(raw[key], f.min, f.max, def[key], f.step);
     }
   }
-  p.m = MATERIAL_KEYS.includes(raw.m) ? raw.m : spec.def.m;
+  p.m = MATERIAL_KEYS.includes(raw.m) ? raw.m : def.m;
   if (raw.rough) p.rough = true;
   if (raw.noshadow) p.noshadow = true;
   return p;
