@@ -562,7 +562,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  */
 .studio-pad-grid {
   flex: 1; max-width: 520px;
-  display: grid; grid-template-columns: 2fr 1fr 3fr; gap: 10px;
+  display: grid; grid-template-columns: 2fr 1fr 1fr 3fr; gap: 10px;
 }
 /*
  * Cada grupo es una pieza redondeada con sus botones dentro, separados por un
@@ -570,7 +570,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * generosas y el relleno plano. Las flechas van en cruz de dos por dos y subir
  * y bajar uno encima de otro, que es como se apunta con el pulgar sin mirar.
  */
-.studio-cross, .studio-lift, .studio-scale, .studio-pad-acts,
+.studio-cross, .studio-lift, .studio-turn, .studio-scale, .studio-pad-acts,
 .studio-hist, .studio-make, .studio-look {
   display: grid; gap: 1px;
   background: #ded2b8;
@@ -579,21 +579,20 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 }
 /*
  * La barra de arriba, con la misma hechura: se pega bajo la cinta de datos que
- * pinta el lienzo y su raya cae hacia el modelo. Comparte la rejilla de siete
- * columnas de la de abajo —de ahí las dos pistas de 2fr a los lados— para que
- * sus botones midan exactamente lo mismo, y sus tres grupos van en el medio.
+ * pinta el lienzo y su raya cae hacia el modelo. Sus botones miden lo mismo que
+ * los de abajo, y sus tres grupos van en el medio.
  */
 .studio-pad-top {
   top: 22px; bottom: auto;
   border-top: 0; border-bottom: 1px solid var(--borde);
 }
 /* Tres grupos de una columna, con el ancho justo para que sus botones midan lo
-   mismo que los de abajo: allí seis columnas se reparten el hueco menos dos
-   huecos entre grupos, y aquí tres se reparten la mitad de eso más los dos
-   huecos que se ahorran. Sale la misma cuenta y el mismo botón. */
+   mismo que los de abajo: allí siete columnas se reparten el hueco menos los
+   tres huecos entre grupos, y aquí tres columnas han de medir eso mismo, más
+   los dos huecos que les quedan. Sale la misma cuenta y el mismo botón. */
 .studio-pad-top .studio-pad-grid {
   flex: none;
-  width: calc((min(100%, 520px) - 20px) / 2 + 20px);
+  width: calc((min(100%, 520px) - 30px) * 3 / 7 + 20px);
   grid-template-columns: repeat(3, 1fr);
 }
 .studio-hist, .studio-make, .studio-look { grid-template-columns: 1fr; }
@@ -616,7 +615,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 .studio-cross { grid-template-columns: repeat(2, 1fr); }
 .studio-scale { grid-template-columns: repeat(3, 1fr); }
-.studio-lift, .studio-pad-acts { grid-template-columns: 1fr; }
+.studio-lift, .studio-turn, .studio-pad-acts { grid-template-columns: 1fr; }
 .studio-pad button {
   width: auto; height: 36px; min-width: 0; padding: 0; margin: 0;
   border: 0; border-radius: 0;
