@@ -343,9 +343,10 @@ Para colocar:
   piezas no llaman igual a sus lados —la caja tiene ancho y fondo, el cilindro
   radios, la viga largo y grueso—, así que cada botón toca el campo que a esa
   pieza le hace de ese lado, los dos radios del cilindro a la vez para que no
-  se vuelva cono, y se apaga en las que no lo tienen (un barril no se estira
-  desde aquí). La barra es una rejilla de ocho columnas, así que cabe igual en
-  un teléfono pequeño que en uno grande.
+  se vuelva cono, y se apaga en las que no lo tienen (una pieza redonda no
+  tiene fondo aparte del radio, y unas almenas miden lo que miden de alto). La
+  barra es una rejilla de ocho columnas, así que cabe igual en un teléfono
+  pequeño que en uno grande.
 - **Estirar y encoger van a dos velocidades**: mientras el lado mide más de
   0,2 cada toque es de 0,05, y de ahí para abajo, de 0,01, que es hasta donde
   llegan las piezas. Así un muro se recorta a zancadas y un listón o el marco
