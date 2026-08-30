@@ -1233,6 +1233,40 @@ export class Studio {
     ctx.restore();
   }
 
+  /**
+   * El contorno de la guía mientras es suya la barra de abajo. Es lo mismo que
+   * el resaltado de la pieza elegida y por eso va del mismo color: dice quién
+   * se lleva los botones. Se pinta por encima de todo —del modelo y de la
+   * propia imagen— para que se vea aunque la guía esté detrás, y desaparece en
+   * cuanto se bloquea o se aparta, que entonces los botones vuelven a la pieza.
+   */
+  drawRefMarco(ctx) {
+    if (!this.colocandoGuia()) return;
+    const r = this.ref;
+    if (!r.img) return;
+    const x = this.ox + r.px * this.zoom, y = this.oy + r.py * this.zoom;
+    const w = r.img.width * r.scale * this.zoom, h = r.img.height * r.scale * this.zoom;
+    if (!(w > 0 && h > 0)) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(240,214,133,.85)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([6, 4]);
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    // Las cuatro esquinas, en trazo seguido y más gordo: con la imagen muy
+    // grande el marco se sale del lienzo y las esquinas son lo que queda.
+    ctx.setLineDash([]);
+    ctx.lineWidth = 2.5;
+    const brazo = Math.max(8, Math.min(22, Math.min(w, h) / 6));
+    for (const [ex, ey, sx, sy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]]) {
+      ctx.beginPath();
+      ctx.moveTo(ex + sx * brazo, ey);
+      ctx.lineTo(ex, ey);
+      ctx.lineTo(ex, ey + sy * brazo);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   /** Guarda la guía en el navegador, con su sitio y sus ajustes. */
   saveRef() {
     clearTimeout(this.refTimer);
@@ -1752,6 +1786,7 @@ export class Studio {
 
     if (this.ref && this.ref.front) this.drawRef(ctx);
     this.drawSelection(ctx);
+    this.drawRefMarco(ctx);
     this.drawLegend(ctx, W);
     this.updatePad();
   }

@@ -392,7 +392,11 @@ Para colocar:
   **Vista** también manda aquí: fina para ajustarla, media casilla para
   llevarla de un lado a otro—, y el primer par de estirar la **agranda y la
   achica** un tanto por ciento cada toque, que una imagen crece entera. Los
-  otros dos lados y el giro se apagan: no son suyos. Cuando esté en su sitio,
+  otros dos lados y el giro se apagan: no son suyos. Mientras es suya la barra,
+  la imagen lleva **un contorno** —de puntos, con las cuatro esquinas en trazo
+  seguido y del mismo color con que se resalta la pieza elegida— por encima del
+  modelo, aunque la guía esté detrás: es lo que dice, sin leer nada, quién se
+  lleva los botones. Cuando esté en su sitio,
   **Bloquear la imagen** la deja fija y los botones vuelven a la pieza.
   **Ocultarla** —el ojo de la barra de arriba, o su casilla en el menú— la
   aparta de la vista sin quitarla: no se dibuja, no se lleva los botones y
