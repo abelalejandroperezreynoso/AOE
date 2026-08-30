@@ -87,11 +87,13 @@ function num(v, min, max, fallback, step) {
   if (!Number.isFinite(n)) return fallback;
   const c = Math.min(max, Math.max(min, n));
   if (!step) return c;
-  // Se redondea al escalón del campo para que no entren valores con veinte
-  // decimales que luego no se pueden reproducir desde la interfaz. Y luego a
-  // cuatro decimales, porque multiplicar por el escalón vuelve a dejar cola
-  // binaria (0,05 × 48 = 2,4000000000000004) y esa cola acaba en lo guardado,
-  // en lo que viaja por la red y en el texto que se comparte.
+  // Se redondea a la rejilla fina del campo para que no entren valores con
+  // veinte decimales que luego no se pueden reproducir desde la interfaz. Fina
+  // y no la del botón: lo que se afina a mano en la ficha, o con el paso corto
+  // de la barra, tiene que sobrevivir a guardar. Y luego a cuatro decimales,
+  // porque multiplicar por el escalón vuelve a dejar cola binaria
+  // (0,05 × 48 = 2,4000000000000004) y esa cola acaba en lo guardado, en lo que
+  // viaja por la red y en el texto que se comparte.
   return Math.round(Math.round(c / step) * step * 1e4) / 1e4;
 }
 
@@ -124,7 +126,7 @@ function cleanPart(raw) {
       const ok = f.options.some(([v]) => v === raw[key]);
       p[key] = ok ? raw[key] : def[key];
     } else {
-      p[key] = num(raw[key], f.min, f.max, def[key], f.step);
+      p[key] = num(raw[key], f.min, f.max, def[key], f.fino || f.step);
     }
   }
   p.m = MATERIAL_KEYS.includes(raw.m) ? raw.m : def.m;
@@ -212,7 +214,7 @@ function resizeDesign(design, size, fromSize = null) {
     for (const key of SCALED_FIELDS) {
       if (p[key] === undefined) continue;
       const f = FIELDS[key];
-      p[key] = num(p[key] * k, f.min, f.max, p[key], f.step);
+      p[key] = num(p[key] * k, f.min, f.max, p[key], f.fino || f.step);
     }
   }
   return scaled;

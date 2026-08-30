@@ -77,7 +77,7 @@ function cleanSub(raw) {
       const ok = f.options.some(([v]) => v === raw[key]);
       p[key] = ok ? raw[key] : spec.def[key];
     } else {
-      p[key] = num(raw[key], f.min, f.max, spec.def[key], f.step);
+      p[key] = num(raw[key], f.min, f.max, spec.def[key], f.fino || f.step);
     }
   }
   p.m = MATERIAL_KEYS.includes(raw.m) ? raw.m : spec.def.m;

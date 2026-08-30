@@ -72,6 +72,28 @@ const SCALE_FIELDS = {
 const ROT_FIELDS = ['yaw', 'axis', 'face'];
 const ROT_STEP = 45;
 
+/*
+ * Estirar y encoger va a dos velocidades. El paso del campo (medio dedo de
+ * casilla) es cómodo mientras la pieza es grande, pero cerca de cero se lo
+ * come todo: de 0,10 el mismo toque se lleva la mitad de la pieza y al
+ * siguiente ya no hay pieza. Por debajo de este tamaño manda el paso fino, y
+ * así un listón o un marco se afinan desde la barra sin abrir la ficha.
+ *
+ * Sólo lo que mide. Una posición cerca del cero no es una posición pequeña
+ * —el origen está en una esquina de la huella—, así que la X y la Y siguen
+ * yendo a pasos iguales por todo el tablero.
+ */
+const ESCALA_FINA = 0.2;
+const CAMPOS_TAMANO = new Set(['w', 'd', 'h', 'r', 'r0', 'r1', 'len', 'th', 'rise', 'over', 'flat']);
+
+/** El escalón con el que crece o mengua un campo, según lo que valga ya. */
+function pasoDe(key, valor) {
+  const f = FIELDS[key];
+  if (!f) return 1;
+  if (!f.fino || !CAMPOS_TAMANO.has(key)) return f.step;
+  return Math.abs(valor) <= ESCALA_FINA + 1e-9 ? f.fino : f.step;
+}
+
 const SNAPS = [
   [0.05, 'fino (0,05)'], [0.1, 'medio (0,1)'], [0.25, 'cuarto (0,25)'], [0.5, 'media casilla'],
 ];
@@ -2166,6 +2188,7 @@ export class Studio {
     const mkEscala = (eje, dibujo, title, dir) => {
       const b = mk(dibujo, title, () => this.scale(eje, dir));
       b.dataset.eje = eje;
+      b.dataset.dir = String(dir);
       return b;
     };
     escala.append(
@@ -2317,12 +2340,16 @@ export class Studio {
     if (!part) return;
     const key = this.scaleField(part, eje);
     if (!key) return;
-    const paso = FIELDS[key].step;
+    const paso = pasoDe(key, part[key]);
     this.pushUndo();
-    part[key] = clampField(key, part[key] + dir * paso);
+    // Se cae en el múltiplo del paso que toca, como las flechas caen en la
+    // rejilla: así las medidas siguen siendo redondas después de afinar una.
+    part[key] = clampField(key, snapTo(part[key] + dir * paso, paso));
     // El radio de arriba acompaña al de abajo: por separado el cilindro se
     // convierte en cono, y eso se afina en la ficha, no aquí.
-    if (key === 'r0' && part.r1 !== undefined) part.r1 = clampField('r1', part.r1 + dir * paso);
+    if (key === 'r0' && part.r1 !== undefined) {
+      part.r1 = clampField('r1', snapTo(part.r1 + dir * paso, paso));
+    }
     this.afterChange();
   }
 
@@ -2395,8 +2422,17 @@ export class Studio {
      * sin «+» no habría por dónde—. Lo que sí depende de la pieza se apaga.
      */
     el('studio-topbar').classList.toggle('hidden', !this.design || !this.hayHuecoArriba());
+    /*
+     * Un lado se apaga si esta pieza no lo tiene y también si ya está en su
+     * tope: pulsar y que no pase nada no dice nada, y el botón apagado dice
+     * que por ahí ya no se puede ir más.
+     */
     for (const b of document.querySelectorAll('.studio-scale button')) {
-      b.disabled = !part || !this.scaleField(part, b.dataset.eje);
+      const key = part && this.scaleField(part, b.dataset.eje);
+      const f = key && FIELDS[key];
+      b.disabled = !f || (b.dataset.dir === '1'
+        ? part[key] >= f.max - 1e-9
+        : part[key] <= f.min + 1e-9);
     }
     // Una bandera o una esfera no giran: sus dos botones se apagan, no se van.
     for (const b of this.btnGiro || []) b.disabled = !part || !this.rotField(part);
@@ -2648,7 +2684,7 @@ export class Studio {
       row.append(name, input);
       return row;
     }
-    const stepper = numberStepper(part[key], f, (v) => {
+    const stepper = numberStepper(part[key], f, key, (v) => {
       this.pushUndo();
       part[key] = clampField(key, v);
       this.afterChange();
@@ -2865,15 +2901,16 @@ function rangeRow(label, value, min, max, step, onChange) {
 /**
  * Un número con sus botones de menos y más. Escribir a mano sigue valiendo,
  * pero en un móvil los pasos evitan sacar el teclado para bajar dos décimas, y
- * los botoncitos que trae el navegador son inpulsables con el dedo.
+ * los botoncitos que trae el navegador son inpulsables con el dedo. Los pasos
+ * son los mismos que dan los botones de la barra, el corto incluido.
  */
-function numberStepper(value, f, apply) {
+function numberStepper(value, f, key, apply) {
   const wrap = document.createElement('span');
   wrap.className = 'studio-num';
   const input = document.createElement('input');
   input.type = 'number';
   input.inputMode = 'decimal';
-  input.min = f.min; input.max = f.max; input.step = f.step;
+  input.min = f.min; input.max = f.max; input.step = f.fino || f.step;
   input.value = round(value);
   const set = (v) => { input.value = round(apply(v)); };
   const bump = (dir) => {
@@ -2884,8 +2921,8 @@ function numberStepper(value, f, apply) {
     b.title = dir > 0 ? 'Subir un paso' : 'Bajar un paso';
     b.onclick = (e) => {
       e.preventDefault();
-      const v = Number(input.value);
-      set((Number.isFinite(v) ? v : f.min) + dir * f.step);
+      const v = Number.isFinite(Number(input.value)) ? Number(input.value) : f.min;
+      set(v + dir * pasoDe(key, v));
     };
     return b;
   };

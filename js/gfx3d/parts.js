@@ -82,25 +82,33 @@ export function renderSize(design) {
  * Rangos y etiquetas de cada campo. El taller construye sus controles con
  * esto y el validador recorta con esto mismo, de modo que no hay forma de
  * guardar un modelo con una viga de mil casillas.
+ *
+ * Dos escalones por campo: `step` es el que dan los botones —lo que se avanza
+ * de un toque— y `fino` es la rejilla a la que se redondea al guardar. Antes
+ * eran el mismo, y una pieza afinada a mano en la ficha volvía al escalón
+ * gordo en cuanto se guardaba: un detalle de 0,03 se despertaba midiendo 0,05.
+ * Con el fino aparte, los botones siguen yendo a pasos cómodos y lo pequeño se
+ * puede dejar pequeño. Los campos que cuentan cosas —lados, peldaños, grados—
+ * no tienen fino: su escalón ya es lo menudo que pueden ser.
  */
 export const FIELDS = {
-  x: { label: 'Posición X', min: -3, max: 11, step: 0.05 },
-  y: { label: 'Posición Y', min: -3, max: 11, step: 0.05 },
-  z: { label: 'Altura del suelo', min: 0, max: 9, step: 0.05 },
-  w: { label: 'Ancho (x)', min: 0.04, max: 10, step: 0.05 },
-  d: { label: 'Fondo (y)', min: 0.04, max: 10, step: 0.05 },
-  h: { label: 'Alto', min: 0.04, max: 8, step: 0.05 },
-  r: { label: 'Radio', min: 0.02, max: 5, step: 0.02 },
-  r0: { label: 'Radio abajo', min: 0, max: 5, step: 0.02 },
-  r1: { label: 'Radio arriba', min: 0, max: 5, step: 0.02 },
-  rise: { label: 'Pendiente', min: 0.02, max: 4, step: 0.05 },
-  over: { label: 'Alero', min: 0, max: 0.8, step: 0.02 },
-  len: { label: 'Largo', min: 0.05, max: 10, step: 0.05 },
-  th: { label: 'Grueso', min: 0.02, max: 1, step: 0.02 },
+  x: { label: 'Posición X', min: -3, max: 11, step: 0.05, fino: 0.01 },
+  y: { label: 'Posición Y', min: -3, max: 11, step: 0.05, fino: 0.01 },
+  z: { label: 'Altura del suelo', min: 0, max: 9, step: 0.05, fino: 0.01 },
+  w: { label: 'Ancho (x)', min: 0.01, max: 10, step: 0.05, fino: 0.01 },
+  d: { label: 'Fondo (y)', min: 0.01, max: 10, step: 0.05, fino: 0.01 },
+  h: { label: 'Alto', min: 0.01, max: 8, step: 0.05, fino: 0.01 },
+  r: { label: 'Radio', min: 0.01, max: 5, step: 0.02, fino: 0.01 },
+  r0: { label: 'Radio abajo', min: 0, max: 5, step: 0.02, fino: 0.01 },
+  r1: { label: 'Radio arriba', min: 0, max: 5, step: 0.02, fino: 0.01 },
+  rise: { label: 'Pendiente', min: 0.01, max: 4, step: 0.05, fino: 0.01 },
+  over: { label: 'Alero', min: 0, max: 0.8, step: 0.02, fino: 0.01 },
+  len: { label: 'Largo', min: 0.01, max: 10, step: 0.05, fino: 0.01 },
+  th: { label: 'Grueso', min: 0.01, max: 1, step: 0.02, fino: 0.01 },
   yaw: { label: 'Giro', min: 0, max: 355, step: 5, unit: '°' },
   pitch: { label: 'Inclinación', min: -90, max: 90, step: 5, unit: '°' },
   seg: { label: 'Lados', min: 3, max: 16, step: 1 },
-  flat: { label: 'Achatado', min: 0.2, max: 2, step: 0.05 },
+  flat: { label: 'Achatado', min: 0.05, max: 2, step: 0.05, fino: 0.01 },
   steps: { label: 'Peldaños', min: 2, max: 12, step: 1 },
   n: { label: 'Cantidad', min: 1, max: 12, step: 1 },
   axis: {
