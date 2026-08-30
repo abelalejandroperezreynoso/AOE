@@ -628,9 +628,6 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 .studio-pad button:hover { filter: none; background: #f3ecdc; }
 .studio-pad button:active { transform: none; background: #e6dbc0; }
 .studio-pad svg { width: 21px; height: 21px; display: block; }
-/* La guía va sola en su grupo y su botón se lleva las dos filas: es de la
-   mesa, no de la pieza, y así no se lee como pareja de ninguno. */
-.studio-pad .studio-guia button { height: 100%; }
 /* Borrar se distingue por el color del icono, no por un botón rojo entero. */
 .studio-pad .studio-del { background: #fbf8f1; color: #c0392b; }
 .studio-pad .studio-del:hover { background: #f8e9e6; }

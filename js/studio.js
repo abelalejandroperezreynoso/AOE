@@ -69,6 +69,15 @@ const SCALE_FIELDS = {
  * y la diagonal en uno, que es lo que se pide en un edificio; los ángulos
  * intermedios, de cinco en cinco, están en la ficha de la pieza.
  */
+/* El ojo dice lo que hace el botón, no cómo está la guía: tapado mientras se
+   ve —tócalo y se va— y abierto mientras está apartada. */
+const OJO = '<path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12Z"/>'
+  + '<circle cx="12" cy="12" r="2.6"/>';
+const OJO_TAPADO = '<path d="m4 4 16 16"/>'
+  + '<path d="M9.8 6.1A9.4 9.4 0 0 1 12 5.8c6 0 9.5 6.2 9.5 6.2a17 17 0 0 1-3.4 4"/>'
+  + '<path d="M6.6 7.9A16.6 16.6 0 0 0 2.5 12S6 18.2 12 18.2c1.1 0 2.2-.2 3.1-.5"/>'
+  + '<path d="M9.9 10.1a2.9 2.9 0 0 0 4 4"/>';
+
 const ROT_FIELDS = ['yaw', 'axis', 'face'];
 const ROT_STEP = 45;
 
@@ -1133,6 +1142,9 @@ export class Studio {
      * en vez de la pieza, que es de lo que se trata mientras se coloca.
      * Bloqueada, los botones vuelven a la pieza y se modela con normalidad.
      */
+    pop.appendChild(checkRow('Ocultar la imagen', !!this.ref.oculta, (on) => {
+      if (on !== !!this.ref.oculta) this.toggleRefOculta();
+    }));
     pop.appendChild(checkRow('Bloquear la imagen', !!this.ref.locked, (on) => {
       this.ref.locked = on;
       this.status(on ? 'Guía bloqueada: ya no se mueve.' : 'Guía suelta: los botones de abajo la colocan.');
@@ -1161,7 +1173,7 @@ export class Studio {
       const img = new Image();
       img.onload = () => {
         this.ref = {
-          img, src: shrinkImage(img), px: 0, py: 0, scale: 1, alpha: 0.45,
+          img, src: shrinkImage(img), px: 0, py: 0, scale: 1, alpha: 0.45, oculta: false,
           // Delante de partida: detrás la tapan las piezas en cuanto hay dos, y
           // una guía que no se ve no guía. Detrás sigue estando a un toque.
           front: true, locked: false,
@@ -1206,7 +1218,7 @@ export class Studio {
 
   drawRef(ctx) {
     const r = this.ref;
-    if (!r || !r.img) return;
+    if (!r || !r.img || r.oculta) return;
     ctx.save();
     ctx.globalAlpha = r.alpha;
     ctx.drawImage(r.img,
@@ -1222,8 +1234,8 @@ export class Studio {
       try {
         if (!this.ref) localStorage.removeItem(REF_KEY);
         else {
-          const { src, px, py, scale, alpha, front, locked } = this.ref;
-          localStorage.setItem(REF_KEY, JSON.stringify({ src, px, py, scale, alpha, front, locked }));
+          const { src, px, py, scale, alpha, front, locked, oculta } = this.ref;
+          localStorage.setItem(REF_KEY, JSON.stringify({ src, px, py, scale, alpha, front, locked, oculta }));
         }
       } catch {
         // Sin sitio en el navegador: la guía sigue puesta hasta recargar.
@@ -1251,6 +1263,8 @@ export class Studio {
         // Al volver del almacenamiento se recupera bloqueada salvo que se
         // dejara suelta: nadie quiere descolocar de un roce lo que ya colocó.
         locked: saved.locked !== false,
+        // Y apartada, si así se dejó: se vuelve a por ella con el mismo botón.
+        oculta: !!saved.oculta,
       };
       this.redraw();
     };
@@ -1907,7 +1921,7 @@ export class Studio {
     const pos = part && part.x !== undefined
       ? `(${part.x.toFixed(2)}, ${part.y.toFixed(2)}, ${(part.z || 0).toFixed(2)})`
       : 'Nada elegido';
-    const placing = this.ref && !this.ref.locked;
+    const placing = this.colocandoGuia();
     const how = placing
       ? 'colocando la guía: la mueven los botones · bloquéala al terminar'
       : 'toca para elegir · la colocan los botones · arrastra o pellizca para mover la vista';
@@ -2254,14 +2268,16 @@ export class Studio {
      * La guía no es de la pieza sino de la mesa, y aun así su sitio está aquí:
      * es lo único de las herramientas que se busca con el modelo delante, y con
      * la hoja plegada —que es como se calca, para ver la imagen a lo grande— el
-     * desplegable de arriba no está. Va en su propia columna, de un solo botón
-     * alto, para que se vea de un vistazo que no es del mismo juego que los
-     * otros seis.
+     * desplegable de arriba no está. Va en su propia columna: arriba sus
+     * ajustes y abajo quitarla de en medio, que es lo que se hace a cada rato
+     * mientras se calca —mirar cómo va el modelo sin la imagen encima— y no
+     * puede costar abrir un menú.
      */
     this.btnGuia = mk('<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>'
       + '<circle cx="9" cy="9.8" r="1.5"/><path d="m4.5 17.5 4.5-4.5 4 4 3-3 3.5 3.5"/>',
       'Imagen guía para calcar', null);
     this.padMenu(bar, this.btnGuia, (pop) => this.refMenu(pop));
+    this.btnOculta = mk(OJO_TAPADO, 'Ocultar la imagen guía', () => this.toggleRefOculta());
 
     const rejilla = document.createElement('div');
     rejilla.className = 'studio-pad-grid';
@@ -2269,7 +2285,7 @@ export class Studio {
       grupo('studio-hist', this.btnUndo, this.btnRedo),
       grupo('studio-make', btnAdd, this.btnDup),
       grupo('studio-look', this.btnColor, this.btnDel),
-      grupo('studio-guia', this.btnGuia),
+      grupo('studio-guia', this.btnGuia, this.btnOculta),
     );
     bar.prepend(rejilla);
   }
@@ -2328,7 +2344,21 @@ export class Studio {
    * se coloca. Al bloquearla vuelven a la pieza.
    */
   colocandoGuia() {
-    return !!(this.ref && !this.ref.locked);
+    return !!(this.ref && !this.ref.locked && !this.ref.oculta);
+  }
+
+  /**
+   * Aparta la guía de la vista sin quitarla: sigue puesta, con su sitio y su
+   * tamaño, y vuelve con el mismo botón. Es lo que se hace a cada rato mientras
+   * se calca, para ver cómo va el modelo sin la imagen por encima. Apartada no
+   * se dibuja ni se lleva los botones de abajo, que vuelven a la pieza.
+   */
+  toggleRefOculta() {
+    if (!this.ref) return;
+    this.ref.oculta = !this.ref.oculta;
+    this.status(this.ref.oculta ? 'Guía apartada; el botón la trae de vuelta.' : 'Guía a la vista.');
+    this.redraw();
+    this.saveRef();
   }
 
   /**
@@ -2486,6 +2516,14 @@ export class Studio {
     // Una bandera o una esfera no giran, y la guía tampoco: sus dos botones se
     // apagan, no se van.
     for (const b of this.btnGiro || []) b.disabled = guia || !pieza || !this.rotField(pieza);
+    if (this.btnOculta) {
+      const oculta = !!this.ref?.oculta;
+      const rotulo = oculta ? 'Mostrar la imagen guía' : 'Ocultar la imagen guía';
+      this.btnOculta.disabled = !this.ref;
+      this.btnOculta.innerHTML = icono(oculta ? OJO : OJO_TAPADO);
+      this.btnOculta.title = rotulo;
+      this.btnOculta.setAttribute('aria-label', rotulo);
+    }
     if (this.btnUndo) {
       this.btnUndo.disabled = !this.undo.length;
       this.btnRedo.disabled = !this.redo.length;
