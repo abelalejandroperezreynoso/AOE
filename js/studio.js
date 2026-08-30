@@ -18,7 +18,7 @@
 // previa horneada de al lado.
 
 import { PLAYER_COLORS, AGES, UNITS, BUILDINGS, BUILD_ORDER, RESOURCES, RES_NAME } from './config.js';
-import { project, depth, faceLight, rotZ, bake, HW, HH, VZ } from './gfx3d/engine.js';
+import { project, depth, faceLight, rotZ, bake } from './gfx3d/engine.js';
 import {
   PARTS, FIELDS, FLAGS, MATERIALS, MATERIAL_KEYS, PLAYER_MAT,
   DEFAULT_PALETTE, designParts, designMesh, MINE, isMine, minePartKeys, canExplode,
@@ -84,7 +84,6 @@ export class Studio {
     this.picks = [];         // triángulos ya proyectados, para saber qué se pulsa
     this.anchors = [];       // el ancla de cada pieza en pantalla, para el dedo
     this.drag = null;
-    this.moveMode = 'xy';    // 'xy' por el suelo, 'z' en vertical (con el dedo)
     this.pointers = new Map(); // dedos o punteros que hay ahora mismo encima
     this.pinch = null;
     this.baked = null;       // el horneado exacto de la vista, cuando está quieta
@@ -607,8 +606,8 @@ export class Studio {
   }
 
   /**
-   * Guarda la copia de trabajo, sin prisa: mientras se arrastra una pieza no
-   * hace falta escribir en el navegador cada fotograma.
+   * Guarda la copia de trabajo, sin prisa: al empujar una pieza botón a botón
+   * no hace falta escribir en el navegador cada toque.
    */
   persist() {
     if (!this.design) return;
@@ -969,19 +968,6 @@ export class Studio {
     // renglones de mesa que ahora se lleva el modelo.
     view.appendChild(mkBtn('＋ Añadir', 'Añadir una pieza al edificio', () => this.openPieceSheet()));
 
-    /*
-     * Mover por el suelo o subir y bajar. Con ratón basta Mayús, pero con el
-     * dedo no hay Mayús que valga: sin este interruptor no habría manera de
-     * levantar una pieza del suelo en un móvil.
-     */
-    this.modeBtn = mkBtn('✥ Mover', 'Cambia entre mover por el suelo y subir o bajar la pieza (con ratón, Mayús mientras arrastras)', () => {
-      this.moveMode = this.moveMode === 'z' ? 'xy' : 'z';
-      this.modeBtn.classList.toggle('on', this.moveMode === 'z');
-      this.modeBtn.textContent = this.moveMode === 'z' ? '⇕ Altura' : '✥ Mover';
-      this.updatePad();
-      this.redraw();
-    });
-    view.appendChild(this.modeBtn);
     view.appendChild(mkBtn('↶', 'Deshacer el último cambio [Ctrl+Z]', () => this.undoLast()));
 
     // Y lo que se toca de vez en cuando, en otro desplegable.
@@ -1724,7 +1710,7 @@ export class Studio {
    *
    * El juego no dibuja triángulos: hornea el modelo con un rasterizador propio
    * que decide píxel a píxel qué cara queda delante (búfer de profundidad). El
-   * taller, mientras se arrastra una pieza, no puede pagar eso —hornear un
+   * taller, mientras se mueve la vista, no puede pagar eso —hornear un
    * edificio mediano cuesta decenas de milisegundos— y pinta las caras
    * ordenadas de lejos a cerca. Ese orden es una aproximación: cuando dos
    * cuerpos se cruzan o uno se mete dentro de otro no hay orden posible que
@@ -1893,9 +1879,7 @@ export class Studio {
     const placing = this.ref && !this.ref.locked;
     const how = placing
       ? 'colocando la guía: arrastra para moverla · bloquéala al terminar'
-      : (this.moveMode === 'z'
-        ? 'arrastrar sube y baja'
-        : 'arrastra para mover · dos dedos o rueda para el zoom');
+      : 'toca para elegir · la colocan los botones · arrastra o pellizca para mover la vista';
     ctx.fillText(W < 420 && !placing ? pos : `${pos} · ${how}`, 10, 15);
   }
 
@@ -1954,33 +1938,24 @@ export class Studio {
       this.drag = { mode: 'ref', px, py, moved: false, start: { px: this.ref.px, py: this.ref.py } };
       return;
     }
+    /*
+     * Tocar una pieza sólo la elige: colocarla es cosa de los botones. Se
+     * arrastraba, y era demasiado fácil descolocar de un roce lo que ya estaba
+     * puesto; el arrastre es siempre de la vista.
+     */
     const hit = e.button === 2 ? -1 : this.pick(px, py, this.slackFor(e));
-    if (hit >= 0 && this.design.parts[hit]) {
-      if (hit !== this.selected) this.selectPart(hit);
-      const part = this.design.parts[hit];
-      this.drag = {
-        mode: e.shiftKey || this.moveMode === 'z' ? 'z' : 'xy',
-        px, py, moved: false,
-        start: { x: part.x, y: part.y, z: part.z },
-      };
-      this.pushUndo();
-    } else {
-      this.drag = { mode: 'pan', px, py, moved: false, ox: this.ox, oy: this.oy };
-    }
+    const sobrePieza = hit >= 0 && !!this.design.parts[hit];
+    if (sobrePieza && hit !== this.selected) this.selectPart(hit);
+    this.drag = { mode: 'pan', px, py, moved: false, sobrePieza, ox: this.ox, oy: this.oy };
     this.redraw();
   }
 
   /**
-   * Empieza un pellizco. El arrastre de pieza que hubiera se cancela y la pieza
-   * vuelve donde estaba: al apoyar el segundo dedo el primero siempre se mueve
-   * un poco, y sería muy fácil descolocar algo sin querer al ir a hacer zoom.
+   * Empieza un pellizco. El arrastre que hubiera se cancela: al apoyar el
+   * segundo dedo el primero siempre se mueve un poco, y la vista daría un
+   * salto justo antes del zoom.
    */
   startPinch() {
-    if (this.drag && this.drag.start) {
-      const part = this.design.parts[this.selected];
-      if (part) Object.assign(part, this.drag.start);
-      this.undo.pop();
-    }
     this.drag = null;
     const [a, b] = [...this.pointers.values()];
     this.pinch = {
@@ -2023,39 +1998,10 @@ export class Studio {
       return;
     }
 
-    if (this.drag.mode === 'pan') {
-      this.encajado = false;
-      this.ox = this.drag.ox + dsx;
-      this.oy = this.drag.oy + dsy;
-      this.redraw();
-      return;
-    }
-
-    const part = this.design.parts[this.selected];
-    if (!part) return;
-    if (this.drag.mode === 'z') {
-      if (part.z === undefined) return;
-      const dz = -dsy / (VZ * this.zoom);
-      part.z = clampField('z', snapTo(this.drag.start.z + dz, this.snap));
-    } else {
-      if (part.x === undefined) return;
-      const [dx, dy] = this.screenToGround(dsx, dsy);
-      part.x = clampField('x', snapTo(this.drag.start.x + dx, this.snap));
-      part.y = clampField('y', snapTo(this.drag.start.y + dy, this.snap));
-    }
+    this.encajado = false;
+    this.ox = this.drag.ox + dsx;
+    this.oy = this.drag.oy + dsy;
     this.redraw();
-    this.updatePad();
-  }
-
-  /**
-   * Del desplazamiento en pantalla al desplazamiento por el suelo, deshaciendo
-   * el giro de la vista: se arrastra hacia donde se mira, no hacia donde
-   * apuntan los ejes del edificio.
-   */
-  screenToGround(dsx, dsy) {
-    const rx = (dsx / (HW * this.zoom) + dsy / (HH * this.zoom)) / 2;
-    const ry = (dsy / (HH * this.zoom) - dsx / (HW * this.zoom)) / 2;
-    return this.unspin(rx, ry);
   }
 
   /** Un vector de la vista girada a los ejes del edificio. */
@@ -2068,7 +2014,7 @@ export class Studio {
     this.pointers.delete(e.pointerId);
     if (this.pinch) {
       // El pellizco no acaba hasta que se levantan todos los dedos: si no, al
-      // soltar uno el otro se pondría a arrastrar piezas de golpe.
+      // soltar uno el otro daría un tirón a la vista.
       if (!this.pointers.size) this.pinch = null;
       return;
     }
@@ -2078,20 +2024,15 @@ export class Studio {
       this.saveRef();
       return;
     }
-    const wasPan = this.drag.mode === 'pan';
-    const moved = this.drag.moved;
+    const { moved, sobrePieza } = this.drag;
     this.drag = null;
-    if (wasPan) {
-      // Un toque limpio en el suelo suelta la selección; arrastrar sólo movía
-      // la vista.
-      if (!moved && e.button !== 2 && this.selected >= 0) {
-        this.selected = -1;
-        this.renderPanel();
-        this.redraw();
-      }
-      return;
+    // Un toque limpio en el suelo suelta la selección; arrastrar sólo movía la
+    // vista, y un toque en una pieza ya la eligió al bajar el dedo.
+    if (!moved && !sobrePieza && e.button !== 2 && this.selected >= 0) {
+      this.selected = -1;
+      this.renderPanel();
+      this.redraw();
     }
-    if (moved) { this.renderPanel(); this.persist(); this.schedulePreview(); } else this.undo.pop();
   }
 
   onWheel(e) {
@@ -2163,10 +2104,10 @@ export class Studio {
   // --- Cruceta ----------------------------------------------------------------
 
   /**
-   * Los botones flotantes que empujan la pieza. Con el dedo son la forma fina
-   * de colocar algo —arrastrar sirve para ponerlo más o menos y esto para
-   * clavarlo—, y sustituyen a unas flechas de teclado que en un móvil no hay.
-   * Las direcciones son las de la pantalla, así que siguen al giro de la vista.
+   * Los botones flotantes que empujan la pieza: la única forma de colocarla,
+   * desde que arrastrarla dejó de mover nada. Van un paso de rejilla, y
+   * sustituyen a unas flechas de teclado que en un móvil no hay. Las
+   * direcciones son las de la pantalla, así que siguen al giro de la vista.
    */
   buildPad() {
     const pad = el('studio-pad');
@@ -2416,7 +2357,6 @@ export class Studio {
       const sw = this.btnColor.querySelector('.studio-swatch');
       if (sw && part) sw.style.background = this.matColor(part.m);
     }
-    el('studio-view').classList.toggle('lifting', this.moveMode === 'z');
   }
 
   // --- Vista previa horneada --------------------------------------------------
