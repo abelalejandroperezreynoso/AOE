@@ -127,7 +127,15 @@ export function hipRoof(out, x0, y0, x1, y1, zb, rise, roofCol, o = {}) {
   }
   quad(out, [X0, Y0, zb], [X1, Y0, zb], r1, r0, rL);           // faldón -y
   tri(out, [X0, Y0, zb], [X0, Y1, zb], r0, rL);                 // faldón -x
-  limb(out, [r0[0], r0[1], zt + 0.01], [r1[0] + 0.001, r1[1], zt + 0.01], 0.04, tone(rD, -0.2), { noshadow: true });
+  /*
+   * La cumbrera, sólo si hay cumbrera. Con la planta cuadrada el tejado es una
+   * pirámide y sus cuatro faldones se juntan en un punto: la viga salía de
+   * milímetro y medio y se quedaba de pie en el pico, como un pilar plantado
+   * ahí sin venir a cuento.
+   */
+  if (ridge) {
+    limb(out, [r0[0], r0[1], zt + 0.01], [r1[0], r1[1], zt + 0.01], 0.04, tone(rD, -0.2), { noshadow: true });
+  }
   return zt;
 }
 

@@ -232,6 +232,48 @@ function vaultMesh(p, col, o) {
   return t;
 }
 
+/**
+ * Teja: un canal curvo con su grueso, la teja árabe de toda la vida. Es media
+ * bóveda de pared fina y sin testeros: el lomo por fuera, el canal por dentro
+ * —más oscuro, que ahí no da la luz— y el canto vivo por los cuatro bordes,
+ * que es lo que se ve de una teja apoyada sobre la de al lado.
+ */
+function tejaMesh(p, col, o) {
+  const seg = Math.max(3, Math.round(p.seg || 6));
+  const t = [];
+  const hl = Math.max(0.01, p.len) / 2;
+  const hw = Math.max(0.01, p.w) / 2;
+  const rise = Math.max(0.01, p.rise);
+  // El grueso no puede comerse la curva: si no, la teja se cierra sobre sí misma.
+  const th = Math.max(0.004, Math.min(p.th, Math.min(hw, rise) * 0.7));
+  const dentro = tone(col, -0.16);
+  const arco = (rw, rz) => {
+    const pts = [];
+    for (let i = 0; i <= seg; i++) {
+      const a = (i / seg) * Math.PI;
+      pts.push([Math.cos(a) * rw, Math.sin(a) * rz]);
+    }
+    return pts;
+  };
+  const fuera = arco(hw, rise), canal = arco(hw - th, rise - th);
+  for (let i = 0; i < seg; i++) {
+    const [ay0, az0] = fuera[i], [ay1, az1] = fuera[i + 1];
+    const [by0, bz0] = canal[i], [by1, bz1] = canal[i + 1];
+    quad(t, [-hl, ay0, az0], [hl, ay0, az0], [hl, ay1, az1], [-hl, ay1, az1], col, o);
+    quad(t, [-hl, by1, bz1], [hl, by1, bz1], [hl, by0, bz0], [-hl, by0, bz0], dentro, o);
+    // Los cantos de los dos extremos, que es donde se ve el grueso.
+    quad(t, [-hl, ay0, az0], [-hl, ay1, az1], [-hl, by1, bz1], [-hl, by0, bz0], dentro, o);
+    quad(t, [hl, ay0, az0], [hl, by0, bz0], [hl, by1, bz1], [hl, ay1, az1], col, o);
+  }
+  // Y los dos bordes largos, donde apoya la siguiente.
+  for (const k of [0, seg]) {
+    const [ay, az] = fuera[k], [by, bz] = canal[k];
+    quad(t, [-hl, ay, az], [hl, ay, az], [hl, by, bz], [-hl, by, bz], col, o);
+  }
+  if (p.axis === 'y') rotZ(t, Math.PI / 2);
+  return t;
+}
+
 /** Tubo: un cilindro hueco. Pozos, chimeneas, brocales, aljibes. */
 function pipeMesh(p, col, o) {
   const seg = Math.max(3, Math.round(p.seg || 9));
@@ -349,6 +391,26 @@ export const PARTS = {
     },
   },
 
+  brick: {
+    label: 'Ladrillo', glyph: '▭',
+    hint: 'Un ladrillo con su junta. Duplícalo para correr una hilada, rematar un canto o marcar un dintel.',
+    fields: ['x', 'y', 'z', 'w', 'd', 'h', 'yaw'],
+    def: { x: 1, y: 1, z: 0, w: 0.26, d: 0.12, h: 0.08, yaw: 0, m: 'wall' },
+    build(out, p, c) {
+      const col = matColor(p, c), o = { ...matOpts(p), yaw: rad(p.yaw) };
+      /*
+       * Dos cuerpos para que un ladrillo encima de otro se lea como dos y no
+       * como un bloque: la junta, una losa fina y más apagada del tamaño de la
+       * huella, y encima el ladrillo, un pelo metido por los cuatro lados.
+       */
+      const junta = Math.min(0.02, p.h * 0.3);
+      box(out, p.x, p.y, p.z, p.w, p.d, junta, tone(col, -0.2), o);
+      const mete = Math.min(0.012, Math.min(p.w, p.d) * 0.12);
+      box(out, p.x, p.y, p.z + junta, Math.max(0.01, p.w - mete * 2),
+        Math.max(0.01, p.d - mete * 2), Math.max(0.01, p.h - junta), col, o);
+    },
+  },
+
   wedge: {
     label: 'Cuña', glyph: '◺',
     hint: 'Una caja con la tapa caída de un lado: rampas, contrafuertes, chaflanes.',
@@ -439,6 +501,16 @@ export const PARTS = {
       } else {
         quad(out, [x0, y0, p.z], [x1, y0, p.z], [x1, y1, p.z + p.rise], [x0, y1, p.z + p.rise], col, o);
       }
+    },
+  },
+
+  teja: {
+    label: 'Teja', glyph: '◡',
+    hint: 'Una teja curva de canal. Duplícala para correr una hilada, o agrándala para un tejadillo o un caballete.',
+    fields: ['x', 'y', 'z', 'len', 'w', 'rise', 'th', 'axis', 'seg'],
+    def: { x: 1, y: 1, z: 0, len: 0.5, w: 0.22, rise: 0.09, th: 0.025, axis: 'x', seg: 6, m: 'roof' },
+    build(out, p, c) {
+      place(out, tejaMesh(p, matColor(p, c), matOpts(p)), p);
     },
   },
 
@@ -738,8 +810,8 @@ export const PART_KEYS = Object.keys(PARTS);
  * empieza. Casi todas se pueden deshacer en sus partes (`explode`).
  */
 const BASICAS = new Set([
-  'box', 'wedge', 'cyl', 'pipe', 'dome', 'gable', 'hip', 'vault', 'panel',
-  'beam', 'arch', 'wheel', 'ring', 'barrel',
+  'box', 'brick', 'wedge', 'cyl', 'pipe', 'dome', 'gable', 'hip', 'vault',
+  'panel', 'teja', 'beam', 'arch', 'wheel', 'ring', 'barrel',
 ]);
 
 /** ¿Es una pieza de un solo cuerpo? */
