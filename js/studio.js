@@ -2276,12 +2276,26 @@ export class Studio {
       + '<path d="M10.2 11v5M13.8 11v5"/>',
       'Borrar la pieza', () => this.deletePart(), 'studio-del');
 
+    /*
+     * La guía no es de la pieza sino de la mesa, y aun así su sitio está aquí:
+     * es lo único de las herramientas que se busca con el modelo delante, y con
+     * la hoja plegada —que es como se calca, para ver la imagen a lo grande— el
+     * desplegable de arriba no está. Va en su propia columna, de un solo botón
+     * alto, para que se vea de un vistazo que no es del mismo juego que los
+     * otros seis.
+     */
+    this.btnGuia = mk('<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>'
+      + '<circle cx="9" cy="9.8" r="1.5"/><path d="m4.5 17.5 4.5-4.5 4 4 3-3 3.5 3.5"/>',
+      'Imagen guía para calcar', null);
+    this.padMenu(bar, this.btnGuia, (pop) => this.refMenu(pop));
+
     const rejilla = document.createElement('div');
     rejilla.className = 'studio-pad-grid';
     rejilla.append(
       grupo('studio-hist', this.btnUndo, this.btnRedo),
       grupo('studio-make', btnAdd, this.btnDup),
       grupo('studio-look', this.btnColor, this.btnDel),
+      grupo('studio-guia', this.btnGuia),
     );
     bar.prepend(rejilla);
   }

@@ -354,19 +354,27 @@ Para colocar:
   apagados. Los ángulos
   intermedios, de cinco en cinco, se ponen en la ficha de la pieza.
 - **Arriba**: **deshacer y rehacer**, **añadir** —abre el catálogo de piezas— y
-  **duplicar**, y el **color de la pieza** y **borrarla**. El botón del color
-  enseña el material que lleva y despliega los demás con su muestra, para
-  cambiarlo de un toque. Sus botones miden lo mismo que los de abajo porque
+  **duplicar**, el **color de la pieza** y **borrarla**, y en la punta, sola en
+  su columna y de un solo botón alto, la **imagen guía**. Es lo único de esta
+  barra que no es de la pieza sino de la mesa, y está aquí porque es lo que se
+  busca con el modelo delante: se calca con la hoja plegada, para ver la imagen
+  a lo grande, y entonces el desplegable de las herramientas no está. El botón
+  del color enseña el material que lleva y despliega los demás con su muestra,
+  para cambiarlo de un toque. Sus botones miden lo mismo que los de abajo porque
   comparten su rejilla. Con la mesa muy corta —la hoja desplegada en un
   teléfono pequeño— esta barra se aparta: lo suyo está también en la barra de
   herramientas y en la ficha de la pieza, y lo de abajo, que es colocar, no
   está en ninguna otra parte. Los iconos están dibujados a
   trazo, todos con el mismo grosor, y borrar se distingue por el color del
-  icono y no por un botón rojo entero. Sin pieza elegida no hay barra: al poner
-  un edificio en la mesa se llega a verlo, no con una pieza cogida de antemano.
+  icono y no por un botón rojo entero. Sin pieza elegida no hay barra de abajo:
+  al poner un edificio en la mesa se llega a verlo, no con una pieza cogida de
+  antemano. La de arriba sí está desde el principio, porque lo que no es de la
+  pieza —deshacer, añadir, la guía— hace falta antes de que haya ninguna; lo
+  que sí lo es se queda apagado hasta que la haya.
 - **Girar vista** enseña el modelo desde otro lado sin tocar el edificio, que
   para eso la cámara del juego es fija.
-- **Guía** pone una imagen de referencia —una foto, un dibujo, un boceto con
+- **Guía** —en las herramientas, y también en la barra de arriba de la pieza—
+  pone una imagen de referencia —una foto, un dibujo, un boceto con
   transparencia— para copiarla: aparece **de pie sobre la huella**, al ancho de
   las casillas del edificio, y por delante del modelo a media opacidad, para
   que no la tapen las piezas. Se le regula la opacidad y el tamaño, se puede
