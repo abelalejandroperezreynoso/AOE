@@ -179,6 +179,46 @@ debajo se eligen, con cada una dibujada como está puesta y su color al lado, y
 encima se sigue viendo el modelo, que se recoloca solo en lo que la hoja deja
 libre. Se abre con **Pieza**, y elegir no la cierra, para poder ir mirando.
 
+### Las tres capas
+
+El taller trabaja en tres alturas, y conviene tenerlas claras porque cada una se
+guarda en un sitio distinto y se comporta de otra manera:
+
+| capa | qué es | dónde vive | quién la puede cambiar |
+| ---- | ------ | ---------- | ---------------------- |
+| **1. Pieza individual** | la caja, el cilindro, el tejado, las almenas… | código (`PARTS`, en `js/gfx3d/parts.js`) | nadie desde el juego: son parte del programa |
+| **2. Pieza del taller** | varias de la capa 1 colocadas y guardadas con un nombre | datos: tabla `custom_parts` | quien juega, desde el taller |
+| **3. Edificio** | piezas de la capa 1 y de la capa 2, mezcladas | datos: tabla `building_models` | quien juega, desde el taller |
+
+Las reglas que hacen que esto se sostenga:
+
+- **Se baja de capa, nunca se sube ni se salta.** Un edificio lleva piezas de
+  las capas 1 y 2; una pieza del taller lleva sólo de la 1. Una pieza del taller
+  **no puede llevar otra pieza del taller**, así que no hay forma de que una se
+  contenga a sí misma ni de que el dibujo entre en bucle. El validador tira
+  cualquier `mia:` que aparezca dentro de una pieza.
+- **La capa 2 se guarda por referencia, no copiada.** El edificio anota la clave
+  (`mia:reja`) y el tamaño de la caja en la que la mete; lo que hay dentro lo
+  pone la pieza al dibujar. Por eso rehacer una pieza cambia de golpe todos los
+  edificios que la lleven. Lo que no cambia es la caja: la pieza nueva se ajusta
+  al hueco que ya tenía puesto, que es lo que evita que retocar una pieza
+  descoloque veinte edificios.
+- **Una referencia sin resolver no es un modelo roto.** Si un edificio menciona
+  una pieza que en este dispositivo todavía no está —las piezas aún no han
+  llegado de la nube, o el navegador es otro— el modelo **la conserva**: no se
+  dibuja mientras falte y vuelve a verse en cuanto la pieza esté. Si se tirara,
+  el modelo se guardaría pelado y al subir se llevaría la pieza por delante en
+  el edificio de todo el mundo. En el taller sale en la lista como «Pieza que
+  falta», se puede mover y estirar como cualquier otra —dónde va es del edificio,
+  no de la pieza— y se puede quitar, que es lo único que no se puede deshacer
+  solo.
+- **Cada capa tiene su tope**: 60 piezas dentro de una del taller, 40 piezas del
+  taller en total, 200 piezas en un edificio.
+
+Las tres capas y sus fronteras están comprobadas de punta a punta; el guion de
+validación vive fuera del repositorio, pero lo que comprueba es esto mismo,
+punto por punto.
+
 ### Piezas compuestas, y cómo deshacerlas
 
 Unas cuantas piezas del juego no son un cuerpo sino varios: las almenas son un
