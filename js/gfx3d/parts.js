@@ -454,6 +454,49 @@ export const PARTS = {
     },
   },
 
+  tabla: {
+    label: 'Tabla', glyph: '▤',
+    hint: 'Una tabla de entablar, con su ranura. Repítela para forrar un muro de madera, levantar una empalizada o cerrar un hastial.',
+    fields: ['x', 'y', 'z', 'w', 'd', 'h', 'yaw'],
+    def: { x: 1, y: 1, z: 0, w: 0.9, d: 0.05, h: 0.22, yaw: 0, m: 'wood' },
+    build(out, p, c) {
+      const col = matColor(p, c), o = { ...matOpts(p), yaw: rad(p.yaw) };
+      /*
+       * Dos cuerpos: la tabla y, pegada a ella, la ranura —una franja más
+       * apagada—, que es la sombra que deja una tabla contra la siguiente. Sin
+       * ella una fila de tablas es un tablón liso; con ella se lee el
+       * entablado.
+       *
+       * La ranura corre por el lado largo, que es por donde una tabla se junta
+       * con la de al lado: tumbada la lleva abajo, como el solape de un chilla,
+       * y de pie por un canto, como una empalizada. Así la misma pieza forra un
+       * muro en hiladas o en tablas verticales sin más que estirarla.
+       *
+       * Dos avisos que costaron una prueba cada uno. **Pegados, no encajados**:
+       * el taller dibuja por orden de lejanía y no sabe ordenar dos cuerpos que
+       * se solapan —lo mismo que deshacía la escalinata cuando sus peldaños se
+       * metían unos dentro de otros—, así que cada uno ocupa su trozo y no hay
+       * nada que ordenar. Y **a ras, no metida**: recogida de canto dejaba un
+       * escalón, y al hornear la casilla ese escalón y la ranura son un píxel
+       * cada uno, que se turnan y sacan la pared punteada, como si estuviera
+       * claveteada. A ras salen las juntas seguidas, que es lo que se busca.
+       */
+      const sombra = tone(col, -0.3);
+      if (p.w >= p.h) {
+        const ranura = Math.min(0.03, p.h * 0.2);
+        box(out, p.x, p.y, p.z, p.w, p.d, ranura, sombra, o);
+        box(out, p.x, p.y, p.z + ranura, p.w, p.d, Math.max(0.01, p.h - ranura), col, o);
+      } else {
+        const yw = rad(p.yaw), cs = Math.cos(yw), sn = Math.sin(yw);
+        const ranura = Math.min(0.03, p.w * 0.2);
+        const corre = (u, fn) => fn(p.x + u * cs, p.y + u * sn);
+        corre(-ranura / 2, (x, y) => box(out, x, y, p.z,
+          Math.max(0.01, p.w - ranura), p.d, p.h, col, o));
+        corre((p.w - ranura) / 2, (x, y) => box(out, x, y, p.z, ranura, p.d, p.h, sombra, o));
+      }
+    },
+  },
+
   wedge: {
     label: 'Cuña', glyph: '◺',
     hint: 'Una caja con la tapa caída de un lado: rampas, contrafuertes, chaflanes.',
@@ -867,8 +910,8 @@ export const PART_KEYS = Object.keys(PARTS);
  * empieza. Casi todas se pueden deshacer en sus partes (`explode`).
  */
 const BASICAS = new Set([
-  'box', 'brick', 'wedge', 'cyl', 'pipe', 'dome', 'gable', 'hip', 'vault',
-  'panel', 'teja', 'escama', 'beam', 'arch', 'wheel', 'ring', 'barrel',
+  'box', 'brick', 'tabla', 'wedge', 'cyl', 'pipe', 'dome', 'gable', 'hip',
+  'vault', 'panel', 'teja', 'escama', 'beam', 'arch', 'wheel', 'ring', 'barrel',
 ]);
 
 /** ¿Es una pieza de un solo cuerpo? */

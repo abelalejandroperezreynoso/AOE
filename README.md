@@ -255,8 +255,8 @@ más parecido a editarlas y por donde se empieza casi siempre: se parte de la
 caja o del tejado y se le añade lo que haga falta.
 
 Ese catálogo va partido en dos, y la hoja de **Añadir** lo repite: **básicas**
-—las de un solo cuerpo: caja, ladrillo, cuña, cilindro, tubo, cúpula, los dos
-tejados, bóveda, faldón, teja, escama, viga, arco, rueda, aro y barril— y
+—las de un solo cuerpo: caja, ladrillo, tabla, cuña, cilindro, tubo, cúpula,
+los dos tejados, bóveda, faldón, teja, escama, viga, arco, rueda, aro y barril— y
 **compuestas**
 —las que ya traen varias en una: almenas, torreón, puerta, ventana, estandarte,
 escalinata, cerca, pila de troncos—. Las básicas van delante porque son con las que se hace lo demás: haciendo una pieza del
@@ -265,10 +265,15 @@ cuerpos que no hacían falta para los edificios de serie y sí para el detalle: 
 **cuña** (rampas, contrafuertes, chaflanes), el **tubo** (pozos, brocales,
 chimeneas), la **bóveda** (túneles, naves, puentes, tejados curvos), el **arco**
 de medio punto (puertas de muralla, acueductos, soportales) y el **aro** (cercos,
-zunchos, argollas). Y los dos de poner a mano lo que un cuerpo entero deja liso:
+zunchos, argollas). Y los de poner a mano lo que un cuerpo entero deja liso:
 el **ladrillo**, que no es una caja pequeña sino un ladrillo con su junta —una
 losa fina y más apagada debajo, y el cuerpo un pelo metido—, de modo que uno
-encima de otro se leen como dos y no como un bloque; y la **teja**, un canal
+encima de otro se leen como dos y no como un bloque; la **tabla**, que es lo
+mismo para un muro de madera —una tabla con su ranura, la sombra que deja
+contra la de al lado—, y que corre la ranura por su lado largo: tumbada la
+lleva abajo, como el solape de un chilla, y de pie por un canto, como una
+empalizada, así que la misma pieza forra en hiladas o en tablas verticales sin
+más que estirarla; y la **teja**, un canal
 curvo con su grueso, para correr una hilada duplicándola o para hacer un
 tejadillo o un caballete agrandándola. Y con ella la **escama**, que es la otra
 teja: la plana de frente en medio punto —pizarra, cola de castor— con el lomo un
@@ -301,9 +306,10 @@ con la paleta del modelo que se está haciendo—, que es lo que se mira para
 decidir; antes era un menú con el nombre y un glifo y había que saberse de
 memoria qué era cada cosa. Se cierra eligiendo, tocando el velo o con Escape.
 
-Un modelo se arma con **piezas** —cajas, cilindros, cúpulas, tejados a dos y a
-cuatro aguas, faldones, vigas, ruedas, almenas, torreones, puertas, ventanas,
-estandartes, escalinatas, cercas, pilas de troncos y barriles— colocadas sobre
+Un modelo se arma con **piezas** —cajas, ladrillos, tablas, cilindros, cúpulas,
+tejados a dos y a cuatro aguas, faldones, vigas, ruedas, almenas, torreones,
+puertas, ventanas, estandartes, escalinatas, cercas, pilas de troncos y
+barriles— colocadas sobre
 la huella que ese edificio ocupa en el mapa, que es la que manda.
 
 Los edificios que aún llevan su aspecto de siempre se ven en la mesa, pero su
