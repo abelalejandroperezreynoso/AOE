@@ -384,14 +384,18 @@ Para colocar:
   herramientas y en la ficha de la pieza, y lo de abajo, que es colocar, no
   está en ninguna otra parte. Los iconos están dibujados a
   trazo, todos con el mismo grosor, y borrar se distingue por el color del
-  icono y no por un botón rojo entero. El **tamaño de partida** —la regla— deja
-  puesto lo que mide la pieza elegida como lo que medirán las siguientes de su
-  clase: se estira una caja hasta dar con el poste que hace falta, se guarda, y
-  a partir de ahí cada caja nace ya siendo ese poste. Guarda lo que mide y su
-  forma —ancho, fondo, alto, radios, grueso, pendiente, lados—, nunca dónde
-  está, de qué color es ni cómo está girada, que eso se pone al colocarla. Va en
-  el navegador, no en el modelo —es cómo trabaja quien modela, no cómo es el
-  edificio—, y el mismo menú lo devuelve al tamaño del catálogo. Sin pieza
+  icono y no por un botón rojo entero. El **tamaño y el giro de partida** —la
+  regla— dejan puesta la pieza elegida como saldrán las siguientes de su clase:
+  se estira una caja hasta dar con el poste que hace falta, se guarda, y a
+  partir de ahí cada caja nace ya siendo ese poste. Guarda lo que mide y su
+  forma —ancho, fondo, alto, radios, grueso, pendiente, lados— y cómo está
+  puesta —su ángulo, los tres giros de fuera y el eje o la cara de las que se
+  ponen a lo largo de algo—, nunca dónde está ni de qué color es, que eso es de
+  cada pieza. Lo del giro no es un adorno: una hilada de tejas se corre por
+  donde se corre, y una empalizada va toda hacia el mismo lado; volver a
+  girarlas una a una era el mismo trabajo que volver a medirlas. Va en el
+  navegador, no en el modelo —es cómo trabaja quien modela, no cómo es el
+  edificio—, y el mismo menú la devuelve a como viene del catálogo. Sin pieza
   elegida no hay barra de abajo:
   al poner un edificio en la mesa se llega a verlo, no con una pieza cogida de
   antemano. La de arriba sí está desde el principio, porque lo que no es de la

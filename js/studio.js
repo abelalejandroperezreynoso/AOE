@@ -48,14 +48,23 @@ const BUILDING_ORDER = [
 /** Dónde se guarda la imagen de guía, aparte de los modelos. */
 const REF_KEY = 'aor-studio-ref';
 /*
- * El tamaño de partida de cada clase de pieza, el que se le ha puesto a mano
- * desde la barra: `{ box: { w, d, h }, teja: { len, w, ... } }`. Va en el
- * navegador y no en el modelo —es cómo trabaja quien modela, no cómo es el
- * edificio— y sólo guarda lo que mide y la forma, nunca dónde está la pieza,
- * de qué color es ni cómo está girada.
+ * Cómo nace cada clase de pieza, lo que se le ha puesto a mano desde la barra:
+ * `{ box: { w, d, h, yaw }, teja: { len, w, axis, ... } }`. Va en el navegador
+ * y no en el modelo —es cómo trabaja quien modela, no cómo es el edificio— y
+ * guarda lo que mide y cómo está puesta, nunca dónde está la pieza ni de qué
+ * color es.
  */
 const TALLAS_KEY = 'aor-studio-tallas';
 const CAMPOS_TALLA = ['w', 'd', 'h', 'r', 'r0', 'r1', 'len', 'th', 'rise', 'over', 'flat', 'seg', 'steps', 'n'];
+/*
+ * Y cómo está puesta: el ángulo propio de la pieza si lo tiene (`yaw`), la
+ * inclinación de la viga (`pitch`), el eje o la cara de las que se ponen a lo
+ * largo de algo en vez de girar, y los tres giros de fuera, que son de todas y
+ * por eso no salen en la lista de campos de ninguna. Una hilada de tejas se
+ * corre por donde se corre y una empalizada va toda hacia el mismo lado:
+ * volver a girarlas una a una era el mismo trabajo que volver a medirlas.
+ */
+const CAMPOS_GIRO = ['yaw', 'pitch', 'axis', 'face'];
 /** Lado máximo con el que se guarda la guía: es para calcar, no para enmarcar. */
 const REF_MAX = 640;
 /*
@@ -125,6 +134,55 @@ function leerTallas() {
   } catch {
     return {};
   }
+}
+
+/*
+ * Lo que vale un campo cuando se guarda o se lee una talla, ya recortado, o
+ * null si eso no se puede guardar. Se limpia a la ida y a la vuelta: lo que hay
+ * en el navegador puede venir de otra versión del taller o de una mano ajena.
+ */
+function valorTalla(key, v) {
+  const f = FIELDS[key];
+  if (!f) return null;
+  if (f.type === 'choice') return f.options.some(([o]) => o === v) ? v : null;
+  return Number.isFinite(v) ? clampField(key, v) : null;
+}
+
+/**
+ * Lo guardado, en una línea que se lee: «ancho (x) 0.7 · alto 1.2 · giro 45°».
+ * Los ángulos llevan su unidad, y el eje y la cara su nombre, que un «eje x» a
+ * secas no dice de qué lado se corre la pieza.
+ */
+function resumenTalla(talla) {
+  return Object.entries(talla || {}).map(([k, v]) => {
+    const f = FIELDS[k];
+    if (f.type === 'choice') {
+      const op = f.options.find(([o]) => o === v);
+      return `${f.label.toLowerCase()}: ${(op ? op[1] : v).toLowerCase()}`;
+    }
+    return `${f.label.toLowerCase()} ${v}${f.unit || ''}`;
+  }).join(' · ');
+}
+
+/**
+ * Junta lo que se guarda de una pieza —lo que mide y cómo está puesta— de donde
+ * diga `valor`: de la pieza elegida al guardarla, y de lo guardado al leerlo.
+ * Los tres giros de fuera son de todas las piezas, así que ahí no hay lista de
+ * campos que consultar, y sólo cuentan si giran: una pieza derecha no tiene por
+ * qué cargar con tres ceros.
+ */
+function recogeTalla(campos, valor) {
+  const talla = {};
+  for (const key of [...CAMPOS_TALLA, ...CAMPOS_GIRO]) {
+    if (!campos.includes(key)) continue;
+    const v = valorTalla(key, valor(key));
+    if (v !== null) talla[key] = v;
+  }
+  for (const key of TILT_FIELDS) {
+    const v = valorTalla(key, valor(key));
+    if (v) talla[key] = v;
+  }
+  return Object.keys(talla).length ? talla : null;
 }
 
 function guardarTallas(tallas) {
@@ -1130,8 +1188,8 @@ export class Studio {
   }
 
   /**
-   * El menú del tamaño de partida. Se monta al abrir, así que dice de qué pieza
-   * se está hablando y si ya tiene uno puesto.
+   * El menú de cómo nacen las piezas. Se monta al abrir, así que dice de qué
+   * pieza se está hablando y si ya tiene algo puesto.
    */
   tallaMenu(pop) {
     const part = this.design?.parts[this.selected];
@@ -1140,20 +1198,18 @@ export class Studio {
     hint.className = 'studio-hint-text';
     hint.style.margin = '0';
     if (!part) {
-      hint.textContent = 'Elige una pieza y su tamaño se puede dejar puesto para las siguientes.';
+      hint.textContent = 'Elige una pieza y su tamaño y su giro se pueden dejar puestos para las siguientes.';
       pop.appendChild(hint);
       return;
     }
-    pop.appendChild(this.menuButton(`▭ Guardar el tamaño de ${nombre}`,
-      'Lo que mide ahora será lo que mida la próxima que añadas.', () => this.guardarTalla()));
+    pop.appendChild(this.menuButton(`▭ Guardar el tamaño y el giro de ${nombre}`,
+      'Como está puesta ahora será como salga la próxima que añadas.', () => this.guardarTalla()));
     if (this.tallas[part.k]) {
-      const medidas = Object.entries(this.tallaDe(part.k) || {})
-        .map(([k, v]) => `${FIELDS[k].label.toLowerCase()} ${v}`).join(' · ');
-      pop.appendChild(this.menuButton('↺ Volver al tamaño del catálogo',
-        'Olvida el tamaño guardado para esta clase de pieza.', () => this.olvidarTalla(part.k)));
-      hint.textContent = `Guardado ahora mismo: ${medidas}.`;
+      pop.appendChild(this.menuButton('↺ Volver a como viene del catálogo',
+        'Olvida lo guardado para esta clase de pieza.', () => this.olvidarTalla(part.k)));
+      hint.textContent = `Guardado ahora mismo: ${resumenTalla(this.tallaDe(part.k))}.`;
     } else {
-      hint.textContent = 'Se guarda lo que mide y su forma; ni el sitio, ni el color, ni el giro.';
+      hint.textContent = 'Se guarda lo que mide y cómo está puesta; ni el sitio ni el color.';
     }
     pop.appendChild(hint);
   }
@@ -1684,44 +1740,36 @@ export class Studio {
     const guardada = this.tallas[kind];
     if (!spec || !guardada) return null;
     const campos = spec.fields || (isMineKey(kind) ? PIECE_FIELDS : []);
-    const talla = {};
-    for (const key of CAMPOS_TALLA) {
-      if (!campos.includes(key) || !Number.isFinite(guardada[key])) continue;
-      talla[key] = clampField(key, guardada[key]);
-    }
-    return Object.keys(talla).length ? talla : null;
+    return recogeTalla(campos, (key) => guardada[key]);
   }
 
   /**
-   * Deja el tamaño de la pieza elegida como el de partida de las de su clase:
-   * la próxima caja nacerá con este ancho, este fondo y este alto. Lo que mide
-   * y su forma, nada más —ni el sitio, ni el color, ni el giro—, que eso se
-   * pone al colocarla.
+   * Deja la pieza elegida como el patrón de las de su clase: la próxima caja
+   * nacerá con este ancho, este fondo, este alto y este giro. Lo que mide y
+   * cómo está puesta, nada más —ni el sitio ni el color—, que eso es de cada
+   * pieza y se pone al colocarla.
    */
   guardarTalla() {
     const part = this.design?.parts[this.selected];
     if (!part) return;
     const spec = PARTS[part.k];
     const campos = spec?.fields || (isMineKey(part.k) ? PIECE_FIELDS : []);
-    const talla = {};
-    for (const key of CAMPOS_TALLA) {
-      if (campos.includes(key) && Number.isFinite(part[key])) talla[key] = part[key];
-    }
-    if (!Object.keys(talla).length) {
-      this.status(`${spec?.label || 'Esta pieza'} no tiene medidas que guardar.`);
+    const talla = recogeTalla(campos, (key) => part[key]);
+    if (!talla) {
+      this.status(`${spec?.label || 'Esta pieza'} no tiene nada que guardar.`);
       return;
     }
     this.tallas[part.k] = talla;
     guardarTallas(this.tallas);
-    this.status(`Hecho: la próxima ${(spec?.label || 'pieza').toLowerCase()} saldrá con este tamaño.`);
+    this.status(`Hecho: la próxima ${(spec?.label || 'pieza').toLowerCase()} saldrá así.`);
   }
 
-  /** La devuelve al tamaño con el que viene del catálogo. */
+  /** La devuelve a como viene del catálogo. */
   olvidarTalla(kind) {
     if (!this.tallas[kind]) return;
     delete this.tallas[kind];
     guardarTallas(this.tallas);
-    this.status(`${PARTS[kind]?.label || 'La pieza'} vuelve al tamaño del catálogo.`);
+    this.status(`${PARTS[kind]?.label || 'La pieza'} vuelve a como viene del catálogo.`);
   }
 
   duplicatePart() {
@@ -2474,7 +2522,7 @@ export class Studio {
      */
     this.btnTalla = mk('<rect x="2.5" y="8.5" width="19" height="7" rx="2"/>'
       + '<path d="M7 8.5v3M11 8.5v4.5M15 8.5v3M19 8.5v4.5"/>',
-      'Tamaño de partida de esta clase de pieza', null);
+      'Tamaño y giro de partida de esta clase de pieza', null);
     this.padMenu(bar, this.btnTalla, (pop) => this.tallaMenu(pop));
 
     this.btnGuia = mk('<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/>'
