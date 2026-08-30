@@ -16,7 +16,7 @@
 import { PLAYER_COLORS, BUILDINGS } from '../config.js';
 import { LOOK } from '../data/appearance.js';
 import {
-  quad, box, cyl, sphere, limb, wheel, tone, srand, translate, scaleMesh,
+  tri, quad, box, cyl, sphere, limb, wheel, tone, srand, translate, scaleMesh,
   mapVerts, rotZ,
 } from './engine.js';
 import {
@@ -144,6 +144,127 @@ function lifted(out, z, fn) {
   for (const t of tmp) out.push(t);
 }
 
+/**
+ * Deja una pieza construida en el origen donde toca: girada sobre su eje y
+ * llevada a su sitio. Las que se arman a mano aquí abajo se construyen centradas
+ * en (0,0) y apoyadas en z=0, que es mucho más fácil de leer, y terminan por
+ * aquí.
+ */
+function place(out, tris, p) {
+  if (p.yaw) rotZ(tris, rad(p.yaw));
+  translate(tris, p.x, p.y, p.z);
+  for (const t of tris) out.push(t);
+}
+
+/*
+ * Cuerpos que el kit de obra no trae, porque los edificios de serie no los
+ * necesitaban y el taller sí: con ellos se hace el detalle que con una caja y un
+ * cilindro sale a martillazos.
+ */
+
+/** Cuña: una caja con la tapa caída de un lado. Rampas, contrafuertes, chaflanes. */
+function wedgeMesh(p, col, o) {
+  const t = [];
+  const x0 = -p.w / 2, x1 = p.w / 2, y0 = -p.d / 2, y1 = p.d / 2;
+  const a0 = [x0, y0, 0], b0 = [x1, y0, 0], c0 = [x1, y1, 0], d0 = [x0, y1, 0];
+  const b1 = [x1, y0, p.h], c1 = [x1, y1, p.h];
+  quad(t, a0, b0, c0, d0, col, o);   // el suelo
+  quad(t, b0, c0, c1, b1, col, o);   // el testero alto
+  quad(t, a0, b1, c1, d0, col, o);   // la rampa
+  tri(t, a0, b0, b1, col, o);
+  tri(t, d0, c0, c1, col, o);
+  return t;
+}
+
+/** Bóveda: medio cilindro tumbado. Túneles, naves, puentes, tejados curvos. */
+function vaultMesh(p, col, o) {
+  const seg = Math.max(3, Math.round(p.seg || 8));
+  const t = [];
+  const hw = p.w / 2, hd = p.d / 2;
+  const arco = [];
+  for (let i = 0; i <= seg; i++) {
+    const a = (i / seg) * Math.PI;
+    arco.push([Math.cos(a) * hd, Math.sin(a) * p.rise]);
+  }
+  for (let i = 0; i < seg; i++) {
+    const [y0, z0] = arco[i], [y1, z1] = arco[i + 1];
+    quad(t, [-hw, y0, z0], [hw, y0, z0], [hw, y1, z1], [-hw, y1, z1], col, o);
+  }
+  // Los dos testeros, en abanico desde el centro de su base.
+  for (const sx of [-hw, hw]) {
+    for (let i = 0; i < seg; i++) {
+      tri(t, [sx, 0, 0], [sx, arco[i][0], arco[i][1]], [sx, arco[i + 1][0], arco[i + 1][1]], col, o);
+    }
+  }
+  if (p.axis === 'y') rotZ(t, Math.PI / 2);
+  return t;
+}
+
+/** Tubo: un cilindro hueco. Pozos, chimeneas, brocales, aljibes. */
+function pipeMesh(p, col, o) {
+  const seg = Math.max(3, Math.round(p.seg || 9));
+  const ro = p.r, ri = Math.max(0.02, p.r - p.th);
+  const dentro = tone(col, -0.14);   // el interior, en penumbra
+  const t = [];
+  const P = (r, a, z) => [Math.cos(a) * r, Math.sin(a) * r, z];
+  for (let i = 0; i < seg; i++) {
+    const a0 = (i / seg) * Math.PI * 2, a1 = ((i + 1) / seg) * Math.PI * 2;
+    quad(t, P(ro, a0, 0), P(ro, a1, 0), P(ro, a1, p.h), P(ro, a0, p.h), col, o);
+    quad(t, P(ri, a0, 0), P(ri, a1, 0), P(ri, a1, p.h), P(ri, a0, p.h), dentro, o);
+    quad(t, P(ri, a0, p.h), P(ri, a1, p.h), P(ro, a1, p.h), P(ro, a0, p.h), col, o);
+  }
+  return t;
+}
+
+/** Aro: una rosca tumbada. Cercos de pozo, zunchos, coronas, ruedas de molino. */
+function ringMesh(p, col, o) {
+  const seg = Math.max(4, Math.round(p.seg || 10));
+  const lados = 5;
+  const R = p.r, rr = Math.max(0.01, p.th / 2);
+  const t = [];
+  const P = (i, j) => {
+    const A = (i / seg) * Math.PI * 2, B = (j / lados) * Math.PI * 2;
+    const rad2 = R + Math.cos(B) * rr;
+    return [Math.cos(A) * rad2, Math.sin(A) * rad2, rr + Math.sin(B) * rr];
+  };
+  for (let i = 0; i < seg; i++) {
+    for (let j = 0; j < lados; j++) {
+      quad(t, P(i, j), P(i + 1, j), P(i + 1, j + 1), P(i, j + 1), col, o);
+    }
+  }
+  return t;
+}
+
+/**
+ * Arco: un paño con el hueco de medio punto. Puertas de muralla, acueductos,
+ * claustros, soportales. Las jambas van en caja y el hueco por fajas, para que
+ * ni se solapen entre sí —que el dibujo del taller no sabría ordenarlas— ni
+ * hagan escalones en la rosca.
+ */
+function archMesh(p, col, o) {
+  const seg = Math.max(3, Math.round(p.seg || 9));
+  const hw = p.w / 2, hd = p.d / 2;
+  const ro = Math.max(0.05, hw - p.th);              // medio hueco
+  const arranque = Math.max(0, p.h - p.th - ro);     // dónde empieza a curvarse
+  const t = [];
+  // Las dos jambas, macizas de arriba abajo.
+  for (const sx of [-1, 1]) {
+    const ancho = hw - ro;
+    if (ancho > 0.001) box(t, sx * (ro + ancho / 2), 0, 0, ancho, p.d, p.h, col, o);
+  }
+  // Y el hueco: cada faja va del intradós a la tapa.
+  const alto = (u) => arranque + Math.sqrt(Math.max(0, ro * ro - u * u));
+  for (let i = 0; i < seg; i++) {
+    const u0 = -ro + (2 * ro * i) / seg, u1 = -ro + (2 * ro * (i + 1)) / seg;
+    const b0 = alto(u0), b1 = alto(u1);
+    quad(t, [u0, -hd, b0], [u1, -hd, b1], [u1, -hd, p.h], [u0, -hd, p.h], col, o);
+    quad(t, [u0, hd, b0], [u1, hd, b1], [u1, hd, p.h], [u0, hd, p.h], col, o);
+    quad(t, [u0, -hd, b0], [u0, hd, b0], [u1, hd, b1], [u1, -hd, b1], col, o);
+    quad(t, [u0, -hd, p.h], [u1, -hd, p.h], [u1, hd, p.h], [u0, hd, p.h], col, o);
+  }
+  return t;
+}
+
 // --- La tabla de piezas ------------------------------------------------------
 
 /*
@@ -196,6 +317,16 @@ export const PARTS = {
     },
   },
 
+  wedge: {
+    label: 'Cuña', glyph: '◺',
+    hint: 'Una caja con la tapa caída de un lado: rampas, contrafuertes, chaflanes.',
+    fields: ['x', 'y', 'z', 'w', 'd', 'h', 'yaw'],
+    def: { x: 1, y: 1, z: 0, w: 0.8, d: 0.8, h: 0.5, yaw: 0, m: 'base' },
+    build(out, p, c) {
+      place(out, wedgeMesh(p, matColor(p, c), matOpts(p)), p);
+    },
+  },
+
   cyl: {
     label: 'Cilindro', glyph: '▮',
     hint: 'Torres, columnas y postes. Con el radio de arriba a cero sale un cono.',
@@ -203,6 +334,16 @@ export const PARTS = {
     def: { x: 1, y: 1, z: 0, r0: 0.4, r1: 0.36, h: 1, seg: 9, m: 'stone' },
     build(out, p, c) {
       cyl(out, p.x, p.y, p.z, p.r0, p.r1, p.h, matColor(p, c), { ...matOpts(p), seg: p.seg });
+    },
+  },
+
+  pipe: {
+    label: 'Tubo', glyph: '◎',
+    hint: 'Cilindro hueco: pozos, brocales, chimeneas, aljibes, torres abiertas.',
+    fields: ['x', 'y', 'z', 'r', 'th', 'h', 'seg'],
+    def: { x: 1, y: 1, z: 0, r: 0.3, th: 0.08, h: 0.45, seg: 9, m: 'stone' },
+    build(out, p, c) {
+      place(out, pipeMesh(p, matColor(p, c), matOpts(p)), p);
     },
   },
 
@@ -242,6 +383,16 @@ export const PARTS = {
     },
   },
 
+  vault: {
+    label: 'Bóveda', glyph: '◠',
+    hint: 'Medio cilindro tumbado: túneles, naves, puentes, tejados curvos. La curva corre por el eje elegido.',
+    fields: ['x', 'y', 'z', 'w', 'd', 'rise', 'axis', 'seg'],
+    def: { x: 1, y: 1, z: 0, w: 1.2, d: 0.9, rise: 0.45, axis: 'x', seg: 8, m: 'stone' },
+    build(out, p, c) {
+      place(out, vaultMesh(p, matColor(p, c), matOpts(p)), p);
+    },
+  },
+
   panel: {
     label: 'Faldón', glyph: '◣',
     hint: 'Un plano inclinado: tejados de una sola agua, toldos, rampas, puentes.',
@@ -275,6 +426,16 @@ export const PARTS = {
     },
   },
 
+  arch: {
+    label: 'Arco', glyph: '∩',
+    hint: 'Un paño con el hueco de medio punto: puertas de muralla, acueductos, soportales.',
+    fields: ['x', 'y', 'z', 'w', 'd', 'h', 'th', 'yaw', 'seg'],
+    def: { x: 1, y: 1, z: 0, w: 1.1, d: 0.3, h: 1, th: 0.22, yaw: 0, seg: 9, m: 'stone' },
+    build(out, p, c) {
+      place(out, archMesh(p, matColor(p, c), matOpts(p)), p);
+    },
+  },
+
   wheel: {
     label: 'Rueda', glyph: '◎',
     hint: 'Disco de eje horizontal: ruedas, aspas de molino, dianas, escudos.',
@@ -283,6 +444,16 @@ export const PARTS = {
     build(out, p, c) {
       wheel(out, p.x, p.y, p.z + p.r, p.r, p.th, matColor(p, c),
         { ...matOpts(p), axis: p.axis, seg: p.seg });
+    },
+  },
+
+  ring: {
+    label: 'Aro', glyph: '○',
+    hint: 'Una rosca tumbada: cercos de pozo, zunchos, coronas, argollas.',
+    fields: ['x', 'y', 'z', 'r', 'th', 'seg'],
+    def: { x: 1, y: 1, z: 0, r: 0.3, th: 0.08, seg: 9, m: 'wood' },
+    build(out, p, c) {
+      place(out, ringMesh(p, matColor(p, c), matOpts(p)), p);
     },
   },
 
@@ -534,7 +705,10 @@ export const PART_KEYS = Object.keys(PARTS);
  * del taller son un atajo que a veces viene bien, pero no es por donde se
  * empieza. Casi todas se pueden deshacer en sus partes (`explode`).
  */
-const BASICAS = new Set(['box', 'cyl', 'dome', 'gable', 'hip', 'panel', 'beam', 'wheel', 'barrel']);
+const BASICAS = new Set([
+  'box', 'wedge', 'cyl', 'pipe', 'dome', 'gable', 'hip', 'vault', 'panel',
+  'beam', 'arch', 'wheel', 'ring', 'barrel',
+]);
 
 /** ¿Es una pieza de un solo cuerpo? */
 export function isBasic(k) { return BASICAS.has(k); }

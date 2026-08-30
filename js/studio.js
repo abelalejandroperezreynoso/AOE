@@ -965,7 +965,7 @@ export class Studio {
       return b;
     };
 
-    // Las piezas, en un desplegable: son diecisiete y en fila ocupaban tres
+    // Las piezas, en un desplegable: son más de veinte y en fila ocupaban tres
     // renglones de mesa que ahora se lleva el modelo.
     view.appendChild(mkBtn('＋ Añadir', 'Añadir una pieza al edificio', () => this.openPieceSheet()));
 

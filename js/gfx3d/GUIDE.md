@@ -84,7 +84,12 @@ horneado sea repetible).
   convierte en malla con las mismas primitivas y el mismo kit de obra que
   `buildings.js`. Añadir una pieza nueva es meter una entrada en `PARTS` con sus
   campos y su `build()`; el editor monta sus controles y el validador la recorta
-  solo, a partir de la tabla `FIELDS`. Si la pieza no es un cuerpo sino varios
+  solo, a partir de la tabla `FIELDS`. El catálogo va partido en **básicas** —un
+  solo cuerpo, `BASICAS`— y **compuestas** —varias en una—; las básicas salen
+  delante en el taller, porque son con las que se hace el detalle. Los cuerpos
+  que el kit de obra no traía (cuña, tubo, bóveda, arco, aro) se arman aquí
+  mismo, centrados en el origen y apoyados en z=0, y terminan en `place()`, que
+  los gira y los lleva a su sitio. Si la pieza no es un cuerpo sino varios
   —las almenas, la escalinata, la cerca—, dale además un `explode(p)` que
   devuelva las piezas sueltas que dibujan lo mismo: es lo que deja al jugador
   tocarlas una a una desde el taller. Comprueba que la caja y el número de
