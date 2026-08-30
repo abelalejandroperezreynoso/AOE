@@ -335,6 +335,15 @@ Para colocar:
   se vuelva cono, y se apaga en las que no lo tienen (un barril no se estira
   desde aquí). La barra es una rejilla de siete columnas, así que cabe igual en
   un teléfono pequeño que en uno grande.
+- **Estirar y encoger van a dos velocidades**: mientras el lado mide más de
+  0,2 cada toque es de 0,05, y de ahí para abajo, de 0,01, que es hasta donde
+  llegan las piezas. Así un muro se recorta a zancadas y un listón o el marco
+  de una ventana se afinan desde la misma barra, sin que el paso gordo se lleve
+  media pieza de un golpe. Los botones de la ficha dan ese mismo paso, y
+  escribir el número a mano vale para cualquier valor de la rejilla fina: lo
+  afinado se guarda tal cual, no se redondea al volver. Cuando un lado toca su
+  tope —el suelo de 0,01 o el techo del campo— su botón se apaga, para que se
+  vea que por ahí ya no hay más.
 - **Girar** vuelve la pieza **45° por toque** —la diagonal en un toque, el
   cuarto de vuelta en dos— y cae siempre en el múltiplo más cercano, como las
   flechas caen en la rejilla. Las piezas que no llevan ángulo sino un eje o una
