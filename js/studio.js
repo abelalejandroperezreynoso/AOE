@@ -81,6 +81,30 @@ const SCALE_FIELDS = {
 };
 
 /*
+ * Y las que no se dejan leer por la lista, porque su lado no se llama como en
+ * ninguna otra. Aquí manda la forma, no el nombre del campo:
+ *
+ * - la **rueda** es un disco de canto, así que lo que mide de alto es su
+ *   diámetro —el mismo radio que la ensancha— y lo que mide de fondo es el
+ *   grueso de la tabla;
+ * - el **aro** está tumbado, y entonces es al revés: de ancho y de fondo mide
+ *   su diámetro y de alto, el grueso de la rosca;
+ * - la **pila de troncos** crece por troncos, no por medidas: bajarle el alto
+ *   es quitarle una fila;
+ * - y la **viga** nace de pie, así que lo que mide de alto es su largo.
+ *
+ * Que un mismo campo lleve dos lados no es un descuido: en una pieza redonda el
+ * ancho y el fondo son la misma medida, y más vale que los dos botones hagan lo
+ * que dicen a que uno esté apagado sin explicación.
+ */
+const EJES_PIEZA = {
+  wheel: { d: 'th', h: 'r' },
+  ring: { d: 'r', h: 'th' },
+  logs: { h: 'n' },
+  beam: { h: 'len' },
+};
+
+/*
  * Girar. La mayoría de las piezas llevan un ángulo (`yaw`); las que no, se
  * ponen a lo largo de un eje o miran a una cara, y ahí girar es cambiar de eje,
  * que es un cuarto de vuelta. Un toque son 45°: el cuarto de vuelta sale en dos
@@ -2588,6 +2612,8 @@ export class Studio {
    */
   scaleField(part, eje) {
     const campos = PARTS[part.k]?.fields || (isMineKey(part.k) ? PIECE_FIELDS : []);
+    const suyo = EJES_PIEZA[part.k]?.[eje];
+    if (suyo && campos.includes(suyo)) return suyo;
     return SCALE_FIELDS[eje].find((k) => campos.includes(k)) || null;
   }
 

@@ -343,10 +343,19 @@ Para colocar:
   piezas no llaman igual a sus lados —la caja tiene ancho y fondo, el cilindro
   radios, la viga largo y grueso—, así que cada botón toca el campo que a esa
   pieza le hace de ese lado, los dos radios del cilindro a la vez para que no
-  se vuelva cono, y se apaga en las que no lo tienen (una pieza redonda no
-  tiene fondo aparte del radio, y unas almenas miden lo que miden de alto). La
-  barra es una rejilla de ocho columnas, así que cabe igual en un teléfono
-  pequeño que en uno grande.
+  se vuelva cono. En unas cuantas manda la forma y no el nombre del campo: la
+  rueda es un disco de canto, así que lo que mide de alto es su diámetro y lo
+  que mide de fondo es el grueso de la tabla; el aro está tumbado y es al
+  revés; la pila de troncos crece por troncos, así que bajarle el alto es
+  quitarle una fila; y la viga nace de pie, así que lo que mide de alto es su
+  largo. Que un mismo campo lleve dos lados no es un descuido: en
+  una pieza redonda el ancho y el fondo son la misma medida, y más vale que los
+  dos botones hagan lo que dicen a que uno esté apagado sin explicación. Sólo
+  se apaga el lado que la pieza de verdad no tiene: el fondo de las redondas y
+  el ancho de la pila y del estandarte. **El alto lo tienen todas**, que es lo
+  que se toca a cada rato. La barra es una
+  rejilla de ocho columnas, así que cabe igual en un teléfono pequeño que en
+  uno grande.
 - **Estirar y encoger van a dos velocidades**: mientras el lado mide más de
   0,2 cada toque es de 0,05, y de ahí para abajo, de 0,01, que es hasta donde
   llegan las piezas. Así un muro se recorta a zancadas y un listón o el marco

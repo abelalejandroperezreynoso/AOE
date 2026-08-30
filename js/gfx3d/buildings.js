@@ -139,9 +139,22 @@ export function hipRoof(out, x0, y0, x1, y1, zb, rise, roofCol, o = {}) {
   return zt;
 }
 
-/** Almenas alrededor del borde superior de un rectángulo. */
-export function battlements(out, x0, y0, x1, y1, z, M) {
-  slab(out, x0 - 0.05, y0 - 0.05, x1 + 0.05, y1 + 0.05, z, 0.1, tone(M.wall, -0.06));
+/*
+ * Almenas alrededor del borde superior de un rectángulo. El alto es el del
+ * conjunto —el antepecho y el merlón que se le pone encima— y se reparte entre
+ * los dos en la misma proporción de siempre. Por defecto vale lo de siempre
+ * (0,24 = 0,1 + 0,14), así que las murallas de serie salen igual que salían.
+ */
+export const CRESTA_PETO = 0.1, CRESTA_MERLON = 0.14;
+// La suma, escrita y no sumada: 0,1 + 0,14 no da 0,24 clavado en coma flotante,
+// y con la suma un alto de 0,24 —el que trae la pieza— sacaba un antepecho de
+// 0,0999999 en vez del de siempre.
+export const CRESTA_ALTO = 0.24;
+
+export function battlements(out, x0, y0, x1, y1, z, M, o = {}) {
+  const k = (o.h ?? CRESTA_ALTO) / CRESTA_ALTO;
+  const peto = CRESTA_PETO * k, merlon = CRESTA_MERLON * k;
+  slab(out, x0 - 0.05, y0 - 0.05, x1 + 0.05, y1 + 0.05, z, peto, tone(M.wall, -0.06));
   const step = 0.34;
   const edges = [
     [[x0, y0], [x1, y0]], [[x1, y0], [x1, y1]],
@@ -152,7 +165,7 @@ export function battlements(out, x0, y0, x1, y1, z, M) {
     const n = Math.max(2, Math.floor(len / step));
     for (let i = 0; i <= n; i += 2) {
       const t = i / n;
-      box(out, ax + (bx - ax) * t, ay + (by - ay) * t, z + 0.1, 0.14, 0.14, 0.14, M.wall, { noshadow: true });
+      box(out, ax + (bx - ax) * t, ay + (by - ay) * t, z + peto, 0.14, 0.14, merlon, M.wall, { noshadow: true });
     }
   }
 }

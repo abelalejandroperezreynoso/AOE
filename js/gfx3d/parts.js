@@ -20,7 +20,8 @@ import {
   mapVerts, rotZ, rotX, rotY,
 } from './engine.js';
 import {
-  gableRoof, hipRoof, battlements, roundTower, flag, scaffold, foundation,
+  gableRoof, hipRoof, battlements, CRESTA_ALTO, CRESTA_PETO, CRESTA_MERLON,
+  roundTower, flag, scaffold, foundation,
   logPile, barrel,
 } from './buildings.js';
 
@@ -114,7 +115,7 @@ export const FIELDS = {
   ry: { label: 'Giro Y', min: 0, max: 355, step: 5, unit: '°' },
   pitch: { label: 'Inclinación', min: -90, max: 90, step: 5, unit: '°' },
   seg: { label: 'Lados', min: 3, max: 16, step: 1 },
-  flat: { label: 'Achatado', min: 0.05, max: 2, step: 0.05, fino: 0.01 },
+  flat: { label: 'Achatado', min: 0.01, max: 2, step: 0.05, fino: 0.01 },
   steps: { label: 'Peldaños', min: 2, max: 12, step: 1 },
   n: { label: 'Cantidad', min: 1, max: 12, step: 1 },
   axis: {
@@ -611,18 +612,21 @@ export const PARTS = {
 
   crest: {
     label: 'Almenas', glyph: '⊓',
-    hint: 'Corona un rectángulo con su antepecho y sus merlones.',
-    fields: ['x', 'y', 'z', 'w', 'd'],
-    def: { x: 1, y: 1, z: 1, w: 1.2, d: 1.2, m: 'stone' },
+    hint: 'Corona un rectángulo con su antepecho y sus merlones. Bajándolas salen un pretil o un bordillo.',
+    fields: ['x', 'y', 'z', 'w', 'd', 'h'],
+    def: { x: 1, y: 1, z: 1, w: 1.2, d: 1.2, h: CRESTA_ALTO, m: 'stone' },
     build(out, p, c) {
       battlements(out, p.x - p.w / 2, p.y - p.d / 2, p.x + p.w / 2, p.y + p.d / 2,
-        p.z, { wall: matColor(p, c) });
+        p.z, { wall: matColor(p, c) }, { h: p.h });
     },
     explode(p) {
       // Lo mismo que dibuja `battlements`, pero en piezas: el antepecho y sus
-      // merlones. Las esquinas las pintan dos lados, así que se descartan las
-      // repetidas: puestas dos veces se verían igual y estorbarían el doble.
-      const out = [caja(p, p.x, p.y, p.z, p.w + 0.1, p.d + 0.1, 0.1)];
+      // merlones, repartiéndose el alto igual que allí. Las esquinas las pintan
+      // dos lados, así que se descartan las repetidas: puestas dos veces se
+      // verían igual y estorbarían el doble.
+      const k = (p.h ?? CRESTA_ALTO) / CRESTA_ALTO;
+      const peto = CRESTA_PETO * k, merlon = CRESTA_MERLON * k;
+      const out = [caja(p, p.x, p.y, p.z, p.w + 0.1, p.d + 0.1, peto)];
       const x0 = p.x - p.w / 2, y0 = p.y - p.d / 2, x1 = p.x + p.w / 2, y1 = p.y + p.d / 2;
       const step = 0.34;
       const bordes = [
@@ -639,7 +643,7 @@ export const PARTS = {
           const sitio = `${mx.toFixed(3)},${my.toFixed(3)}`;
           if (puestos.has(sitio)) continue;
           puestos.add(sitio);
-          out.push({ ...caja(p, mx, my, p.z + 0.1, 0.14, 0.14, 0.14), noshadow: true });
+          out.push({ ...caja(p, mx, my, p.z + peto, 0.14, 0.14, merlon), noshadow: true });
         }
       }
       return out;
