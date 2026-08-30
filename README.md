@@ -256,7 +256,8 @@ caja o del tejado y se le añade lo que haga falta.
 
 Ese catálogo va partido en dos, y la hoja de **Añadir** lo repite: **básicas**
 —las de un solo cuerpo: caja, ladrillo, cuña, cilindro, tubo, cúpula, los dos
-tejados, bóveda, faldón, teja, viga, arco, rueda, aro y barril— y **compuestas**
+tejados, bóveda, faldón, teja, escama, viga, arco, rueda, aro y barril— y
+**compuestas**
 —las que ya traen varias en una: almenas, torreón, puerta, ventana, estandarte,
 escalinata, cerca, pila de troncos—. Las básicas van delante porque son con las que se hace lo demás: haciendo una pieza del
 taller se busca el detalle, y el detalle sale de formas sueltas. Ahí están los
@@ -269,7 +270,12 @@ el **ladrillo**, que no es una caja pequeña sino un ladrillo con su junta —un
 losa fina y más apagada debajo, y el cuerpo un pelo metido—, de modo que uno
 encima de otro se leen como dos y no como un bloque; y la **teja**, un canal
 curvo con su grueso, para correr una hilada duplicándola o para hacer un
-tejadillo o un caballete agrandándola. Las compuestas
+tejadillo o un caballete agrandándola. Y con ella la **escama**, que es la otra
+teja: la plana de frente en medio punto —pizarra, cola de castor— con el lomo un
+poco abombado, la que se solapa por hiladas, cada una a media escama de la de
+abajo, hasta cubrir el faldón como las escamas de un pez. El bombeo no es
+adorno: es lo que le saca el brillo por arriba y la sombra en el solape, que sin
+él un tejado así se ve como una pared lisa con rayas. Las compuestas
 siguen ahí detrás, que a veces son justo el atajo que hace falta, y cualquiera
 de ellas se puede meter y descomponer para quedarse con sus trozos.
 
@@ -362,8 +368,8 @@ Para colocar:
   ángulos intermedios, de cinco en cinco, se ponen en la ficha de la pieza, que
   enseña los tres.
 - **Arriba**: **deshacer y rehacer**, **añadir** —abre el catálogo de piezas— y
-  **duplicar**, el **color de la pieza** y **borrarla**, y en la punta, en su
-  propia columna, la **imagen guía**: arriba sus ajustes y abajo **ocultarla y
+  **duplicar**, el **color de la pieza** y **borrarla**, el **tamaño de
+  partida** y, en la punta, en su propia columna, la **imagen guía**: arriba sus ajustes y abajo **ocultarla y
   volver a verla**, que es lo que se hace a cada rato mientras se calca —mirar
   cómo va el modelo sin la imagen encima— y no puede costar abrir un menú. Es
   lo único de esta barra que no es de la pieza sino de la mesa, y está aquí
@@ -377,7 +383,15 @@ Para colocar:
   herramientas y en la ficha de la pieza, y lo de abajo, que es colocar, no
   está en ninguna otra parte. Los iconos están dibujados a
   trazo, todos con el mismo grosor, y borrar se distingue por el color del
-  icono y no por un botón rojo entero. Sin pieza elegida no hay barra de abajo:
+  icono y no por un botón rojo entero. El **tamaño de partida** —la regla— deja
+  puesto lo que mide la pieza elegida como lo que medirán las siguientes de su
+  clase: se estira una caja hasta dar con el poste que hace falta, se guarda, y
+  a partir de ahí cada caja nace ya siendo ese poste. Guarda lo que mide y su
+  forma —ancho, fondo, alto, radios, grueso, pendiente, lados—, nunca dónde
+  está, de qué color es ni cómo está girada, que eso se pone al colocarla. Va en
+  el navegador, no en el modelo —es cómo trabaja quien modela, no cómo es el
+  edificio—, y el mismo menú lo devuelve al tamaño del catálogo. Sin pieza
+  elegida no hay barra de abajo:
   al poner un edificio en la mesa se llega a verlo, no con una pieza cogida de
   antemano. La de arriba sí está desde el principio, porque lo que no es de la
   pieza —deshacer, añadir, la guía— hace falta antes de que haya ninguna; lo

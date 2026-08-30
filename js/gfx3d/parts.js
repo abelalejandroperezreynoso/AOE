@@ -274,6 +274,44 @@ function tejaMesh(p, col, o) {
   return t;
 }
 
+/**
+ * Escama: la teja plana de frente redondo —pizarra, cola de castor—, la que se
+ * pone solapada por hiladas hasta cubrir el faldón como las escamas de un pez.
+ * Es una plancha con el frente en medio punto y el lomo un poco abombado: ese
+ * bombeo es lo que le saca el brillo por arriba y la sombra en el solape, que
+ * si no un tejado así se ve como una pared lisa con rayas.
+ */
+function escamaMesh(p, col, o) {
+  const seg = Math.max(3, Math.round(p.seg || 8));
+  const t = [];
+  const hw = Math.max(0.01, p.w) / 2;
+  const len = Math.max(0.02, p.len);
+  const th = Math.max(0.004, p.th);
+  const rise = Math.max(0, p.rise);
+  const x0 = -len / 2;
+  // El frente es un medio punto del ancho de la escama; con la escama más
+  // corta que ancha se queda en lo que quepa, y sigue saliendo redondo.
+  const r = Math.min(hw, len);
+  const xc = Math.max(x0, len / 2 - r);
+  const dentro = tone(col, -0.16);
+  const X = (y) => xc + Math.sqrt(Math.max(0, r * r - Math.min(r, Math.abs(y)) ** 2));
+  const Z = (y) => th + rise * Math.sqrt(Math.max(0, 1 - (y / hw) ** 2));
+  for (let i = 0; i < seg; i++) {
+    const y0 = -hw + ((2 * hw) / seg) * i, y1 = -hw + ((2 * hw) / seg) * (i + 1);
+    const xa = X(y0), xb = X(y1), z0 = Z(y0), z1 = Z(y1);
+    quad(t, [x0, y0, z0], [xa, y0, z0], [xb, y1, z1], [x0, y1, z1], col, o);      // el lomo
+    quad(t, [x0, y0, 0], [xa, y0, 0], [xb, y1, 0], [x0, y1, 0], dentro, o);       // la panza
+    quad(t, [xa, y0, 0], [xb, y1, 0], [xb, y1, z1], [xa, y0, z0], col, o);        // el frente
+    quad(t, [x0, y0, 0], [x0, y1, 0], [x0, y1, z1], [x0, y0, z0], dentro, o);     // el canto de atrás
+  }
+  // Y los dos lados rectos, de atrás al arranque del medio punto.
+  for (const sy of [-hw, hw]) {
+    quad(t, [x0, sy, 0], [xc, sy, 0], [xc, sy, th], [x0, sy, th], col, o);
+  }
+  if (p.axis === 'y') rotZ(t, Math.PI / 2);
+  return t;
+}
+
 /** Tubo: un cilindro hueco. Pozos, chimeneas, brocales, aljibes. */
 function pipeMesh(p, col, o) {
   const seg = Math.max(3, Math.round(p.seg || 9));
@@ -511,6 +549,16 @@ export const PARTS = {
     def: { x: 1, y: 1, z: 0, len: 0.5, w: 0.22, rise: 0.09, th: 0.025, axis: 'x', seg: 6, m: 'roof' },
     build(out, p, c) {
       place(out, tejaMesh(p, matColor(p, c), matOpts(p)), p);
+    },
+  },
+
+  escama: {
+    label: 'Escama', glyph: '⌒',
+    hint: 'Teja plana de frente redondo: pizarra, cola de castor. Duplícala y solápala por hiladas, cada una a medio paso de la de abajo.',
+    fields: ['x', 'y', 'z', 'len', 'w', 'rise', 'th', 'axis', 'seg'],
+    def: { x: 1, y: 1, z: 0, len: 0.26, w: 0.22, rise: 0.03, th: 0.02, axis: 'x', seg: 8, m: 'stone' },
+    build(out, p, c) {
+      place(out, escamaMesh(p, matColor(p, c), matOpts(p)), p);
     },
   },
 
@@ -811,7 +859,7 @@ export const PART_KEYS = Object.keys(PARTS);
  */
 const BASICAS = new Set([
   'box', 'brick', 'wedge', 'cyl', 'pipe', 'dome', 'gable', 'hip', 'vault',
-  'panel', 'teja', 'beam', 'arch', 'wheel', 'ring', 'barrel',
+  'panel', 'teja', 'escama', 'beam', 'arch', 'wheel', 'ring', 'barrel',
 ]);
 
 /** ¿Es una pieza de un solo cuerpo? */

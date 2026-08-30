@@ -571,7 +571,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
  * y bajar uno encima de otro, que es como se apunta con el pulgar sin mirar.
  */
 .studio-cross, .studio-lift, .studio-turn, .studio-scale, .studio-pad-acts,
-.studio-hist, .studio-make, .studio-look, .studio-guia {
+.studio-hist, .studio-make, .studio-look, .studio-guia, .studio-talla {
   display: grid; gap: 1px;
   background: #ded2b8;
   border-radius: 14px; overflow: hidden;
@@ -586,16 +586,20 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   top: 22px; bottom: auto;
   border-top: 0; border-bottom: 1px solid var(--borde);
 }
-/* Cuatro grupos de una columna, con el ancho justo para que sus botones midan
+/* Cinco grupos de una columna, con el ancho justo para que sus botones midan
    lo mismo que los de abajo: allí ocho columnas se reparten el hueco menos los
-   tres huecos entre grupos, y aquí cuatro columnas han de medir eso mismo, más
-   los tres huecos que les quedan. Sale la misma cuenta y el mismo botón. */
+   tres huecos entre grupos, y aquí cinco columnas han de medir eso mismo, más
+   los cuatro huecos que les quedan. Sale la misma cuenta y el mismo botón. */
 .studio-pad-top .studio-pad-grid {
   flex: none;
-  width: calc((min(100%, 520px) - 30px) / 2 + 30px);
-  grid-template-columns: repeat(4, 1fr);
+  width: calc((min(100%, 520px) - 30px) * 5 / 8 + 40px);
+  grid-template-columns: repeat(5, 1fr);
 }
-.studio-hist, .studio-make, .studio-look, .studio-guia { grid-template-columns: 1fr; }
+.studio-hist, .studio-make, .studio-look, .studio-guia,
+.studio-talla { grid-template-columns: 1fr; }
+/* El tamaño de partida va solo en su grupo y se lleva las dos filas: es de las
+   piezas que vendrán, no de la que hay elegida. */
+.studio-pad .studio-talla button { height: 100%; }
 /* Los menús de estas barras cuelgan de la propia barra —los grupos recortan lo
    que se sale de sus esquinas— y se colocan a mano bajo su botón. */
 .studio-pad > .studio-pop { max-width: min(300px, 78vw); }
