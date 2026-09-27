@@ -466,7 +466,7 @@ export class Renderer {
       if (!b.built) {
         ctx.fillStyle = 'rgba(0,0,0,.55)';
         ctx.fillRect(cx - 20, topY + 7, 40, 4);
-        ctx.fillStyle = '#e6c86a';
+        ctx.fillStyle = '#0a84ff'; // la obra, en el azul de iOS
         ctx.fillRect(cx - 20, topY + 7, 40 * b.progress, 4);
       }
     }
@@ -477,7 +477,7 @@ export class Renderer {
       const topY = cy - (b.size * TILE_H) / 2 - 34;
       ctx.fillStyle = 'rgba(0,0,0,.5)';
       ctx.fillRect(cx - 18, topY, 36, 3);
-      ctx.fillStyle = item.blocked ? '#d2453c' : '#6fd06f';
+      ctx.fillStyle = item.blocked ? '#ff3b30' : '#34c759';
       ctx.fillRect(cx - 18, topY, 36 * (item.progress / item.time), 3);
     }
   }
@@ -520,7 +520,8 @@ export class Renderer {
     frac = clamp(frac, 0, 1);
     ctx.fillStyle = 'rgba(0,0,0,.65)';
     ctx.fillRect(x - w / 2 - 1, y - 1, w + 2, 8);
-    ctx.fillStyle = frac > 0.6 ? '#4fbf4f' : frac > 0.3 ? '#e0b52c' : '#d2453c';
+    // Verde, amarillo y rojo del sistema de iOS.
+    ctx.fillStyle = frac > 0.6 ? '#34c759' : frac > 0.3 ? '#ffcc00' : '#ff3b30';
     ctx.fillRect(x - w / 2, y, w * frac, 4);
     const p = this.game.players[owner];
     if (p) {

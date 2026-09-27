@@ -236,13 +236,15 @@ Para depurar, el objeto de la partida está disponible en la consola como
 
 ## Notas técnicas
 
-- La interfaz va en **claro**: papel de fondo, tinta para las letras y el
-  dorado de siempre para lo que manda. Los tonos que se repiten están en las
-  fichas de `:root` (`--papel`, `--tinta`, `--tinta-2`, `--tinta-3`, `--borde`,
-  `--gold`, `--gold-l`), así que se repinta todo desde ahí. Cada letra llega a
-  4,5:1 contra su fondo y el borde de los controles a 3:1, que es lo que hace
-  falta para que un tema claro se lea. El arte del juego —el mapa y los
-  sprites— no es interfaz y no cambia.
+- La interfaz usa los **colores de iOS**: blanco y el gris agrupado
+  (`#f2f2f7`) de fondo, negro y los grises del sistema para las letras, rayas
+  finas de separación y el azul del sistema (`#007aff`) para lo que se pulsa o
+  está elegido, con el verde, el rojo y el naranja de iOS para lo bueno, lo
+  malo y los avisos, y la letra del sistema. Están en las fichas de `:root`
+  (`--papel`, `--fondo`, `--tinta`, `--tinta-2`, `--tinta-3`, `--raya`,
+  `--relleno`, `--acento`…), así que se repinta todo desde ahí. El arte del
+  juego —el mapa, los sprites, y los colores de cada recurso y de cada
+  jugador— no es interfaz y no cambia.
 - `theme-color` en blanco tiñe las barras del navegador y, con ellas, la franja
   del reloj y la batería del teléfono. Es sólo el tinte del navegador: no toca
   la pantalla completa ni las zonas seguras, que tienen su propia historia en

@@ -483,7 +483,7 @@ const iconCache = new Map();
 function techGlyph(ctx, sym) {
   ctx.save();
   ctx.translate(28, 28);
-  ctx.strokeStyle = '#2e2413';
+  ctx.strokeStyle = '#1c1c1e';
   ctx.lineWidth = 2.2;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
@@ -552,8 +552,8 @@ function techGlyph(ctx, sym) {
       ctx.fillRect(-4, 6, 8, 10);
       break;
     default: { // números romanos de la edad
-      ctx.fillStyle = '#3a2c14';
-      ctx.font = 'bold 26px Georgia, serif';
+      ctx.fillStyle = '#fff';
+      ctx.font = '700 26px -apple-system, system-ui, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(sym, 0, 2);
     }
@@ -627,14 +627,13 @@ export function iconFor(kind, type, colorIdx = 0) {
     ctx.drawImage(s.canvas, b.x, b.y, b.w, b.h,
       28 - (b.w * sc) / 2, 54 - b.h * sc, b.w * sc, b.h * sc);
   } else if (kind === 'tech') {
-    const grad = ctx.createLinearGradient(0, 0, 0, 56);
-    grad.addColorStop(0, '#e2d3a6'); grad.addColorStop(1, '#bda87a');
+    // Insignia de iOS: cuadrado redondeado con el degradado del azul del sistema.
+    const grad = ctx.createLinearGradient(0, 4, 0, 52);
+    grad.addColorStop(0, '#5ac8fa'); grad.addColorStop(1, '#007aff');
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.moveTo(6, 4); ctx.lineTo(50, 4); ctx.lineTo(50, 40);
-    ctx.quadraticCurveTo(28, 56, 6, 40);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = '#7a5f36'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.roundRect(4, 4, 48, 48, 12);
+    ctx.fill();
     techGlyph(ctx, TECH_SYMBOLS[type] || (type || '?').slice(0, 1).toUpperCase());
   } else if (kind === 'res') {
     const cols = { food: ['#ff8b76', '#b8332a'], wood: ['#b98a4d', '#6b4a24'], gold: ['#ffe58a', '#c9971a'], stone: ['#dcdcd6', '#85857e'] }[type] || ['#aaa', '#666'];
