@@ -232,6 +232,16 @@ button:active { filter: brightness(.88); }
 .cat-modelo .hoja-boton { margin: 0; }
 .cat-modelo-nota { margin: 0; font-size: 14px; line-height: 1.4; color: #3a3a3c; }
 .cat-modelo-aviso { margin: 0; font-size: 13px; line-height: 1.35; color: #8a8a8e; }
+.cat-poses { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.cat-poses li {
+  display: grid; grid-template-columns: 84px 1fr; gap: 10px; align-items: baseline;
+  padding: 9px 0; border-top: .5px solid var(--raya);
+  font-size: 14px; line-height: 1.35; color: #3a3a3c;
+}
+.cat-poses code {
+  font: 600 13px ui-monospace, Menlo, monospace; color: #000;
+  background: #f2f2f7; border-radius: 6px; padding: 2px 6px; justify-self: start;
+}
 
 .cat-field {
   position: relative;

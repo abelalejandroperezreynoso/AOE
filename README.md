@@ -155,6 +155,13 @@ sale con su color liso. **Z arriba / Y arriba** elige qué eje del modelo es la
 vertical (Z en 3ds Max y Blender; con el otro sale tumbado) y **Girar 90°**
 lo orienta.
 
+Debajo, **Poses que hay que modelar** lista lo que pide cada elemento, con el
+nombre de cada pose y su postura: una unidad, la quieta y tantas de andar y de
+golpe como fotogramas usa hoy su animación (el aldeano y la milicia, 4 y 2; el
+explorador, 6 de trote y 2); un edificio o un recurso, un solo modelo. Todas
+mirando hacia el mismo lado y con los pies en el mismo punto: el juego gira
+cada una para sacar las direcciones. Por ahora sólo se importa la quieta.
+
 Lo importado se ve al momento en el catálogo y en las partidas de esa sesión,
 sólo en ese aparato; al recargar vuelve lo de siempre. Para que quede en el
 juego de todos, **Descargar paquete** guarda un `.zip` con el modelo y los

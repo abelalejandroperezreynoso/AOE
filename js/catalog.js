@@ -6,7 +6,7 @@ import {
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
   drawSprite, prepareSprites, unitAnim, terrainHasBitmap, terrainSprite,
-  sustituirSprites, quitarSustitucion, alturaDeUnidad,
+  sustituirSprites, quitarSustitucion, alturaDeUnidad, animDelIndice,
 } from './sprites.js';
 import { reunirArchivos, leerModelo, spritesDeModelo, escribirZip, RES_MODELO } from './modelo3d.js';
 import {
@@ -345,6 +345,7 @@ export class Catalog {
       sub.textContent = `Da ${RES_NAME[def.res]}. ${def.blocking ? 'Bloquea el paso.' : 'No bloquea el paso.'}`;
       box.appendChild(this.lupaFija(resourceSprite(key, 0), key));
       box.appendChild(this.seccionModelo('node', key));
+      box.appendChild(this.listaPoses('node', key, def));
       box.appendChild(this.nodeForm(key, def));
     } else {
       const def = this.tab === 'unit' ? UNITS[key] : BUILDINGS[key];
@@ -356,6 +357,7 @@ export class Catalog {
       if (this.tab === 'unit') box.appendChild(this.animations(key, def));
       else box.appendChild(this.lupaFija(buildingSprite(key, 0, 2), key));
       box.appendChild(this.seccionModelo(this.tab, key));
+      box.appendChild(this.listaPoses(this.tab, key, def));
       box.appendChild(this.form(this.tab, key, def));
     }
     // Las cifras de las unidades sólo se miran: no hay nada que restablecer.
@@ -572,6 +574,78 @@ export class Catalog {
       filas.push(bajar, quitar);
     }
     const sec = this.group('Modelo 3D', filas);
+    sec.classList.add('cat-modelo');
+    return sec;
+  }
+
+  /**
+   * Las poses que hay que modelar para sustituir a este elemento, con el
+   * nombre que lleva cada una (el del archivo, `andar-1.obj`, o el del grupo
+   * dentro de un solo .obj) y qué postura es. Una unidad tiene tantas como
+   * fotogramas usa hoy su animación; un edificio o un recurso, una sola.
+   */
+  posesDe(tipo, key, def) {
+    if (tipo === 'building') {
+      return [['edificio', 'Terminado y entero. Los cimientos y la obra salen solos, cortándolo a distintas alturas.']];
+    }
+    if (tipo === 'node') {
+      return [['recurso', 'Entero, sin agotar. Las cuatro variantes del mapa salen solas, girándolo.']];
+    }
+    const n = animDelIndice(key) || { andar: 4, golpe: 2 };
+    const poses = [['quieto', 'De pie, en reposo. Es la pose de referencia: de ella salen la escala y el punto de los pies.']];
+    const PASO = [
+      'Pierna derecha delante, apoyando el talón; brazo izquierdo adelantado.',
+      'La derecha carga el peso y la izquierda pasa por debajo del cuerpo.',
+      'Pierna izquierda delante, apoyando el talón; brazo derecho adelantado.',
+      'La izquierda carga el peso y la derecha pasa por debajo del cuerpo.',
+    ];
+    // El trote va en pares diagonales: mano derecha con pie izquierdo, y al
+    // revés, con un instante en el aire entre medias.
+    const TROTE = [
+      'Apoyan la mano derecha y el pie izquierdo; las otras dos patas, recogidas y yendo hacia delante.',
+      'Esas dos empujan hacia atrás y las otras dos bajan a buscar el suelo.',
+      'En el aire: las cuatro patas recogidas bajo el cuerpo.',
+      'Apoyan la mano izquierda y el pie derecho; las otras dos, recogidas y yendo hacia delante.',
+      'Esas dos empujan hacia atrás y las otras dos bajan a buscar el suelo.',
+      'En el aire otra vez, antes de volver a la 1.',
+    ];
+    const ciclo = def.class === 'cavalry' ? 'trote' : 'paso';
+    for (let i = 1; i <= n.andar; i++) {
+      const texto = n.andar === 4 && ciclo === 'paso' ? PASO[i - 1]
+        : n.andar === 6 && ciclo === 'trote' ? TROTE[i - 1]
+        : `Fase ${i} de ${n.andar} del ${ciclo}${ciclo === 'trote' ? ', con las patas en pares diagonales' : ''}; la ${n.andar} enlaza otra vez con la 1.`;
+      poses.push([`andar-${i}`, texto]);
+    }
+    const trabaja = key === 'villager';
+    const GOLPE = trabaja
+      ? ['Trabajando: la herramienta arriba, a punto de bajar.', 'La herramienta abajo, en el momento del golpe.']
+      : ['Atacando: el arma atrás o arriba, preparando el golpe.', 'El arma al final del golpe, con el brazo estirado.'];
+    for (let i = 1; i <= n.golpe; i++) poses.push([`golpe-${i}`, GOLPE[i - 1] || `Fase ${i} de ${n.golpe} del golpe.`]);
+    return poses;
+  }
+
+  listaPoses(tipo, key, def) {
+    const poses = this.posesDe(tipo, key, def);
+    const filas = [];
+    const nota = document.createElement('p');
+    nota.className = 'cat-modelo-nota';
+    nota.textContent = poses.length > 1
+      ? `${poses.length} poses, todas mirando hacia el mismo lado y con los pies en el mismo punto: el juego gira cada una para sacar todas las direcciones. Por ahora se importa una sola pose, la quieta; las demás entrarán cuando lo haga la importación por poses.`
+      : 'Un solo modelo.';
+    filas.push(nota);
+    const lista = document.createElement('ol');
+    lista.className = 'cat-poses';
+    for (const [nombre, texto] of poses) {
+      const li = document.createElement('li');
+      const n = document.createElement('code');
+      n.textContent = nombre;
+      const t = document.createElement('span');
+      t.textContent = texto;
+      li.append(n, t);
+      lista.appendChild(li);
+    }
+    filas.push(lista);
+    const sec = this.group(poses.length > 1 ? 'Poses que hay que modelar' : 'Qué hay que modelar', filas);
     sec.classList.add('cat-modelo');
     return sec;
   }
