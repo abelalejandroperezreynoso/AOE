@@ -215,6 +215,7 @@ js/sprites.js       Sprites: carga de los atlas, terreno a mano e iconos
 assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
 tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
 tools/importar-edificio.mjs  Mete en los atlas el dibujo de un edificio terminado
+tools/importar-direcciones.mjs  Añade a una unidad las posturas de otras orientaciones
 tools/importar-terreno.mjs  Mete en los atlas losetas de terreno dibujadas
 tools/importar-arbol.mjs  Mete en los atlas el dibujo del árbol
 tools/dibujar-jinete.html  Dibuja por código al explorador (caballo y jinete)
@@ -282,6 +283,13 @@ Para depurar, el objeto de la partida está disponible en la consola como
   `assets/fuentes/aldeano-andar.png`, con `--quieto 4 --andar 0,1,2,3,4`: el
   sexto fotograma de esa hoja es casi igual que el primero (difieren en un
   11 %) y, dejándolo, el aldeano se paraba un instante en cada zancada.
+- Las demás orientaciones del aldeano (↓, →, ↗ y ↑; las de la izquierda,
+  volteadas) vienen de una rosa de 3×3 con una postura por dirección,
+  `assets/fuentes/aldeano-direcciones.jpg`, con `tools/importar-direcciones.mjs`.
+  Separa cada figura del fondo y de su halo de JPG, la ancla en su sombra, la
+  iguala a la altura de referencia y pinta el azul del uniforme con el color
+  del jugador (`villager-dir-<color>.png`). Como es una sola postura, al andar
+  alterna con ella misma un píxel más arriba; ↘ conserva su ciclo completo.
 - Un edificio dibujado entra con `tools/importar-edificio.mjs <tipo>
   <dibujo.png>`: busca la base (desde la esquina de abajo el contorno sube en
   pendiente 2:1 hasta donde las paredes se vuelven verticales), la escala a la
