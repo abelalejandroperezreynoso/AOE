@@ -348,6 +348,28 @@ export class Catalog {
     const centro = rosa.querySelector('.centro');
     card.appendChild(rosa);
 
+    // Velocidad, para estudiar la animación a cámara lenta. Se recuerda al
+    // pasar de una unidad a otra, pero no se guarda: la partida no la usa.
+    if (!this.animSpeed) this.animSpeed = 1;
+    const vel = document.createElement('label');
+    vel.className = 'cat-anim-vel';
+    const velTxt = document.createElement('span');
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = '0.05'; slider.max = '1'; slider.step = '0.05';
+    slider.value = String(this.animSpeed);
+    slider.setAttribute('aria-label', 'Velocidad de la animación');
+    const velFps = document.createElement('span');
+    velFps.className = 'cat-anim-fps';
+    const pintaVel = () => {
+      velTxt.textContent = `Velocidad ${Math.round(this.animSpeed * 100)} %`;
+      const fps = modo.fps * this.animSpeed;
+      velFps.textContent = modo.frames.length > 1 ? `${fps < 1 ? fps.toFixed(1) : Math.round(fps * 10) / 10} fotogramas/s` : '';
+    };
+    slider.oninput = () => { this.animSpeed = Number(slider.value); pintaVel(); };
+    vel.append(velTxt, slider, velFps);
+    card.appendChild(vel);
+
     const h = document.createElement('p');
     h.className = 'cat-anim-nota';
     card.appendChild(h);
@@ -421,6 +443,8 @@ export class Catalog {
         return box;
       });
       last = -1;
+      fase = 0;
+      pintaVel();
     };
     for (const m of modos) {
       const b = document.createElement('button');
@@ -431,10 +455,14 @@ export class Catalog {
     }
 
     let last = -1;
-    const t0 = performance.now();
+    // La fase avanza con el tiempo por la velocidad elegida: así, al mover el
+    // deslizador, la animación sigue desde donde estaba en vez de saltar.
+    let fase = 0, antes = performance.now();
     const tick = (now) => {
       this.animRaf = requestAnimationFrame(tick);
-      const i = Math.floor(((now - t0) / 1000) * modo.fps) % modo.frames.length;
+      fase += ((now - antes) / 1000) * modo.fps * this.animSpeed;
+      antes = now;
+      const i = Math.floor(fase) % modo.frames.length;
       if (i === last) return;
       last = i;
       for (const { face, canvas } of celdas) pinta(canvas, face, modo.frames[i]);

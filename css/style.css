@@ -364,6 +364,14 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   font-size: 13px; color: #8a8a8e;
 }
 .cat-anim-celda.centro { background: none; font-size: 15px; font-weight: 600; color: #3c3c43; }
+.cat-anim-vel {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 12px;
+  margin: 14px 4px 0;
+  font-size: 15px; color: #000;
+}
+.cat-anim-vel input { width: 100%; accent-color: var(--gold); }
+.cat-anim-fps { grid-column: 1 / -1; font-size: 13px; color: #8a8a8e; }
+.cat-anim-fps:empty { display: none; }
 .cat-anim-nota { margin: 14px 4px 8px; font-size: 13px; color: #8a8a8e; }
 .cat-anim-tira { display: flex; flex-wrap: wrap; gap: 6px; }
 .cat-anim-foto {
