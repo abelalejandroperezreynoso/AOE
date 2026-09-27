@@ -215,6 +215,8 @@ js/sprites.js       Sprites: carga de los atlas, terreno a mano e iconos
 assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
 tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
 tools/importar-edificio.mjs  Mete en los atlas el dibujo de un edificio terminado
+tools/dibujar-jinete.html  Dibuja por código al explorador (caballo y jinete)
+tools/dibujar-jinete.mjs   Escribe sus hojas de sprites
 assets/fuentes/     Las hojas dibujadas tal como llegaron, para reimportarlas
 tools/icon.html     Dibujo del icono de la aplicación: el castillo al atardecer
 tools/make-icons.mjs  Saca de él los PNG de icons/ (necesita Playwright)
@@ -287,6 +289,14 @@ Para depurar, el objeto de la partida está disponible en la consola como
   los cimientos y la obra siguen con los de antes. Las barras de vida y de
   producción se colocan encima de lo más alto de cada dibujo. Así entró el
   centro urbano, desde `assets/fuentes/centro-urbano.png`.
+- El explorador está dibujado por código (`tools/dibujar-jinete.html`): caballo
+  y jinete son piezas simples (elipsoides, cápsulas y cajas) con un esqueleto
+  que anima el trote en pares diagonales y el golpe de espada. Se ven con la
+  cámara isométrica del juego, lanzando un rayo por píxel, y se pasan a pixel
+  art con tres tonos de luz, contorno oscuro, la sombra proyectada en el suelo
+  y el camuflaje del color de cada jugador. Salen las cinco orientaciones con
+  nueve fotogramas: seis de trote, dos de golpe y uno parado. Se regeneran con
+  `node tools/dibujar-jinete.mjs`.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
 - En multijugador el anfitrión manda hasta diez instantáneas por segundo en

@@ -36,7 +36,8 @@ Los mensajes de commit van en español, y dicen qué se ha comprobado.
   edificio y los ocho colores. Los fotogramas de cada unidad los dice `anim`
   en el índice (por defecto, cuatro de andar y dos de golpe). Una hoja
   dibujada entra con `tools/importar-unidad.mjs`, y un edificio con
-  `tools/importar-edificio.mjs`; el original se guarda en `assets/fuentes/`. El terreno, los iconos de
+  `tools/importar-edificio.mjs`; el original se guarda en `assets/fuentes/`.
+  El explorador se dibuja por código con `tools/dibujar-jinete.mjs`. El terreno, los iconos de
   tecnologías y el sonido siguen generándose por código.
 - Los modelos 3D por código y el taller de edificios se retiraron para no
   volver, y se borraron también del historial: no hay commit del que

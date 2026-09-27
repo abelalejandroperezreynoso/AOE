@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Jinete por código — Age of Realms II</title>
+<style>
+  body { margin: 0; padding: 16px; background: #5b8b3a; font: 14px system-ui, sans-serif; color: #fff; }
+  canvas { image-rendering: pixelated; display: block; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<!-- Dibuja por código al explorador: caballo y jinete hechos de piezas simples
+     (elipsoides, cápsulas y cajas) con su esqueleto, vistos con la cámara
+     isométrica del juego y pasados a pixel art: tres tonos de luz, contorno
+     oscuro, sombra en el suelo y el camuflaje del color de cada jugador.
+     Abierto a mano enseña la hoja del primer color; tools/dibujar-jinete.mjs
+     la usa para escribir las hojas de assets/sprites/. -->
+<canvas id="vista"></canvas>
+<script type="module">
+import { PLAYER_COLORS } from '../js/config.js';
+
+// --- Cámara ------------------------------------------------------------------
+// La del juego: rombos de suelo 2:1, es decir, 30° de elevación mirando en
+// diagonal. `L` son los píxeles de hoja por metro, elegidos para que el jinete
+// mida de los cascos al casco lo que el explorador de antes (97 px).
+const L = 44;
+const S30 = Math.sin(Math.PI / 6), C30 = Math.cos(Math.PI / 6), R2 = Math.SQRT2;
+const RAYO = [-C30 / R2, -C30 / R2, -S30]; // hacia dónde mira la cámara (u, v, z)
+// Luz de sombreado: de arriba, a la izquierda de la pantalla y algo de frente.
+const LUZ = norma([-0.6 / R2 + 0.35 / R2, 0.6 / R2 + 0.35 / R2, 0.9]);
+// Luz de la sombra en el suelo: de arriba a la izquierda y de detrás, para que
+// la sombra caiga abajo a la derecha, como en el resto de sprites.
+const LUZ_SOMBRA = norma([-0.18, 0.3, 1.7]);
+
+function norma(v) { const l = Math.hypot(...v); return v.map((x) => x / l); }
+const punto = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const resta = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const suma = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+const por = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+
+// --- Piezas ------------------------------------------------------------------
+// Todas en coordenadas del modelo: x hacia delante, y a la izquierda, z arriba,
+// en metros, con el origen en el suelo bajo el centro del caballo.
+function elipsoide(c, r, mat, extra = {}) { return { tipo: 'e', c, r, mat, ...extra }; }
+function capsula(a, b, r, mat, extra = {}) { return { tipo: 'c', a, b, r, mat, ...extra }; }
+
+function choca(p, o, d) {
+  if (p.tipo === 'e') {
+    const oc = [(o[0] - p.c[0]) / p.r[0], (o[1] - p.c[1]) / p.r[1], (o[2] - p.c[2]) / p.r[2]];
+    const dd = [d[0] / p.r[0], d[1] / p.r[1], d[2] / p.r[2]];
+    const A = punto(dd, dd), B = 2 * punto(oc, dd), C = punto(oc, oc) - 1;
+    const D = B * B - 4 * A * C;
+    if (D < 0) return null;
+    const t = (-B - Math.sqrt(D)) / (2 * A);
+    if (t < 0) return null;
+    const q = suma(o, por(d, t));
+    const n = norma([(q[0] - p.c[0]) / (p.r[0] ** 2), (q[1] - p.c[1]) / (p.r[1] ** 2), (q[2] - p.c[2]) / (p.r[2] ** 2)]);
+    return { t, q, n };
+  }
+  // Cápsula: el cilindro entre a y b más dos semiesferas.
+  const ba = resta(p.b, p.a), oa = resta(o, p.a);
+  const baba = punto(ba, ba), bard = punto(ba, d), baoa = punto(ba, oa), rdoa = punto(d, oa), oaoa = punto(oa, oa);
+  const a = baba - bard * bard, b = baba * rdoa - baoa * bard, c = baba * oaoa - baoa * baoa - p.r * p.r * baba;
+  let t = null;
+  const h = b * b - a * c;
+  if (h >= 0 && a > 1e-9) {
+    const tc = (-b - Math.sqrt(h)) / a;
+    const y = baoa + tc * bard;
+    if (y > 0 && y < baba && tc > 0) t = tc;
+  }
+  if (t === null) {
+    for (const cap of [p.a, p.b]) {
+      const oc = resta(o, cap);
+      const bb = punto(oc, d), cc = punto(oc, oc) - p.r * p.r, hh = bb * bb - cc;
+      if (hh > 0) { const tt = -bb - Math.sqrt(hh); if (tt > 0 && (t === null || tt < t)) t = tt; }
+    }
+  }
+  if (t === null) return null;
+  const q = suma(o, por(d, t));
+  const k = Math.max(0, Math.min(1, punto(resta(q, p.a), ba) / baba));
+  const n = norma(resta(q, suma(p.a, por(ba, k))));
+  return { t, q, n };
+}
+
+// --- El explorador -----------------------------------------------------------
+
+const MAT = {
+  caballo: ['#a19d96', '#7b7771', '#57544f', '#3f3d3a'],
+  crin: ['#4a4643', '#34312e', '#252321', '#1a1817'],
+  casco: ['#3a3430', '#2a2522', '#1d1917', '#141110'],
+  cuero: ['#945f33', '#6d4526', '#4b2f19', '#352112'],
+  chaleco: ['#86633c', '#654a2d', '#48341f', '#332416'],
+  piel: ['#f2c49b', '#d6a078', '#b27d57', '#8e5f40'],
+  metal: ['#f2f4f7', '#c3c7ce', '#8a8f98', '#62666e'],
+  bota: ['#3d3128', '#2c231c', '#1e1813', '#14100c'],
+};
+
+/**
+ * Piezas de un fotograma. `trote` va de 0 a 1 por el ciclo (null, parado) y
+ * `golpe` es 0 (espada arriba) o 1 (espada abajo) al atacar.
+ */
+function modelo(trote, golpe) {
+  const P = [];
+  const fase = trote ?? 0;
+  const anda = trote !== null;
+  const bote = anda ? -0.05 * Math.abs(Math.sin(fase * Math.PI * 2)) : 0;
+  const zc = 1.25 + bote;
+
+  // Patas: cadera, rodilla y casco. Al trote van en pares diagonales.
+  const pata = (x, y, desfase) => {
+    const ang = anda ? Math.sin((fase + desfase) * Math.PI * 2) * 0.5 : 0;
+    const alza = anda ? Math.max(0, Math.cos((fase + desfase) * Math.PI * 2)) : 0;
+    const cadera = [x, y, zc - 0.05];
+    const rodilla = [x + Math.sin(ang) * 0.42, y, zc - 0.05 - Math.cos(ang) * 0.42 + alza * 0.06];
+    const doblez = ang - alza * 0.9 * (x > 0 ? 1 : -0.6);
+    const casco = [rodilla[0] + Math.sin(doblez) * 0.5, y, Math.max(0.06, rodilla[2] - Math.cos(doblez) * 0.5)];
+    P.push(capsula(cadera, rodilla, 0.105, 'caballo'));
+    P.push(capsula(rodilla, casco, 0.07, 'caballo'));
+    P.push(capsula(casco, [casco[0] + 0.03, y, casco[2] - 0.04], 0.08, 'casco'));
+  };
+  pata(0.55, 0.19, 0); pata(0.55, -0.19, 0.5);
+  pata(-0.5, 0.19, 0.5); pata(-0.5, -0.19, 0);
+
+  // Cuerpo: tronco, pecho y grupa. La manta del color del jugador y la silla
+  // se sacan del propio tronco según dónde caiga el punto.
+  const lomo = (q) => (Math.abs(q[0] + 0.05) < 0.3 && q[2] > zc - 0.2 ? (q[2] > zc + 0.28 && Math.abs(q[0] + 0.03) < 0.19 ? 'cuero' : 'camo') : 'caballo');
+  P.push(elipsoide([0, 0, zc], [0.74, 0.34, 0.36], lomo));
+  P.push(elipsoide([0.46, 0, zc + 0.02], [0.37, 0.33, 0.38], 'caballo'));
+  P.push(elipsoide([-0.48, 0, zc + 0.03], [0.39, 0.34, 0.37], lomo));
+  // Cuello, cabeza, orejas, crin y cola.
+  P.push(capsula([0.62, 0, zc + 0.18], [0.92, 0, zc + 0.68], 0.18, 'caballo'));
+  P.push(capsula([0.94, 0, zc + 0.74], [1.26, 0, zc + 0.46], 0.125, 'caballo'));
+  P.push(capsula([0.9, 0.06, zc + 0.8], [0.88, 0.07, zc + 0.9], 0.03, 'caballo'));
+  P.push(capsula([0.9, -0.06, zc + 0.8], [0.88, -0.07, zc + 0.9], 0.03, 'caballo'));
+  P.push(capsula([0.56, 0, zc + 0.36], [0.86, 0, zc + 0.84], 0.075, 'crin'));
+  const cola = anda ? Math.sin(fase * Math.PI * 4) * 0.05 : 0;
+  P.push(capsula([-0.82, 0, zc + 0.12], [-1.02, cola, zc - 0.45], 0.07, 'crin'));
+
+  // Jinete: piernas a los lados, tronco con chaleco, cabeza, casco y brazos.
+  const zj = zc + 0.36;
+  for (const s of [1, -1]) {
+    P.push(capsula([-0.05, 0.14 * s, zj], [0.2, 0.32 * s, zj - 0.25], 0.075, 'camo'));
+    P.push(capsula([0.2, 0.32 * s, zj - 0.25], [0.12, 0.33 * s, zj - 0.62], 0.065, 'camo'));
+    P.push(capsula([0.12, 0.33 * s, zj - 0.62], [0.22, 0.33 * s, zj - 0.66], 0.06, 'bota'));
+  }
+  const pecho = (q) => (q[2] > zj + 0.14 && q[2] < zj + 0.5 ? 'chaleco' : 'camo');
+  P.push(capsula([-0.07, 0, zj + 0.06], [-0.03, 0, zj + 0.52], 0.17, pecho));
+  P.push(elipsoide([0.0, 0, zj + 0.74], [0.11, 0.11, 0.12], 'piel'));
+  P.push(elipsoide([-0.01, 0, zj + 0.79], [0.15, 0.15, 0.11], 'camo', { deja: (q) => q[2] > zj + 0.76 }));
+  const hombro = (s) => [0.0, 0.2 * s, zj + 0.47];
+  const brazo = (s, codo, mano) => {
+    P.push(capsula(hombro(s), codo, 0.06, 'camo'));
+    P.push(capsula(codo, mano, 0.05, 'camo'));
+    P.push(elipsoide(mano, [0.05, 0.05, 0.05], 'piel'));
+  };
+  const boca = [1.26, 0, zc + 0.44];
+  // Izquierdo, siempre a las riendas.
+  const manoI = [0.4, 0.13, zj + 0.18];
+  brazo(1, [0.18, 0.26, zj + 0.25], manoI);
+  P.push(capsula(manoI, boca, 0.012, 'cuero'));
+  // Derecho: a las riendas o con la espada.
+  if (golpe === null) {
+    const manoD = [0.4, -0.13, zj + 0.18];
+    brazo(-1, [0.18, -0.26, zj + 0.25], manoD);
+    P.push(capsula(manoD, boca, 0.012, 'cuero'));
+  } else if (golpe === 0) {
+    const mano = [-0.12, -0.3, zj + 0.95];
+    brazo(-1, [-0.06, -0.3, zj + 0.72], mano);
+    P.push(capsula(mano, [-0.42, -0.34, zj + 1.5], 0.025, 'metal'));
+  } else {
+    const mano = [0.5, -0.36, zj + 0.3];
+    brazo(-1, [0.28, -0.33, zj + 0.42], mano);
+    P.push(capsula(mano, [1.12, -0.44, zj - 0.05], 0.025, 'metal'));
+  }
+  return P;
+}
+
+// --- Pixel art ---------------------------------------------------------------
+
+const ANCHO = 190, ALTO = 180, AX = 95, AY = 140; // lienzo de trabajo y dónde caen los pies
+
+/** Proyección del modelo a la pantalla, con el caballo mirando a `ang`. */
+function dibuja(piezas, ang, colorJugador) {
+  const h = [Math.cos(ang), Math.sin(ang), 0], izq = [-Math.sin(ang), Math.cos(ang), 0];
+  const aLocal = (w) => [punto(w, h), punto(w, izq), w[2]];
+  const dL = aLocal(RAYO), luz = aLocal(LUZ), luzS = aLocal(LUZ_SOMBRA);
+  const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  const camo = [colorJugador.light, colorJugador.main, colorJugador.dark,
+    '#' + hex(colorJugador.dark).map((v) => Math.round(v * 0.62).toString(16).padStart(2, '0')).join('')];
+
+  const N = ANCHO * ALTO;
+  const col = new Array(N).fill(null), prof = new Float32Array(N).fill(Infinity), pieza = new Int16Array(N).fill(-1);
+  const sombra = new Uint8Array(N);
+  for (let py = 0; py < ALTO; py++) {
+    for (let px = 0; px < ANCHO; px++) {
+      // Punto del suelo que cae en este píxel, y el rayo que pasa por él.
+      const sx = px + 0.5 - AX, sy = py + 0.5 - AY;
+      const uv = [(sx * R2 / L + (2 * R2 * sy) / L) / 2, ((2 * R2 * sy) / L - sx * R2 / L) / 2];
+      const suelo = aLocal([uv[0], uv[1], 0]);
+      const o = suma(suelo, por(dL, -12));
+      let mejor = null, cual = -1;
+      piezas.forEach((p, i) => {
+        const g = choca(p, o, dL);
+        if (!g || (p.deja && !p.deja(g.q))) return;
+        if (!mejor || g.t < mejor.t) { mejor = g; cual = i; }
+      });
+      const k = py * ANCHO + px;
+      if (!mejor) {
+        // Suelo: ¿le tapa el sol alguna pieza?
+        if (piezas.some((p) => { const g = choca(p, suma(suelo, por(luzS, 0.001)), luzS); return g && (!p.deja || p.deja(g.q)); })) sombra[k] = 1;
+        continue;
+      }
+      const p = piezas[cual];
+      const mat = typeof p.mat === 'function' ? p.mat(mejor.q) : p.mat;
+      const lum = punto(mejor.n, luz);
+      let tono = lum > 0.62 ? 0 : lum > 0.18 ? 1 : 2;
+      if (mat === 'camo') {
+        // Manchas fijas al cuerpo: celdas de unos 6 cm, algo movidas para que
+        // no salgan cuadradas, con tres tonos.
+        const q = mejor.q, m = 16, w = 0.35 * Math.sin(q[2] * 23 + q[0] * 17);
+        const c = [Math.floor(q[0] * m + w), Math.floor(q[1] * m - w), Math.floor(q[2] * m + w * 0.7)];
+        const r = Math.abs(Math.sin(c[0] * 12.9898 + c[1] * 78.233 + c[2] * 37.719) * 43758.5453) % 1;
+        const base = r < 0.32 ? 0 : r < 0.76 ? 1 : 2;
+        col[k] = camo[Math.min(3, base + (tono === 2 ? 1 : 0))];
+      } else {
+        col[k] = MAT[mat][tono];
+      }
+      prof[k] = mejor.t; pieza[k] = cual;
+    }
+  }
+  // Contorno: por fuera de la figura, oscuro; por dentro, donde una pieza
+  // tapa a otra que queda bastante más atrás, el tono más oscuro de la de atrás.
+  const out = col.slice();
+  const vecinos = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  for (let py = 0; py < ALTO; py++) {
+    for (let px = 0; px < ANCHO; px++) {
+      const k = py * ANCHO + px;
+      for (const [dx, dy] of vecinos) {
+        const x = px + dx, y = py + dy;
+        if (x < 0 || y < 0 || x >= ANCHO || y >= ALTO) continue;
+        const j = y * ANCHO + x;
+        if (!col[k] && col[j]) { out[k] = '#1b1714'; break; }
+        if (col[k] && col[j] && pieza[j] !== pieza[k] && prof[k] - prof[j] > 0.16) { out[k] = '#2a2320'; break; }
+      }
+    }
+  }
+  return { out, sombra };
+}
+
+/** Fotograma recortado: lienzo, anclaje en píxeles de hoja. */
+function fotograma(piezas, ang, colorJugador) {
+  const { out, sombra } = dibuja(piezas, ang, colorJugador);
+  let x0 = ANCHO, y0 = ALTO, x1 = -1, y1 = -1;
+  for (let k = 0; k < out.length; k++) {
+    if (!out[k] && !sombra[k]) continue;
+    const x = k % ANCHO, y = Math.floor(k / ANCHO);
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  x0 -= 1; y0 -= 1; x1 += 1; y1 += 1;
+  const c = document.createElement('canvas');
+  c.width = x1 - x0 + 1; c.height = y1 - y0 + 1;
+  const ctx = c.getContext('2d');
+  for (let k = 0; k < out.length; k++) {
+    const x = k % ANCHO - x0, y = Math.floor(k / ANCHO) - y0;
+    if (sombra[k] && !out[k]) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x, y, 1, 1); }
+    if (out[k]) { ctx.fillStyle = out[k]; ctx.fillRect(x, y, 1, 1); }
+  }
+  return { canvas: c, ox: AX - x0, oy: AY - y0 };
+}
+
+// Fotogramas: 0-5 trote, 6-7 golpe, 8 parado. Orientaciones dibujadas: las
+// cinco del juego (las otras tres salen volteadas).
+const POSES = [0, 1, 2, 3, 4, 5].map((i) => [i / 6, null]).concat([[null, 0], [null, 1], [null, null]]);
+const CARAS = [0, 1, 5, 6, 7];
+
+function hoja(colorJugador) {
+  const fotos = [];
+  for (const cara of CARAS) {
+    for (const [trote, golpe] of POSES) fotos.push({ cara, ...fotograma(modelo(trote, golpe), (cara * Math.PI) / 4, colorJugador) });
+  }
+  // Una fila por orientación.
+  const alto = Math.max(...fotos.map((f) => f.canvas.height));
+  const anchoFila = (cara) => fotos.filter((f) => f.cara === cara).reduce((s, f) => s + f.canvas.width + 1, 0);
+  const c = document.createElement('canvas');
+  c.width = Math.max(...CARAS.map(anchoFila)); c.height = CARAS.length * (alto + 1);
+  const ctx = c.getContext('2d');
+  const sitios = [];
+  CARAS.forEach((cara, fila) => {
+    let x = 0;
+    fotos.filter((f) => f.cara === cara).forEach((f, i) => {
+      ctx.drawImage(f.canvas, x, fila * (alto + 1));
+      sitios.push({ cara, f: i, e: [x, fila * (alto + 1), f.canvas.width, f.canvas.height, f.ox, f.oy] });
+      x += f.canvas.width + 1;
+    });
+  });
+  return { canvas: c, sitios };
+}
+
+window.hojaJinete = (color) => { const h = hoja(PLAYER_COLORS[color]); return { url: h.canvas.toDataURL('image/png'), sitios: h.sitios }; };
+
+// A mano: la hoja del primer color, ampliada.
+const h = hoja(PLAYER_COLORS[0]);
+const v = document.getElementById('vista');
+v.width = h.canvas.width * 3; v.height = h.canvas.height * 3;
+const vx = v.getContext('2d');
+vx.imageSmoothingEnabled = false;
+vx.drawImage(h.canvas, 0, 0, v.width, v.height);
+window.__listo = true;
+</script>
+</body>
+</html>
