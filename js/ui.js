@@ -509,14 +509,25 @@ export class UI {
       }
       if (this.pending === 'attackmove') { this.issueAttackMove(x, y); return; }
       /*
-       * Con el dedo, el toque es sólo para la selección: coger algo, cambiar de
-       * unidad o soltar lo que hubiera. Todas las órdenes —moverse, recolectar,
-       * atacar, descargar, el punto de reunión— se dan manteniendo pulsado (ver
-       * `touchHold`), así que un toque no manda a nadie a ninguna parte por
-       * mucho que se falle el dedo.
+       * Con unidades propias seleccionadas, el toque da la orden: al suelo se
+       * mueven, a un enemigo lo atacan, a un recurso van a recolectar, y los
+       * aldeanos, además, van a trabajar a una obra o una granja, a descargar
+       * a un almacén o a por una oveja del rebaño (`canWorkOn`). Tocar otra
+       * cosa propia la selecciona en su lugar. La selección se suelta tocando
+       * su ficha de abajo. Con un edificio seleccionado el toque sigue siendo
+       * de selección: su punto de reunión va por la pulsación mantenida.
        */
-      if (this.game.selection.some((s) => s.owner === this.game.human.id)) {
-        this.orderHint(this.r.entityAtScreen(x, y));
+      const g = this.game;
+      const target = this.r.entityAtScreen(x, y);
+      if (this.hasMovable()) {
+        const mio = target && ((!isNode(target) && target.owner === g.human.id) || isMyAnimal(target, g));
+        if (!mio || this.canWorkOn(target)) {
+          this.rightClick(x, y, false);
+          e.preventDefault();
+          return;
+        }
+      } else if (g.selection[0] && g.selection[0].kind === 'building' && g.selection[0].owner === g.human.id) {
+        this.rallyHint();
       }
       this.clickSelect(x, y, false, 0, true);
       e.preventDefault();
@@ -528,13 +539,17 @@ export class UI {
     });
   }
 
+  /** ¿Hay en la selección algo propio que se mueva (unidades o el rebaño)? */
+  hasMovable() {
+    const g = this.game;
+    return g.selection.some((e) => (e.kind === 'unit' && e.owner === g.human.id) || isMyAnimal(e, g));
+  }
+
   /**
-   * Pulsación mantenida sobre el mapa: es el clic derecho del táctil, y con el
-   * dedo el único que da órdenes. Reparte el trabajo con el toque en dos
-   * mitades que no se pisan: el toque manda la selección —coger algo, cambiar
-   * de unidad, soltarlo todo— y el dedo mantenido manda las órdenes —moverse,
-   * recolectar, atacar, descargar, el punto de reunión—, sin tocar nunca lo
-   * que hubiera seleccionado.
+   * Pulsación mantenida sobre el mapa: es el clic derecho del táctil. Da la
+   * orden sin cambiar nunca lo seleccionado, también sobre algo propio (por
+   * ejemplo, mandar las unidades junto a un edificio sin seleccionarlo), y es
+   * la que pone el punto de reunión de un edificio.
    *
    * Devuelve si el gesto se ha consumido: sin nada propio seleccionado no hay
    * orden que dar, así que se deja pasar y el toque acaba seleccionando.
@@ -569,25 +584,11 @@ export class UI {
   }
 
   /**
-   * La primera vez que un toque cambia la selección teniendo algo propio, se
-   * dice dónde han ido a parar las órdenes. El aviso se afina según lo que se
-   * suelta, que es lo que el jugador tenía en la cabeza al tocar.
-   */
-  orderHint(target) {
-    if (this.canDeposit(target)) {
-      this.holdHint('deposit', 'Mantén pulsado el edificio para ir a descargar');
-      return;
-    }
-    if (this.game.selection[0].kind === 'building') { this.rallyHint(); return; }
-    this.holdHint('order', 'Mantén pulsado para dar la orden');
-  }
-
-  /**
    * ¿Los aldeanos seleccionados tienen trabajo que hacer en ese objetivo? Es
    * cosa del ratón: con aldeanos seleccionados, pulsar una oveja propia es
    * mandarlos a por su comida y no cambiar la selección (para pastorearla se
-   * pulsa sin aldeanos seleccionados). Con el dedo no se usa: allí el toque
-   * siempre selecciona y las órdenes van por la pulsación mantenida.
+   * pulsa sin aldeanos seleccionados). Con el dedo también decide si el toque
+   * da la orden o selecciona el objetivo.
    */
   canWorkOn(target) {
     const g = this.game;

@@ -149,12 +149,14 @@ Detalles a tener en cuenta:
 | Ver a dónde va | Selecciónalo: una bandera marca su destino (verde ir, ámbar recurso, roja objetivo) |
 | Ayuda | `F1` |
 
-En **móvil y tablet** el dedo reparte el trabajo en dos gestos que no se pisan:
-un **toque** manda la selección —coge lo que toques, cambia de unidad o suelta lo
-que tuvieras al tocar el suelo— y **mantener el dedo** un momento da la orden
-—moverse, recolectar, atacar, descargar en el centro urbano o un campamento,
-plantar el punto de reunión de un cuartel— sin cambiar lo que tengas
-seleccionado. Así un toque mal dado nunca manda a nadie a ninguna parte.
+En **móvil y tablet**, con unidades tuyas seleccionadas, **tocar da la orden**:
+en el suelo se mueven, en un enemigo atacan y en un recurso recolectan; los
+aldeanos, además, trabajan en una obra o una granja, descargan en un almacén o
+van a por una oveja tuya. Tocar otra cosa tuya la selecciona (dos toques en una
+unidad cogen todas las de su tipo) y la selección se suelta tocando su ficha de
+abajo. Sin nada seleccionado, o con un edificio, el toque selecciona.
+**Mantener el dedo** da la orden sin cambiar la selección, también sobre algo
+propio, y planta el punto de reunión de un edificio.
 Arrastrar mueve la cámara y pellizcar acerca o aleja.
 
 ### Bucle de juego
