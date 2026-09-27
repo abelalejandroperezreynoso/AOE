@@ -343,21 +343,29 @@ function loadSheet(name) {
 
 /**
  * Carga lo que hace falta para dibujar con estos colores de jugador: el índice,
- * los recursos y las hojas de unidades y edificios de cada color. Lo que ya
- * esté cargado no se vuelve a pedir.
+ * las hojas sin color (los recursos) y las de cada color, que se reconocen por
+ * acabar en `-<color>.png`. Lo que ya esté cargado no se vuelve a pedir.
  */
 export async function prepareSprites(colors = [0]) {
   await loadIndex();
-  const names = ['recursos.png'];
-  for (const c of new Set(colors)) names.push(`unidades-${c}.png`, `edificios-${c}.png`);
+  const want = new Set(colors.map(Number));
+  const names = index.hojas.filter((n) => {
+    const m = n.match(/-(\d+)\.png$/);
+    return !m || want.has(Number(m[1]));
+  });
   await Promise.all(names.map(loadSheet));
 }
 
-/** Hoja en la que vive un sprite según su clave. */
-function sheetFor(key) {
-  if (key[0] === 'r') return 'recursos.png';
-  const color = key.split('|')[2];
-  return `${key[0] === 'u' ? 'unidades' : 'edificios'}-${color}.png`;
+/*
+ * Animación de cada unidad: cuántos fotogramas tiene al andar (del 0 en
+ * adelante), cuál enseña quieta y cuáles al golpear o trabajar. Las que no
+ * digan otra cosa en el índice son las de siempre: cuatro de andar, quieta en
+ * el 0 y golpe en el 4 y el 5.
+ */
+const ANIM_DE_SERIE = { andar: 4, quieto: 0, golpe: [4, 5] };
+
+export function unitAnim(type) {
+  return (index && index.anim && index.anim[type]) || ANIM_DE_SERIE;
 }
 
 /**
@@ -370,7 +378,7 @@ function slice(key) {
   const e = index.sprites[key];
   if (!e) return null;
   const img = loaded.get(index.hojas[e[0]]);
-  if (!img) { loadSheet(sheetFor(key)).catch(() => {}); return null; }
+  if (!img) { loadSheet(index.hojas[e[0]]).catch(() => {}); return null; }
   const [, x, y, w, h, ox, oy] = e;
   const c = makeCanvas(w, h);
   c.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h);
@@ -396,8 +404,8 @@ function flipSprite(s) {
 
 /**
  * Sprite de una unidad: tipo, color de jugador, orientación 0-7 (0 = +u del
- * mundo, hacia abajo-derecha de la pantalla) y fotograma (0-3 andar, 4-5
- * ataque). Anclado a los pies. Null mientras su hoja no haya llegado.
+ * mundo, hacia abajo-derecha de la pantalla) y fotograma (ver `unitAnim`).
+ * Anclado a los pies. Null mientras su hoja no haya llegado.
  */
 export function unitSprite(type, colorIdx, face = 1, f = 0) {
   face = ((Math.round(face) % 8) + 8) % 8;
@@ -585,7 +593,7 @@ export function iconFor(kind, type, colorIdx = 0) {
   const ctx = c.getContext('2d');
   // Sin su hoja cargada no hay retrato: se devuelve el lienzo vacío sin
   // guardarlo, para que la próxima vez salga ya con el dibujo.
-  const s = kind === 'unit' ? unitSprite(type, colorIdx, 1, 0)
+  const s = kind === 'unit' ? unitSprite(type, colorIdx, 1, unitAnim(type).quieto)
     : kind === 'building' ? buildingSprite(type, colorIdx, 2)
       : kind === 'node' ? resourceSprite(type, 0) : null;
   if (!s && (kind === 'unit' || kind === 'building' || kind === 'node')) return c.toDataURL();

@@ -30,9 +30,13 @@ Los mensajes de commit van en español, y dicen qué se ha comprobado.
 - Las unidades, los edificios y los recursos son sprites: atlas PNG en
   `assets/sprites/` con su `indice.json` (hoja, posición y anclaje de cada uno).
   Hay una hoja de unidades y otra de edificios por color de jugador, y una de
-  recursos. Un sprite nuevo o cambiado tiene que respetar ese formato: cinco
-  orientaciones (las otras tres se voltean), seis fotogramas por unidad, tres
-  etapas por edificio y los ocho colores. El terreno, los iconos de
+  recursos, y las unidades dibujadas a mano llevan la suya por color
+  (`villager-<color>.png`). Un sprite nuevo o cambiado tiene que respetar ese
+  formato: cinco orientaciones (las otras tres se voltean), tres etapas por
+  edificio y los ocho colores. Los fotogramas de cada unidad los dice `anim`
+  en el índice (por defecto, cuatro de andar y dos de golpe). Una hoja
+  dibujada entra con `tools/importar-unidad.mjs`; el original se guarda en
+  `assets/fuentes/`. El terreno, los iconos de
   tecnologías y el sonido siguen generándose por código.
 - Los modelos 3D por código y el taller de edificios se retiraron para no
   volver, y se borraron también del historial: no hay commit del que

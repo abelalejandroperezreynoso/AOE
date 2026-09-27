@@ -3,7 +3,7 @@
 import { TILE_W, TILE_H, UNITS, BUILDINGS, PLAYER_COLORS } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, HW, HH,
-  drawSprite, paintUnit, paintBuilding, paintResource, setSpriteQuality, drawTerrainSprite,
+  drawSprite, paintUnit, paintBuilding, paintResource, setSpriteQuality, drawTerrainSprite, unitAnim,
 } from './sprites.js';
 import { clamp, dist } from './utils.js';
 
@@ -488,9 +488,10 @@ export class Renderer {
 
   drawUnit(ctx, u) {
     const g = this.game;
+    const an = unitAnim(u.type);
     const frame = u.attackAnim > 0
-      ? (u.attackAnim > 0.25 ? 4 : 5)
-      : (u.moving ? (Math.floor(u.anim) % 4) : 0);
+      ? an.golpe[u.attackAnim > 0.25 ? 0 : 1]
+      : (u.moving ? (Math.floor(u.anim) % an.andar) : an.quieto);
     const colorIdx = g.players[u.owner].colorIdx;
     const [mx, my] = this.worldToCanvas(u.x, u.y);
     // Orientación en octantes; si viene de una instantánea vieja sin ella, se

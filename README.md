@@ -207,6 +207,8 @@ js/path.js          Búsqueda de caminos A* sobre la rejilla
 js/render.js        Renderizador isométrico y niebla de guerra
 js/sprites.js       Sprites: carga de los atlas, terreno a mano e iconos
 assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
+tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
+assets/fuentes/     Las hojas dibujadas tal como llegaron, para reimportarlas
 tools/icon.html     Dibujo del icono de la aplicación: el castillo al atardecer
 tools/make-icons.mjs  Saca de él los PNG de icons/ (necesita Playwright)
 icons/, manifest.webmanifest  Icono y nombre del juego instalado en el móvil
@@ -255,6 +257,15 @@ Para depurar, el objeto de la partida está disponible en la consola como
   píxeles del sprite, como al ampliar el clásico.
 - Para cambiar un dibujo se sustituye su trozo en la hoja, con el mismo tamaño
   y anclaje, o se reempaqueta la hoja y se actualiza el índice.
+- Una unidad dibujada a mano entra con `tools/importar-unidad.mjs <tipo>
+  <hoja.png> --quieto N`: la hoja trae los fotogramas de andar en fila, con la
+  figura mirando abajo a la derecha y una sombra gris bajo los pies. La
+  herramienta ancla en el centro de la sombra, la iguala en altura a la unidad
+  que sustituye, pinta el verde del uniforme con el color de cada jugador y
+  escribe una hoja por color (`<tipo>-<color>.png`) y su animación en el
+  índice (`anim`: fotogramas de andar, el de quieto y los de golpe). Si sólo
+  hay una orientación dibujada, vale para las ocho (las de la izquierda,
+  volteadas). Así entró el aldeano, desde `assets/fuentes/aldeano-andar.png`.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
 - En multijugador el anfitrión manda hasta diez instantáneas por segundo en

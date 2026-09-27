@@ -5,7 +5,7 @@ import {
 } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
-  drawSprite, prepareSprites,
+  drawSprite, prepareSprites, unitAnim,
 } from './sprites.js';
 import {
   fieldsFor, getPath, setValue, reset, isChanged, defaultValue, countChanges,
@@ -187,7 +187,7 @@ export class Catalog {
     const ctx = c.getContext('2d');
     const MAX = 1.2; // un poco de margen alrededor
     if (this.tab === 'unit') {
-      const s = unitSprite(key, 0, 1, 0, false);
+      const s = unitSprite(key, 0, 1, unitAnim(key).quieto);
       if (!s) return c;
       const sc = real ? size / (60 * MAX) : Math.min(size / (s.w - 4), size / (s.h - 4)) * 1.05;
       drawSprite(ctx, s, size / 2, size - 6, sc);
