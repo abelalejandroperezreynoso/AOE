@@ -240,6 +240,7 @@ assets/fuentes/     Las hojas dibujadas tal como llegaron, para reimportarlas
 tools/icon.html     Dibujo del icono de la aplicación: el castillo al atardecer
 tools/make-icons.mjs  Saca de él los PNG de icons/ (necesita Playwright)
 icons/, manifest.webmanifest  Icono y nombre del juego instalado en el móvil
+diag.html           Mide la pantalla en el propio aparato (enlace en el menú)
 js/ai.js            IA de los rivales
 js/ui.js            HUD, panel de órdenes, ratón, teclado y táctil
 js/audio.js         Efectos de sonido sintetizados con WebAudio
@@ -267,10 +268,16 @@ Para depurar, el objeto de la partida está disponible en la consola como
   `--relleno`, `--acento`…), así que se repinta todo desde ahí. El arte del
   juego —el mapa, los sprites, y los colores de cada recurso y de cada
   jugador— no es interfaz y no cambia.
-- `theme-color` en blanco tiñe las barras del navegador y, con ellas, la franja
-  del reloj y la batería del teléfono. Es sólo el tinte del navegador: no toca
-  la pantalla completa ni las zonas seguras, que tienen su propia historia en
-  `CLAUDE.md`.
+- `theme-color` en blanco tiñe las barras del navegador. Instalado en iOS, la
+  franja del reloj la decide `apple-mobile-web-app-status-bar-style` en
+  `black-translucent`: el contenido pasa por debajo de la hora, que va siempre
+  en blanco. Como iOS mide entonces la ventana 50 px más corta de lo que pinta,
+  `#app` es absoluto y se alarga esa zona segura, las superposiciones fijas se
+  alargan por abajo, y `main.js` devuelve la página arriba si se desplaza. La
+  historia completa, en `CLAUDE.md`.
+- La letra pequeña del menú lleva la versión (la misma que va en la URL del CSS
+  y de `main.js`; se cambia a mano en `index.html` y `diag.html`) y el enlace a
+  `diag.html`.
 - El terreno se dibuja una sola vez en un lienzo fuera de pantalla y se compone
   con transformaciones; la niebla se calcula a un quinto de resolución y sólo se
   rehace cuando cambian la cámara o la visibilidad.

@@ -14,6 +14,13 @@ import { marcaDeslizador } from './utils.js';
 
 const el = (id) => document.getElementById(id);
 
+// Instalada en iOS la página es más alta que la ventana que mide WebKit (ver
+// `#app` en el CSS) y podría desplazarse lo que mide la franja de la hora: se
+// devuelve siempre arriba.
+window.addEventListener('scroll', () => {
+  if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0);
+}, { passive: true });
+
 // Los valores y los retoques del catálogo, antes de que nadie lea los datos.
 loadOverrides();
 

@@ -97,6 +97,19 @@ No hay suite de pruebas.
   sobra nada por ningún lado y el juego se abre sin barras de navegador, pero
   el contenido no pasa por debajo del reloj, que era la parte que gustaba.
 
+- **Cuarto intento (`v2026.09.27-1`), con captura del teléfono delante.** La
+  receta, distinta de las tres anteriores: `#app` deja de ser `fixed` y pasa a
+  `position: absolute` con `height: 100%`, más `env(safe-area-inset-top)` sólo en
+  `display-mode: standalone`, de modo que su alto cuenta como contenido de la
+  página y puede pasar de la ventana recortada; `html` y `body` sin
+  `overflow: hidden`, y un aviso de `scroll` en `main.js` que la devuelve arriba.
+  Las `.overlay`, que siguen siendo fijas, se alargan con un `bottom` negativo
+  del mismo tamaño. El manifiesto pasa a `display: standalone`. Vuelven el
+  marcador de versión en el menú y `diag.html`, que ahora pinta además en azul
+  una caja con el arreglo nuevo: si en el aparato asoma azul bajo el verde, el
+  arreglo llega al borde. Si esto también falla, lo primero es leer la versión
+  en el menú y mirar `diag.html`, no probar otra cosa.
+
 - **IDs y funciones en archivos grandes.** Un `getElementById` que apunta a un
   elemento que ya no está revienta con `TypeError` y aborta el resto de la
   función sin aviso visible. Al tocar el HUD o el catálogo conviene comprobar que

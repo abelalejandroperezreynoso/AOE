@@ -8,11 +8,19 @@
 <!-- Tiñe de blanco las barras del navegador, y con ellas la franja del
      reloj y la batería del teléfono. -->
 <meta name="theme-color" content="#ffffff">
-<link rel="stylesheet" href="css/style.css">
+<!-- Instalado en la pantalla de inicio: sin barras de navegador y con el
+     contenido pasando por debajo de la hora y la batería. El precio de
+     `black-translucent` es que iOS mide la ventana 50 px más corta de lo que
+     pinta; lo compensa `#app` en el CSS (ver CLAUDE.md, «Trampas conocidas»). -->
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- La versión va en la URL del CSS para que el teléfono no use la copia
+     guardada, y es la misma que se enseña en la letra pequeña del menú. Se
+     cambia a mano en los tres sitios al tocar la maquetación. -->
+<link rel="stylesheet" href="css/style.css?v=2026.09.27-1">
 <!-- El icono: el castillo del juego, horneado por tools/make-icons.mjs.
-     El manifiesto sólo pone nombre e icono; `display` va en `browser` a
-     propósito para no tocar el modo de pantalla (ver CLAUDE.md, «Trampas
-     conocidas»). iOS no lee los iconos del manifiesto, sino apple-touch-icon. -->
+     iOS no lee los iconos del manifiesto, sino apple-touch-icon. -->
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
 <link rel="manifest" href="/manifest.webmanifest">
@@ -55,7 +63,12 @@
       </button>
     </div>
 
-    <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios.</p>
+    <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios.
+      <!-- Qué versión se está ejecutando de verdad: en un móvil con la página
+           guardada no hay otra forma de saberlo. Y el enlace a la página de
+           medidas, que instalado no hay barra de direcciones. -->
+      <span class="version">v2026.09.27-1</span>
+      <a class="version" href="/diag.html">Diagnóstico</a></p>
   </div>
 </div>
 
@@ -362,6 +375,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/main.js?v=2026.09.27-1"></script>
 </body>
 </html>

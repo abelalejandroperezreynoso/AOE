@@ -3,7 +3,7 @@
   "short_name": "Age of Realms",
   "lang": "es",
   "start_url": "/",
-  "display": "browser",
+  "display": "standalone",
   "background_color": "#f2f2f7",
   "theme_color": "#ffffff",
   "icons": [

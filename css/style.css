@@ -48,10 +48,15 @@
 
 * { box-sizing: border-box; }
 
+/*
+ * Sin `overflow: hidden` a propósito: instalado en iOS, `#app` es más alto que
+ * la ventana que mide WebKit y ese alto tiene que contar como contenido de la
+ * página. Que no se desplace lo asegura main.js, que la devuelve arriba.
+ */
 html, body {
   margin: 0; padding: 0;
   height: 100%;
-  overflow: hidden;
+  overscroll-behavior: none;
   background: var(--papel);
   color: var(--tinta);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
@@ -84,6 +89,17 @@ html, body {
   overscroll-behavior: contain;
 }
 .overlay > * { margin: auto; flex: none; }
+
+/*
+ * Instalado en iOS con `black-translucent`, la página empieza detrás de la hora
+ * pero WebKit sigue midiendo la ventana como si la franja ocupara sitio:
+ * `inset: 0` se queda corto justo lo que mide la zona segura de arriba y abajo
+ * asoma el fondo. Lo fijo se mide contra esa ventana recortada, así que se
+ * alarga a mano, y sólo instalado. Ver CLAUDE.md, «Trampas conocidas».
+ */
+@media (display-mode: standalone) {
+  .overlay { bottom: calc(-1 * var(--sa-top)); }
+}
 
 /* Cada modo enseña lo suyo y esconde lo del otro. */
 #setup-card[data-modo="solo"] [data-modo="red"],
@@ -418,7 +434,23 @@ button:active { filter: brightness(.88); }
 
 /* ---------- Juego ---------- */
 
-#app { position: fixed; inset: 0; }
+/*
+ * El contenedor de la partida no es fijo ni mide en `vh`/`dvh`: todas esas
+ * medidas vienen de la ventana que iOS recorta al instalar el juego (ver
+ * `.overlay`). Absoluto, su alto cuenta como contenido de la página, y así
+ * puede pasar de esa ventana y llegar al borde de abajo de la pantalla.
+ */
+#app {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 100%;
+  overflow: hidden;
+}
+/* Sólo instalado: se le devuelve lo que iOS le quita arriba. En el navegador
+   la zona segura de arriba no se descuenta y `#app` mide la ventana justa. */
+@media (display-mode: standalone) {
+  #app { height: calc(100% + var(--sa-top)); }
+}
 
 #game {
   position: absolute;
@@ -1236,6 +1268,9 @@ button.hoja-fila:active, .hoja .lobby-player button:active { background: #d1d1d6
   color: #8a8a8e;
   text-align: center;
 }
+/* La versión y el enlace al diagnóstico, en la misma letra pequeña. */
+.version { opacity: .7; white-space: nowrap; }
+a.version { color: inherit; margin-left: 8px; }
 
 /* Datos de la partida (pausa y final): una tarjeta con el valor en gris. */
 .hoja .stats {
