@@ -1464,7 +1464,8 @@ export class UI {
     const cortada = reason === 'disconnect';
     const title = document.getElementById('end-title');
     title.textContent = cortada ? 'Partida interrumpida' : (won ? '¡Victoria!' : 'Derrota');
-    title.className = cortada ? '' : (won ? 'win' : 'lose');
+    title.classList.toggle('win', !cortada && won);
+    title.classList.toggle('lose', !cortada && !won);
     const intro = cortada
       ? 'Se ha perdido la conexión con el anfitrión, así que la partida no puede continuar.'
       : (won ? 'Has conquistado a todos tus rivales.' : 'Tu civilización ha caído.');

@@ -110,12 +110,6 @@ html, body {
 }
 .overlay > * { margin: auto; flex: none; }
 
-#main-menu {
-  background:
-    radial-gradient(circle at 50% 18%, rgba(201,162,39,.07), transparent 65%),
-    linear-gradient(180deg, #fff, #fbf8f1);
-}
-
 /* Al ancho de la caja de la superposición, que ya descuenta su relleno y las
    zonas seguras: con `96vw` la tarjeta más el relleno no cabían en un móvil. */
 .menu-card {
@@ -1682,20 +1676,28 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   .cmd .cost { font-size: 8.5px; }
 }
 
-/* ---------- Menú principal: hoja al estilo de iOS ---------- */
+/* ---------- Menús: hojas al estilo de iOS ---------- */
 
 /*
- * Va al final para ganar a las reglas generales de botones, tarjetas y a las
- * de los medios de arriba. La hoja no mide la pantalla: la superposición ya
- * ocupa la ventana con `inset: 0` y la hoja la llena con `min-height: 100%`
- * (ver «Trampas conocidas» en CLAUDE.md antes de tocar alturas).
+ * El menú principal, la nueva partida, la sala, compartir, la pausa y el final
+ * son hojas como las de iOS: suben desde abajo con las esquinas grandes, fondo
+ * gris agrupado, tarjetas blancas y botones anchos. Va al final para ganar a
+ * las reglas generales de botones y a las de los medios de más arriba.
+ *
+ * La hoja no mide la pantalla: la superposición ya ocupa la ventana con
+ * `inset: 0` y la hoja la llena con `min-height: 100%` (ver «Trampas
+ * conocidas» en CLAUDE.md antes de tocar alturas).
  */
-#main-menu {
-  background: #d1d1d6; /* lo que asoma detrás de la hoja, como una pantalla atenuada */
-  padding: calc(14px + var(--sa-top)) var(--sa-right) 0 var(--sa-left);
+.overlay-hoja, .overlay-alerta {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
 }
-#main-menu > .hoja { margin: 0 auto; }
+.overlay-hoja {
+  background: #d1d1d6; /* lo que asoma detrás de la hoja, como una pantalla atenuada */
+  padding: calc(14px + var(--sa-top)) var(--sa-right) 0 var(--sa-left);
+}
+/* En la partida, lo de detrás es el mapa: se atenúa en vez de taparlo. */
+#app .overlay-hoja { background: rgba(0, 0, 0, .4); }
+.overlay-hoja > .hoja { margin: 0 auto; }
 
 .hoja {
   box-sizing: border-box;
@@ -1707,14 +1709,40 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   padding: 18px 16px calc(28px + var(--sa-bottom));
   color: #000;
   text-align: left;
+  font-size: 17px;
 }
 
+/* Cabecera: la cruz a la izquierda y el título centrado en la hoja. */
+.hoja-cabecera {
+  display: grid; grid-template-columns: 44px 1fr 44px; align-items: center;
+  min-height: 44px;
+  margin-bottom: 18px;
+}
+.hoja-cabecera > .hoja-circulo { grid-column: 1; grid-row: 1; }
+.hoja-cabecera > .hoja-titulo { grid-column: 2; grid-row: 1; margin: 0; }
 .hoja-titulo {
   margin: 4px 0 18px;
   text-align: center;
+  font: inherit;
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -.2px;
+  color: #000;
+}
+.hoja-titulo.win { color: #248a3d; }
+.hoja-titulo.lose { color: #d70015; }
+
+button.hoja-circulo {
+  display: grid; place-items: center;
+  width: 44px; height: 44px;
+  padding: 0;
+  border: 0; border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, .1);
+}
+.hoja-circulo svg {
+  width: 20px; height: 20px;
+  fill: none; stroke: #000; stroke-width: 2; stroke-linecap: round;
 }
 
 .hoja-grupo {
@@ -1723,6 +1751,155 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   overflow: hidden;
 }
 
+/* Notas bajo o sobre una tarjeta, en gris y metidas hacia dentro. */
+.hoja-nota {
+  margin: 8px 16px 20px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #8a8a8e;
+}
+
+/* Control segmentado: dos opciones en un carril, la elegida en blanco. */
+.hoja-segmentos {
+  display: flex;
+  padding: 3px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: rgba(118, 118, 128, .14);
+}
+.hoja-segmentos button {
+  flex: 1;
+  padding: 9px 6px;
+  border: 0; border-radius: 10px;
+  background: transparent;
+  color: #000;
+  font: inherit; font-size: 15px; font-weight: 500;
+}
+.hoja-segmentos button.active {
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
+  font-weight: 600;
+}
+
+/* Las rayas entre filas empiezan donde el texto, como en iOS. Van al pie de
+   cada fila, y la de la última queda fuera de la tarjeta: así da igual qué
+   filas estén ocultas en cada modo. */
+.hoja-campo, button.hoja-fila, label.hoja-fila { position: relative; margin-bottom: -1px; }
+.hoja-campo::after, .hoja-fila::after {
+  content: "";
+  position: absolute; left: 16px; right: 0; bottom: 0;
+  height: 1px;
+  background: #c6c6c8;
+  transform: scaleY(.5); transform-origin: bottom;
+  z-index: 1; /* por encima del fondo blanco de la fila siguiente */
+}
+.hoja-fila::after { left: 64px; } /* pasada la insignia: 16 + 34 + 14 */
+
+/* Filas de formulario: el rótulo a la izquierda y el valor a la derecha. */
+.hoja-campo {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 52px;
+  padding: 0 16px;
+}
+.hoja-campo > span { flex: none; }
+.hoja-campo select, .hoja-campo input {
+  flex: 1; min-width: 0;
+  padding: 12px 0;
+  border: 0; outline: 0;
+  background: transparent;
+  color: #8a8a8e;
+  font: inherit; font-size: 17px;
+  text-align: right; text-align-last: right;
+  -webkit-appearance: none; appearance: none;
+}
+.hoja-campo input { color: #000; }
+.hoja-campo input::placeholder { color: #c4c4c7; }
+/* Las dos flechitas de los desplegables de iOS. */
+.hoja-campo select {
+  padding-right: 20px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 16'%3E%3Cpath d='M1.5 6L5 2.5 8.5 6M1.5 10L5 13.5 8.5 10' fill='none' stroke='%238a8a8e' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right center / 10px 16px no-repeat;
+}
+
+/* Botones anchos: relleno el principal, tenue el secundario y rojo el que
+   no tiene vuelta atrás. */
+button.hoja-boton {
+  display: block;
+  width: 100%;
+  margin: 20px 0;
+  padding: 15px 20px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--gold);
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.2px;
+}
+button.hoja-boton + .hoja-boton { margin-top: -8px; }
+button.hoja-boton.tenue { background: rgba(160, 125, 30, .14); color: var(--gold-l); }
+button.hoja-boton.peligro { background: rgba(255, 59, 48, .12); color: #d70015; }
+button.hoja-boton:disabled { opacity: .45; }
+
+/* Filas de lista: insignia de color, texto y flecha o valor. */
+button.hoja-fila, label.hoja-fila {
+  display: flex; align-items: center; justify-content: flex-start; gap: 14px;
+  width: 100%;
+  margin-top: 0;
+  padding: 0 16px;
+  min-height: 56px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #000;
+  font: inherit;
+  font-size: 17px;
+  text-align: left;
+}
+.hoja-texto { flex: 1; letter-spacing: -.2px; }
+.hoja-valor { color: #8a8a8e; }
+.hoja-volumen input { flex: 0 1 45%; min-width: 0; accent-color: var(--gold); }
+
+.hoja-insignia {
+  flex: none;
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: var(--insignia);
+}
+.hoja-insignia svg, .hoja-fila .fs-icon {
+  width: 20px; height: 20px;
+  fill: none; stroke: #fff;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.hoja-chevron {
+  flex: none;
+  width: 8px; height: 14px;
+  fill: none; stroke: #c4c4c7;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* Tres acciones en una tarjeta, partidas por rayas. */
+.hoja-trio { display: flex; }
+.hoja-trio button {
+  flex: 1;
+  margin: 0; padding: 15px 6px;
+  border: 0; border-radius: 0;
+  background: #fff;
+  color: var(--gold-l);
+  font: inherit; font-size: 17px;
+}
+.hoja-trio button:not(.hidden) ~ button { box-shadow: inset .5px 0 #c6c6c8; }
+
+/* En iOS lo tocado se oscurece, no se aclara ni se hunde. */
+.overlay-hoja button:hover, .overlay-alerta button:hover { filter: none; }
+.overlay-hoja button:active, .overlay-alerta button:active { transform: none; }
+button.hoja-boton:active, button.hoja-circulo:active { filter: brightness(.85); }
+button.hoja-fila:active, .hoja-trio button:active, .hoja .lobby-player button:active { background: #d1d1d6; }
+
+/* La portada del menú principal. */
 .hoja-portada {
   padding: 28px 20px 24px;
   text-align: center;
@@ -1749,73 +1926,6 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   line-height: 1.35;
   color: #8a8a8e;
 }
-
-button.hoja-boton {
-  display: block;
-  width: 100%;
-  margin: 20px 0;
-  padding: 15px 20px;
-  border: 0;
-  border-radius: 16px;
-  background: var(--gold);
-  color: #fff;
-  font: inherit;
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -.2px;
-}
-
-button.hoja-fila {
-  display: flex; align-items: center; justify-content: flex-start; gap: 14px;
-  width: 100%;
-  margin: 0;
-  padding: 0 16px;
-  min-height: 56px;
-  border: 0;
-  border-radius: 0;
-  background: #fff;
-  color: #000;
-  font: inherit;
-  font-size: 17px;
-  text-align: left;
-}
-/* La raya entre filas empieza donde el texto, como en iOS: pasada la insignia
-   (16 de margen + 34 de insignia + 14 de hueco). */
-.hoja-fila + .hoja-fila { position: relative; }
-.hoja-fila + .hoja-fila::before {
-  content: "";
-  position: absolute; top: 0; left: 64px; right: 0;
-  border-top: .5px solid #c6c6c8;
-}
-
-.hoja-texto { flex: 1; letter-spacing: -.2px; }
-
-.hoja-insignia {
-  flex: none;
-  display: grid; place-items: center;
-  width: 34px; height: 34px;
-  border-radius: 9px;
-  background: var(--insignia);
-}
-.hoja-insignia svg, .hoja-fila .fs-icon {
-  width: 20px; height: 20px;
-  fill: none; stroke: #fff;
-  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
-}
-
-.hoja-chevron {
-  flex: none;
-  width: 8px; height: 14px;
-  fill: none; stroke: #c4c4c7;
-  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
-}
-
-/* En iOS lo tocado se oscurece, no se aclara ni se hunde. */
-button.hoja-boton:hover, button.hoja-fila:hover { filter: none; }
-button.hoja-boton:active, button.hoja-fila:active { transform: none; }
-button.hoja-boton:active { filter: brightness(.85); }
-button.hoja-fila:active { background: #d1d1d6; }
-
 .hoja .legal {
   margin: 14px 16px 0;
   font-size: 13px;
@@ -1824,11 +1934,109 @@ button.hoja-fila:active { background: #d1d1d6; }
   text-align: center;
 }
 
+/* Datos de la partida (pausa y final): una tarjeta con el valor en gris. */
+.hoja .stats {
+  display: block;
+  width: 100%;
+  margin: 0 0 20px;
+  border-collapse: separate; border-spacing: 0;
+  border-radius: 26px;
+  overflow: hidden;
+  background: #fff;
+  font-size: 17px;
+}
+.hoja .stats td { padding: 14px 16px; border: 0; box-shadow: inset 0 -.5px #c6c6c8; }
+.hoja .stats tr:last-child td { box-shadow: none; }
+/* Cada fila a su aire: en tabla, la columna del valor tomaba el ancho del
+   más largo («Edad de los Castillos») y partía los rótulos de todas. */
+.hoja .stats tbody { display: block; }
+.hoja .stats tr { display: flex; align-items: center; justify-content: space-between; box-shadow: inset 0 -.5px #c6c6c8; }
+.hoja .stats tr:last-child { box-shadow: none; }
+.hoja .stats td { box-shadow: none !important; }
+.hoja .stats td:first-child { flex: 1 1 auto; }
+.hoja .stats td:last-child { color: #8a8a8e; font-weight: 400; text-align: right; }
+#end-body > p { margin: 0 16px 20px; font-size: 17px; line-height: 1.4; text-align: center; color: #3c3c43; }
+.hoja .end-warn {
+  margin: 0 0 20px; padding: 14px 16px;
+  border: 0; border-radius: 18px;
+  background: rgba(255, 149, 0, .14);
+  color: #7a4a00; font-size: 15px; text-align: left;
+}
+
+/* Compartir: el texto va en su tarjeta. */
+.hoja .share-text {
+  display: block; box-sizing: border-box;
+  margin: 0 0 12px; padding: 14px 16px;
+  border: 0; border-radius: 18px;
+  background: #fff;
+}
+.hoja .share-text:focus { outline: 2px solid var(--gold); }
+.hoja .share-note { margin: 10px 16px 0; font-size: 13px; }
+
+/* Sala de espera: las listas son tarjetas y las acciones, píldoras tenues. */
+.hoja .lobby-head { margin: 0 16px 18px; font-size: 15px; color: #8a8a8e; }
+.hoja .lobby-head b { color: #000; }
+.hoja .lobby-status { font-size: 15px; color: #8a8a8e; }
+.hoja .lobby-cols { gap: 0 14px; }
+.hoja .lobby-col h3 {
+  margin: 0 16px 7px;
+  font-size: 13px; font-weight: 400; letter-spacing: 0;
+  color: #8a8a8e;
+}
+.hoja .lobby-col h3 small { font-size: 13px; color: #8a8a8e; }
+.hoja .lobby-list {
+  margin: 0 0 20px;
+  border: 0; border-radius: 26px;
+  background: #fff;
+}
+.hoja .lobby-player, .hoja .party-slot {
+  min-height: 52px; box-sizing: border-box;
+  padding: 8px 16px;
+  border-bottom: .5px solid #c6c6c8;
+}
+.hoja .lobby-player:last-child, .hoja .party-slot:last-child { border-bottom: 0; }
+.hoja .lobby-player .lobby-name, .hoja .party-slot .lobby-name { font-size: 17px; color: #000; }
+.hoja .lobby-tag { font-size: 15px; color: var(--gold-l); }
+.hoja .lobby-tag.muted { color: #8a8a8e; }
+.hoja .party-color { width: 12px; height: 12px; border: 0; }
+.hoja .lobby-player button {
+  padding: 7px 14px;
+  border: 0; border-radius: 999px;
+  background: rgba(160, 125, 30, .14);
+  color: var(--gold-l);
+  font: inherit; font-size: 15px; font-weight: 600;
+}
+.hoja .lobby-col .hoja-boton { margin: 0 0 20px; }
+.hoja .lobby-col .hoja-boton + .hoja-boton { margin-top: -8px; }
+.hoja .lobby-error, .alerta .lobby-error {
+  margin: 0 0 20px; padding: 14px 16px;
+  border: 0; border-radius: 18px;
+  background: rgba(255, 59, 48, .12);
+  color: #d70015; font-size: 15px;
+}
+
+/* Alertas: una pregunta que hay que contestar, en medio y sobre lo que haya. */
+.overlay-alerta { background: rgba(0, 0, 0, .4); }
+.alerta {
+  box-sizing: border-box;
+  width: min(320px, 100%);
+  padding: 22px 16px 16px;
+  border-radius: 26px;
+  background: #f2f2f7;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .25);
+  color: #000;
+  text-align: center;
+}
+.alerta h2 { margin: 0 0 6px; font: inherit; font-size: 17px; font-weight: 600; color: #000; }
+.alerta p { margin: 0 8px 18px; font-size: 15px; line-height: 1.4; color: #3c3c43; }
+.alerta .hoja-boton { margin: 0; }
+.alerta .hoja-boton + .hoja-boton { margin-top: 8px; }
+
 /* Con sitio de sobra (escritorio, tableta apaisada) la hoja flota en medio,
    redonda por los cuatro lados, en vez de pegarse abajo. */
 @media (min-width: 700px) and (min-height: 700px) {
-  #main-menu { padding: 24px; }
-  #main-menu > .hoja { margin: auto; }
+  .overlay-hoja { padding: 24px; }
+  .overlay-hoja > .hoja { margin: auto; }
   .hoja { min-height: 0; border-radius: 38px; padding-bottom: 28px; box-shadow: 0 20px 60px rgba(0, 0, 0, .18); }
 }
 

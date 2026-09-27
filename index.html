@@ -23,7 +23,7 @@
 <!-- Una hoja al estilo de iOS: sube desde abajo con las esquinas redondas,
      fondo gris agrupado, tarjetas blancas y filas con su insignia de color.
      Los ids son los de siempre, que main.js y ui.js los buscan. -->
-<div id="main-menu" class="overlay">
+<div id="main-menu" class="overlay overlay-hoja">
   <div class="hoja">
     <p class="hoja-titulo">Menú principal</p>
 
@@ -67,26 +67,32 @@
 </div>
 
 <!-- ---------- Nueva partida: contra la máquina o con otra persona ---------- -->
-<div id="setup" class="overlay hidden">
-  <div class="menu-card" id="setup-card" data-modo="solo">
-    <h2>Nueva partida</h2>
+<!-- Las pantallas de menú son hojas de iOS como la del menú principal: la
+     cruz arriba a la izquierda vuelve atrás, las opciones van en filas de una
+     tarjeta blanca y lo que se hace va en botones anchos al pie. -->
+<div id="setup" class="overlay overlay-hoja hidden">
+  <div class="hoja" id="setup-card" data-modo="solo">
+    <header class="hoja-cabecera">
+      <button id="btn-setup-back" class="hoja-circulo" title="Volver al menú" aria-label="Volver al menú"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      <h2 class="hoja-titulo">Nueva partida</h2>
+    </header>
 
     <!-- Contra quién se juega manda sobre lo que se pregunta debajo: cada modo
          enseña sus opciones y esconde las del otro. -->
-    <div id="setup-modos" class="modo-tabs">
+    <div id="setup-modos" class="hoja-segmentos">
       <button data-elige="solo" class="active">Contra la máquina</button>
       <button data-elige="red">Con otra persona</button>
     </div>
 
-    <p class="subtitle" data-modo="solo">Si no tocas nada, se juega con lo de siempre.</p>
-    <p class="subtitle" data-modo="red">De dos a ocho jugadores, cada quien desde su dispositivo.</p>
+    <p class="hoja-nota" data-modo="solo">Si no tocas nada, se juega con lo de siempre.</p>
+    <p class="hoja-nota" data-modo="red">De dos a ocho jugadores, cada quien desde su dispositivo.</p>
 
-    <div class="options">
-      <label data-modo="red">
+    <div class="hoja-grupo">
+      <label class="hoja-campo" data-modo="red">
         <span>Tu nombre</span>
         <input id="lobby-name" type="text" maxlength="20" placeholder="¿Cómo te llamas?" autocomplete="nickname">
       </label>
-      <label data-modo="solo">
+      <label class="hoja-campo" data-modo="solo">
         <span>Rivales</span>
         <select id="opt-opponents">
           <option value="1" selected>1 rival</option>
@@ -98,7 +104,7 @@
           <option value="7">7 rivales</option>
         </select>
       </label>
-      <label data-modo="solo">
+      <label class="hoja-campo" data-modo="solo">
         <span>Dificultad</span>
         <select id="opt-difficulty">
           <option value="easy">Fácil</option>
@@ -108,7 +114,7 @@
       </label>
       <!-- El tamaño lo preguntan los dos modos, así que es el mismo control:
            en red vale el del anfitrión, que es quien monta la partida. -->
-      <label>
+      <label class="hoja-campo">
         <span>Tamaño del mapa</span>
         <select id="opt-size">
           <option value="48">Pequeño</option>
@@ -117,18 +123,17 @@
           <option value="96">Enorme</option>
         </select>
       </label>
-      <label data-modo="solo">
+      <label class="hoja-campo" data-modo="solo">
         <span>Semilla del mapa</span>
         <input id="opt-seed" type="text" inputmode="numeric" placeholder="aleatoria">
       </label>
-      <small class="hint" data-modo="solo">Con muchos rivales el mapa se agranda solo para que quepan todas las bases.</small>
-      <small class="hint" data-modo="red">Manda el tamaño de quien invita, y se agranda solo si hay muchos jugadores.</small>
     </div>
+    <p class="hoja-nota" data-modo="solo">Con muchos rivales el mapa se agranda solo para que quepan todas las bases.</p>
+    <p class="hoja-nota" data-modo="red">Manda el tamaño de quien invita, y se agranda solo si hay muchos jugadores.</p>
 
-    <button id="btn-start" class="primary" data-modo="solo">Comenzar</button>
-    <button id="btn-lobby-enter" class="primary" data-modo="red">Entrar en la sala</button>
+    <button id="btn-start" class="hoja-boton" data-modo="solo">Comenzar</button>
+    <button id="btn-lobby-enter" class="hoja-boton" data-modo="red">Entrar en la sala</button>
     <div id="setup-error" class="lobby-error hidden"></div>
-    <button id="btn-setup-back" class="secondary">Volver al menú</button>
   </div>
 </div>
 
@@ -280,26 +285,31 @@
 </div>
 
 <!-- ---------- Compartir el modelo de un edificio ---------- -->
-<div id="studio-share" class="overlay hidden">
-  <div class="menu-card small">
-    <h2 id="share-title">Compartir edificio</h2>
-    <p id="share-hint" class="subtitle"></p>
+<div id="studio-share" class="overlay overlay-hoja hidden">
+  <div class="hoja">
+    <header class="hoja-cabecera">
+      <button id="btn-share-close" class="hoja-circulo" title="Cerrar" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      <h2 id="share-title" class="hoja-titulo">Compartir edificio</h2>
+    </header>
+    <p id="share-hint" class="hoja-nota"></p>
     <textarea id="share-text" class="share-text" spellcheck="false" autocomplete="off"></textarea>
-    <div class="menu-actions">
+    <div class="hoja-grupo hoja-trio">
       <button id="btn-share-copy">Copiar</button>
       <button id="btn-share-file">Descargar</button>
       <button id="btn-share-paste">Pegar</button>
-      <button id="btn-share-apply" class="wide primary">Ponérselo a este edificio</button>
     </div>
     <p id="share-note" class="share-note"></p>
-    <button id="btn-share-close" class="secondary">Cerrar</button>
+    <button id="btn-share-apply" class="hoja-boton">Ponérselo a este edificio</button>
   </div>
 </div>
 
 <!-- ---------- Sala de espera (multijugador) ---------- -->
-<div id="lobby" class="overlay hidden">
-  <div class="menu-card">
-    <h2>Sala de espera</h2>
+<div id="lobby" class="overlay overlay-hoja hidden">
+  <div class="hoja">
+    <header class="hoja-cabecera">
+      <button id="btn-lobby-leave" class="hoja-circulo" title="Salir de la sala" aria-label="Salir de la sala"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      <h2 class="hoja-titulo">Sala de espera</h2>
+    </header>
 
     <div class="lobby-head">
       <span>Conectado como <b id="lobby-me"></b></span>
@@ -314,12 +324,12 @@
       <div id="lobby-party-box" class="lobby-col hidden">
         <h3>Tu partida <small id="lobby-party-count"></small></h3>
         <ul id="lobby-party" class="lobby-list"></ul>
-        <button id="btn-lobby-start" class="primary hidden">Empezar partida</button>
-        <button id="btn-lobby-cancel" class="secondary">Cancelar partida</button>
+        <button id="btn-lobby-start" class="hoja-boton hidden">Empezar partida</button>
+        <button id="btn-lobby-cancel" class="hoja-boton tenue">Cancelar partida</button>
       </div>
     </div>
 
-    <p class="lobby-hint">
+    <p class="hoja-nota">
       Quien invita hace de anfitrión: su dispositivo lleva la partida de todos,
       así que conviene que sea el de mejor conexión. Puede invitar a varias
       personas y empezar cuando estén listas; y quien llegue después siempre
@@ -327,17 +337,17 @@
     </p>
 
     <div id="lobby-error" class="lobby-error hidden"></div>
-    <button id="btn-lobby-leave" class="secondary">Salir de la sala</button>
   </div>
 </div>
 
 <!-- ---------- Invitación recibida ---------- -->
-<div id="invite-dialog" class="overlay hidden">
-  <div class="menu-card small">
+<!-- Una pregunta que hay que contestar: va como las alertas de iOS, en medio. -->
+<div id="invite-dialog" class="overlay overlay-alerta hidden">
+  <div class="alerta">
     <h2 id="invite-title">Te han invitado</h2>
     <p id="invite-text"></p>
-    <button id="btn-invite-accept" class="primary">Aceptar y jugar</button>
-    <button id="btn-invite-decline" class="secondary">Ahora no</button>
+    <button id="btn-invite-accept" class="hoja-boton">Aceptar y jugar</button>
+    <button id="btn-invite-decline" class="hoja-boton tenue">Ahora no</button>
   </div>
 </div>
 
@@ -429,41 +439,64 @@
     <button id="btn-help-close" class="primary">Cerrar</button>
   </div>
 
-  <div id="pause-menu" class="overlay hidden">
-    <div class="menu-card small">
-      <h2>Pausa</h2>
+  <div id="pause-menu" class="overlay overlay-hoja hidden">
+    <div class="hoja">
+      <header class="hoja-cabecera">
+        <h2 class="hoja-titulo">Pausa</h2>
+      </header>
       <!-- Todo lo que antes vivía en la barra superior: la barra sólo guarda
            los recursos, el reposo y este menú. -->
       <table class="stats">
         <tr><td>Edad</td><td id="age-label">Edad Oscura</td></tr>
         <tr><td>Tiempo de partida</td><td id="clock">0:00</td></tr>
       </table>
-      <div class="menu-actions">
-        <button id="btn-speed" title="Velocidad del juego">Velocidad: <span id="speed-label">1x</span></button>
-        <button id="btn-help" title="Ayuda [F1]">Ayuda</button>
-        <button id="btn-fullscreen" class="wide fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
-          <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
-            <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
-          </svg>
-          <span class="fs-label">Pantalla completa</span>
+      <div class="hoja-grupo hoja-lista">
+        <button id="btn-speed" class="hoja-fila" title="Velocidad del juego">
+          <span class="hoja-insignia" style="--insignia: #34c759">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6l8 6-8 6z M12 6l8 6-8 6z" /></svg>
+          </span>
+          <span class="hoja-texto">Velocidad</span>
+          <span class="hoja-valor" id="speed-label">1x</span>
         </button>
+        <button id="btn-help" class="hoja-fila" title="Ayuda [F1]">
+          <span class="hoja-insignia" style="--insignia: #3478f6">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.2 9a3 3 0 1 1 4.3 2.7c-.9.5-1.5 1.2-1.5 2.3M12 17.5v.01" /></svg>
+          </span>
+          <span class="hoja-texto">Ayuda</span>
+          <svg class="hoja-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6" /></svg>
+        </button>
+        <button id="btn-fullscreen" class="hoja-fila fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
+          <span class="hoja-insignia" style="--insignia: #8e8e93">
+            <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+              <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+            </svg>
+          </span>
+          <span class="hoja-texto fs-label">Pantalla completa</span>
+          <svg class="hoja-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6" /></svg>
+        </button>
+        <label class="hoja-fila hoja-volumen">
+          <span class="hoja-insignia" style="--insignia: #ff9500">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 6v12l-4.5-3.5H4z M15.5 9a4 4 0 0 1 0 6 M18 6.5a7.5 7.5 0 0 1 0 11" /></svg>
+          </span>
+          <span class="hoja-texto">Volumen</span>
+          <input id="volume" type="range" min="0" max="1" step="0.05" value="0.35">
+        </label>
       </div>
-      <label class="vol">Volumen
-        <input id="volume" type="range" min="0" max="1" step="0.05" value="0.35">
-      </label>
-      <button id="btn-resume" class="primary">Continuar</button>
-      <button id="btn-restart" class="secondary">Nueva partida</button>
-      <button id="btn-resign" class="danger">Rendirse</button>
+      <button id="btn-resume" class="hoja-boton">Continuar</button>
+      <button id="btn-restart" class="hoja-boton tenue">Nueva partida</button>
+      <button id="btn-resign" class="hoja-boton peligro">Rendirse</button>
     </div>
   </div>
 
-  <div id="end-screen" class="overlay hidden">
-    <div class="menu-card">
-      <h2 id="end-title">Victoria</h2>
+  <div id="end-screen" class="overlay overlay-hoja hidden">
+    <div class="hoja">
+      <header class="hoja-cabecera">
+        <h2 id="end-title" class="hoja-titulo">Victoria</h2>
+      </header>
       <div id="end-body"></div>
-      <button id="btn-restart2" class="primary">Jugar otra vez</button>
-      <button id="btn-end-watch" class="secondary hidden">Seguir viendo la partida</button>
+      <button id="btn-restart2" class="hoja-boton">Jugar otra vez</button>
+      <button id="btn-end-watch" class="hoja-boton tenue hidden">Seguir viendo la partida</button>
     </div>
   </div>
 </div>
