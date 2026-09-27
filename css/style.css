@@ -454,10 +454,12 @@ button:active { filter: brightness(.88); }
 
 #game {
   position: absolute;
-  top: var(--top-total);
+  /* Desde arriba del todo: la barra superior ya no tiene fondo y el mapa se ve
+     entre las cápsulas y, instalado, por debajo de la hora y la batería. */
+  top: 0;
   left: 0;
   width: 100%;
-  height: calc(100% - var(--top-total) - var(--bottom-total));
+  height: calc(100% - var(--bottom-total));
   display: block;
   cursor: default;
   touch-action: none; /* el lienzo gestiona sus propios gestos */
@@ -474,9 +476,10 @@ body.cursor-attack #game { cursor: cell; }
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px;
   padding: var(--sa-top) calc(12px + var(--sa-right)) 0 calc(12px + var(--sa-left));
-  background: rgba(249, 249, 249, .94);
-  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
-  border-bottom: .5px solid var(--raya);
+  /* Sin fondo: los recursos y los botones flotan sobre el mapa como cápsulas,
+     y los toques entre ellas llegan al mapa. */
+  background: none;
+  pointer-events: none;
   z-index: 10;
   /* Nunca en dos líneas: la barra tiene alto fijo y lo que se envuelve acaba
      dibujado sobre el mapa. Antes que envolver, que se encoja. */
@@ -498,6 +501,16 @@ body.cursor-attack #game { cursor: cell; }
 }
 .res span.warn, #res-pop.warn { color: var(--rojo-texto); }
 
+/* Cápsulas flotantes: cada ficha y cada botón de la barra lleva su propio
+   fondo translúcido y su sombra, para leerse sobre cualquier parte del mapa. */
+#topbar .res, #topbar .tbtn {
+  pointer-events: auto;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .86);
+  -webkit-backdrop-filter: saturate(180%) blur(12px); backdrop-filter: saturate(180%) blur(12px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .22);
+}
+
 /* Los aldeanos en reposo son una ficha igual que las de recursos, sólo que
    pulsable: hay que deshacer el aspecto que trae de serie un <button>. */
 #idle-villager {
@@ -509,9 +522,9 @@ body.cursor-attack #game { cursor: cell; }
 #idle-villager:hover { filter: brightness(1.25); }
 #idle-villager:active { transform: translateY(1px); }
 /* Con aldeanos parados la ficha llama la atención; a cero se apaga. */
-#idle-villager.has-idle {
+#idle-villager.has-idle, #topbar #idle-villager.has-idle {
   color: var(--verde-texto);
-  background: rgba(52, 199, 89, .18);
+  background: rgba(222, 246, 229, .92);
 }
 #idle-villager:not(.has-idle) { opacity: .62; }
 
