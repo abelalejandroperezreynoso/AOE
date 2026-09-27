@@ -1,32 +1,19 @@
 // IA de los rivales: economía, expansión, tecnología y ataques por oleadas.
 //
 // El comportamiento reproduce el del Age of Empires II: explorar el mapa con el
-// jinete inicial, repartir aldeanos por proporciones de recursos, ahorrar para
-// la siguiente edad, responder a las incursiones en el sitio donde ocurren
+// jinete inicial, repartir aldeanos por proporciones de recursos, crecer
+// mientras la economía lo pida, responder a las incursiones donde ocurren
 // (campana incluida), reparar lo dañado, concentrar el ejército antes de salir,
 // componer las tropas según lo que se le haya visto al enemigo y llevar la
 // oleada de objetivo en objetivo hasta arrasar la base o retirarse.
 
-import { UNITS, BUILDINGS, TECHS, UPGRADES, AGES, RESOURCES } from './config.js';
+import { UNITS, BUILDINGS, TECHS, RESOURCES } from './config.js';
 import { dist, clamp } from './utils.js';
 import { nearestFree } from './path.js';
 
-const RATIOS = [
-  { food: 0.48, wood: 0.40, gold: 0.08, stone: 0.04 }, // oscura
-  { food: 0.38, wood: 0.40, gold: 0.16, stone: 0.06 }, // feudal
-  { food: 0.34, wood: 0.34, gold: 0.24, stone: 0.08 }, // castillos
-  { food: 0.32, wood: 0.32, gold: 0.28, stone: 0.08 }, // imperial
-];
-
-// Aldeanos mínimos antes de empezar a ahorrar para la siguiente edad.
-const AGE_MIN_VILLAGERS = [14, 20, 26];
-
-const ARMY_MIX = [
-  ['militia', 'scout'],
-  ['archer', 'spearman', 'skirmisher', 'militia'],
-  ['knight', 'crossbowman', 'pikeman', 'longswordsman', 'ram'],
-  ['cavalier', 'arbalester', 'champion', 'knight', 'ram', 'mangonel'],
-];
+// Reparto de aldeanos entre recursos. Sólo hay una edad, así que el oro pesa
+// algo más que en la Oscura de antes: la milicia lo pide toda la partida.
+const RATIO = { food: 0.46, wood: 0.36, gold: 0.14, stone: 0.04 };
 
 // --- Reglas de combate ------------------------------------------------------
 
@@ -46,9 +33,8 @@ const RETREAT_FRACTION = 0.3;
 
 /**
  * Triángulo de contras del juego original: cuánto vale cada clase propia
- * (filas) frente a cada clase enemiga (columnas). Es lo que hace que la IA
- * saque lanceros cuando le llegan jinetes o caballería cuando le llegan
- * arqueros, en vez de repetir siempre la misma mezcla.
+ * (filas) frente a cada clase enemiga (columnas). Hoy sólo se entrena milicia,
+ * así que no hay elección; se deja para cuando haya más de una unidad.
  */
 const COUNTER_SCORE = {
   infantry: { infantry: 1.0, archer: 1.1, cavalry: 0.5, siege: 1.4, civilian: 1.2 },
@@ -57,21 +43,14 @@ const COUNTER_SCORE = {
   siege: { infantry: 0.6, archer: 0.9, cavalry: 0.4, siege: 0.6, civilian: 0.4 },
 };
 
-// Unidades que existen precisamente para frenar a una clase concreta.
-const SPECIALIST = { spearman: 'cavalry', pikeman: 'cavalry', skirmisher: 'archer' };
-
-// Máquinas de asedio que puede haber en el ejército a la vez, por edad.
-const SIEGE_CAP = [0, 0, 2, 4];
-
 /**
  * Qué merece la pena derribar primero. Se suma a la distancia, así que negativo
- * es «acércate a esto» y positivo «déjalo para el final»: torres y castillos
- * salen caros de asaltar y las murallas no dan nada.
+ * es «acércate a esto» y positivo «déjalo para el final».
  */
 const TARGET_BONUS = {
-  towncenter: -26, barracks: -12, archeryrange: -12, stable: -12, siegeworkshop: -12,
-  mill: -5, lumbercamp: -5, miningcamp: -5, market: -4, blacksmith: -4,
-  house: 4, farm: 7, tower: 9, castle: 14, wall: 22,
+  towncenter: -26, barracks: -12,
+  mill: -5, lumbercamp: -5, miningcamp: -5,
+  house: 4, farm: 7,
 };
 
 export class AI {
@@ -111,7 +90,6 @@ export class AI {
         seen: { infantry: 0, archer: 0, cavalry: 0, siege: 0, civilian: 0 },
         seenCd: 0,
         repairCd: 0,
-        tradeCd: 0,
       };
       for (const u of p.units) if (u.type === 'scout') { b.scout = u; break; }
       b.staging = this.stagingPoint(b);
@@ -138,10 +116,8 @@ export class AI {
     this.buildHouses(b);
     this.buildMilitary(b);
     this.buildEconomy(b);
-    this.advanceAge(b);
     this.trainArmy(b);
     this.research(b);
-    this.trade(b);
     this.manageArmy(b);
   }
 
@@ -165,47 +141,17 @@ export class AI {
     return null;
   }
 
-  /**
-   * ¿Estamos ahorrando para subir de edad? Si ya hay aldeanos suficientes,
-   * la prioridad absoluta es reunir el coste de la siguiente edad.
-   */
-  savingForAge(b) {
-    const p = b.player;
-    if (p.age >= 3) return false;
-    const tc = this.mainTC(p);
-    if (!tc || !tc.built) return false;
-    if (tc.queue.some((q) => q.kind === 'age')) return false;
-    if (this.villagers(p).length < AGE_MIN_VILLAGERS[p.age]) return false;
-    return !p.canAfford(AGES[p.age + 1].cost);
-  }
-
-  /**
-   * ¿Podemos permitirnos este gasto sin comernos lo reservado para la edad?
-   * Sin esta regla el ahorro oscila justo por debajo del coste y nunca se llega.
-   */
-  spendOk(b, cost) {
-    if (!this.savingForAge(b)) return true;
-    const p = b.player;
-    const need = AGES[p.age + 1].cost;
-    for (const r of RESOURCES) {
-      if (!cost[r] || !need[r]) continue;
-      if (p.res[r] - cost[r] < need[r]) return false;
-    }
-    return true;
-  }
-
   trainVillagers(b) {
     const p = b.player;
     const tc = this.mainTC(p);
     if (!tc || !tc.built) return;
-    const target = this.game.difficulty.villagerTarget + p.age * 4;
+    const target = this.game.difficulty.villagerTarget;
     const count = this.villagers(p).length;
     const queued = tc.queue.filter((q) => q.kind === 'unit').length;
     if (count + queued >= target) return;
     if (tc.queue.length >= 3) return;
     if (p.pop >= p.popCap) return;
     if (p.res.food < 50) return;
-    if (!this.spendOk(b, UNITS.villager.cost)) return;
     this.game.queueUnit(tc, 'villager', p);
   }
 
@@ -223,27 +169,30 @@ export class AI {
     const p = b.player, g = this.game;
     const has = (t) => p.countBuildings((x) => x.type === t);
 
-    // Sin centro urbano no hay aldeanos, ni edades, ni almacén: reponerlo va
+    // Sin centro urbano no hay aldeanos ni almacén: reponerlo va
     // por delante de todo lo demás.
     if (!this.mainTC(p) && p.canAfford(BUILDINGS.towncenter.cost)) {
       const spot = this.findSpot(b, 'towncenter', b.base.x, b.base.y, 16);
       if (spot && this.build(b, 'towncenter', spot.x, spot.y)) return;
     }
 
-    // Campamentos junto a los recursos que se están explotando.
-    if (p.res.wood >= 100 && has('lumbercamp') < 1 + p.age) {
+    // Campamentos junto a los recursos que se están explotando, más cuantos
+    // más aldeanos hay, que el primer bosque y la primera mina se agotan.
+    const vils = this.villagers(p).length;
+    if (p.res.wood >= 100 && has('lumbercamp') < Math.min(3, 1 + Math.floor(vils / 15))) {
       const spot = this.resourceSpot(b, 'wood', 'lumbercamp');
       if (spot) { this.build(b, 'lumbercamp', spot.x, spot.y); return; }
     }
-    if (p.res.wood >= 100 && has('miningcamp') < 1 + Math.min(2, p.age)) {
+    if (p.res.wood >= 100 && has('miningcamp') < Math.min(3, 1 + Math.floor(vils / 18))) {
       const spot = this.resourceSpot(b, 'gold', 'miningcamp') || this.resourceSpot(b, 'stone', 'miningcamp');
       if (spot) { this.build(b, 'miningcamp', spot.x, spot.y); return; }
     }
     if (p.res.wood >= 100 && has('mill') < 1) { this.tryBuild(b, 'mill'); return; }
 
-    // Granjas: fuente de comida estable a partir de la Feudal.
+    // Granjas: la comida estable cuando se acaban las bayas y las ovejas, y
+    // más cuanto mayor es el pueblo.
     const farms = p.countBuildings((x) => x.type === 'farm');
-    const wantFarms = p.age === 0 ? 2 : 3 + p.age * 2;
+    const wantFarms = Math.max(2, Math.floor(vils * 0.35));
     if (has('mill') && farms < wantFarms && p.res.wood >= 120) {
       const mill = [...p.buildings].find((x) => x.type === 'mill' && x.built) || this.mainTC(p);
       if (mill) {
@@ -251,10 +200,8 @@ export class AI {
         if (spot) { this.build(b, 'farm', spot.x, spot.y); return; }
       }
     }
-    // El mercado permite convertir excedentes en lo que falta (ver `trade`).
-    if (p.age >= 1 && has('market') < 1 && p.res.wood >= 250) { this.tryBuild(b, 'market'); return; }
-    // Un segundo centro urbano en la Edad de los Castillos.
-    if (p.age >= 2 && has('towncenter') < 2 && p.res.wood >= 400 && p.res.stone >= 200) {
+    // Un segundo centro urbano cuando el pueblo ya es grande.
+    if (vils >= 24 && has('towncenter') < 2 && p.res.wood >= 400 && p.res.stone >= 200) {
       const spot = this.findSpot(b, 'towncenter', b.base.x, b.base.y, 14);
       if (spot) this.build(b, 'towncenter', spot.x, spot.y);
     }
@@ -277,7 +224,7 @@ export class AI {
     const g = this.game, p = b.player;
     const vils = this.villagers(p);
     if (!vils.length) return;
-    const ratio = RATIOS[clamp(p.age, 0, 3)];
+    const ratio = RATIO;
     const counts = { food: 0, wood: 0, gold: 0, stone: 0 };
     const idle = [];
     for (const v of vils) {
@@ -337,30 +284,6 @@ export class AI {
     }
   }
 
-  /**
-   * Mercado: se venden excedentes para completar lo que falta, que es lo que
-   * hace la máquina en el juego original cuando se le atasca una edad o una
-   * tanda de unidades por un solo recurso.
-   */
-  trade(b) {
-    const g = this.game, p = b.player;
-    if (!p.hasBuilding('market')) return;
-    b.tradeCd -= 1;
-    if (b.tradeCd > 0) return;
-    b.tradeCd = 8;
-    const need = p.age < 3 ? AGES[p.age + 1].cost : { gold: 500, food: 400 };
-    for (const r of RESOURCES) {
-      if ((p.res[r] || 0) >= (need[r] || 0)) continue;
-      for (const s of RESOURCES) {
-        // Sólo se vende lo que sobra de verdad, nunca lo que ya está reservado.
-        if (s === r || s === 'gold' || p.res[s] < 400 + (need[s] || 0)) continue;
-        g.tradeAt(p, s, 'sell');
-        if (r !== 'gold') g.tradeAt(p, r, 'buy');
-        return;
-      }
-    }
-  }
-
   // --- Construcción ---------------------------------------------------------
 
   tryBuild(b, type) {
@@ -372,7 +295,7 @@ export class AI {
   build(b, type, tx, ty) {
     const g = this.game, p = b.player;
     if (!p.canAfford(BUILDINGS[type].cost)) return false;
-    const builders = this.pickBuilders(b, tx, ty, type === 'towncenter' || type === 'castle' ? 3 : 2);
+    const builders = this.pickBuilders(b, tx, ty, type === 'towncenter' ? 3 : 2);
     const err = g.placeBuilding(type, tx, ty, p, builders);
     return !err;
   }
@@ -418,82 +341,38 @@ export class AI {
 
   // --- Tecnología y ejército ------------------------------------------------
 
-  advanceAge(b) {
-    const p = b.player;
-    if (p.age >= 3) return;
-    const tc = this.mainTC(p);
-    if (!tc || !tc.built) return;
-    if (tc.queue.some((q) => q.kind === 'age')) return;
-    if (this.villagers(p).length < AGE_MIN_VILLAGERS[p.age]) return;
-    this.game.queueAge(tc, p);
-  }
-
   buildMilitary(b) {
     const p = b.player;
     const has = (t) => p.countBuildings((x) => x.type === t);
     if (p.res.wood < 175) return;
-    // En la Edad Oscura la prioridad es la economía, salvo que nos ataquen.
-    if (p.age === 0 && this.villagers(p).length < 11 && !b.defending) return;
-    if (has('barracks') < 1) { this.tryBuild(b, 'barracks'); return; }
-    if (p.age >= 1) {
-      if (has('archeryrange') < 1) { this.tryBuild(b, 'archeryrange'); return; }
-      if (has('stable') < 1) { this.tryBuild(b, 'stable'); return; }
-      if (has('blacksmith') < 1 && p.res.wood >= 150) { this.tryBuild(b, 'blacksmith'); return; }
-    }
-    if (p.age >= 2) {
-      if (has('barracks') + has('archeryrange') + has('stable') < 5) {
-        const t = ['archeryrange', 'stable', 'barracks'][Math.floor(Math.random() * 3)];
-        this.tryBuild(b, t); return;
-      }
-      if (has('siegeworkshop') < 1 && p.res.wood >= 200) { this.tryBuild(b, 'siegeworkshop'); return; }
-      if (has('castle') < 1 && p.res.stone >= 650) {
-        const spot = this.findSpot(b, 'castle', b.base.x, b.base.y, 12);
-        if (spot) this.build(b, 'castle', spot.x, spot.y);
-        return;
-      }
-    }
-    // Torres defensivas.
-    if (p.age >= 1 && p.res.stone >= 250 && has('tower') < 2 + p.age) {
-      const tc = this.mainTC(p);
-      if (tc) {
-        const spot = this.findSpot(b, 'tower', tc.cx + (Math.random() - 0.5) * 12, tc.cy + (Math.random() - 0.5) * 12, 8);
-        if (spot) this.build(b, 'tower', spot.x, spot.y);
-      }
-    }
+    // Al principio la prioridad es la economía, salvo que nos ataquen.
+    const vils = this.villagers(p).length;
+    if (vils < 11 && !b.defending) return;
+    // Un cuartel, y otro más por cada docena de aldeanos, hasta tres.
+    if (has('barracks') < Math.min(3, Math.max(1, Math.floor(vils / 12)))) this.tryBuild(b, 'barracks');
   }
 
   trainArmy(b) {
     const p = b.player;
     if (p.pop >= p.popCap - 1) return;
     // No ahogar la economía inicial creando soldados demasiado pronto.
-    if (p.age === 0 && this.villagers(p).length < 11 && !b.defending) return;
-    const defending = b.defending;
-    const mix = ARMY_MIX[clamp(p.age, 0, 3)];
-    let siege = 0;
-    for (const u of p.units) if (UNITS[u.type].class === 'siege') siege++;
+    if (this.villagers(p).length < 11 && !b.defending) return;
     const producers = [...p.buildings].filter((x) => x.built && BUILDINGS[x.type].trains
       && x.type !== 'towncenter' && x.queue.length < 3);
     for (const prod of producers) {
-      let options = BUILDINGS[prod.type].trains.filter((t) => p.unitAvailable(t) && mix.includes(t));
-      // El asedio es caro, lento y ocupa el doble: unas pocas piezas bastan.
-      if (siege >= SIEGE_CAP[clamp(p.age, 0, 3)]) {
-        options = options.filter((t) => UNITS[t].class !== 'siege');
-      }
+      const options = BUILDINGS[prod.type].trains;
       if (!options.length) continue;
       const type = this.pickUnit(b, options);
-      const def = UNITS[type];
-      if (!p.canAfford(def.cost)) continue;
-      if (!defending && !this.spendOk(b, def.cost)) continue;
-      if (this.game.queueUnit(prod, type, p) === null && def.class === 'siege') siege++;
+      if (!p.canAfford(UNITS[type].cost)) continue;
+      this.game.queueUnit(prod, type, p);
     }
   }
 
   /**
    * Qué entrenar de entre lo que sabe hacer este edificio. Como en el juego
-   * original se responde con la contra de lo que se le ha visto al enemigo:
-   * lanceros a la caballería, guerrilleros a los arqueros, jinetes a los
-   * arqueros... Mientras no se haya visto nada se reparte al azar, para no
-   * empezar la partida con un ejército de un solo tipo.
+   * original se responde con la contra de lo que se le ha visto al enemigo,
+   * según `COUNTER_SCORE`. Mientras no se haya visto nada se reparte al azar,
+   * para no empezar la partida con un ejército de un solo tipo.
    */
   pickUnit(b, options) {
     const seen = b.seen;
@@ -503,18 +382,9 @@ export class AI {
     let sum = 0;
     for (const type of options) {
       const cls = UNITS[type].class;
-      let score;
-      if (cls === 'siege') {
-        // El asedio no se elige por contras sino por necesidad: cuantas más
-        // oleadas se hayan estrellado contra la base enemiga, más falta hace.
-        score = 0.9 + Math.min(0.7, b.wave * 0.12);
-      } else {
-        score = 0;
-        for (const k of ['infantry', 'archer', 'cavalry', 'siege']) {
-          const share = seen[k] / total;
-          score += share * (COUNTER_SCORE[cls][k] ?? 1);
-          if (SPECIALIST[type] === k) score += share * 1.2;
-        }
+      let score = 0;
+      for (const k of ['infantry', 'archer', 'cavalry', 'siege']) {
+        score += (seen[k] / total) * (COUNTER_SCORE[cls]?.[k] ?? 1);
       }
       // Sorteo proporcional en vez de coger siempre el mejor: la contra sale
       // la mayoría de las veces, pero el ejército no acaba siendo de un solo
@@ -538,16 +408,10 @@ export class AI {
       const list = BUILDINGS[bd.type].techs || [];
       for (const key of list) {
         const t = TECHS[key];
-        if (p.techs.has(key) || p.age < t.age) continue;
+        if (p.techs.has(key)) continue;
         if (t.requires && !p.techs.has(t.requires)) continue;
-        if (!p.canAfford(t.cost) || !this.spendOk(b, t.cost)) continue;
+        if (!p.canAfford(t.cost)) continue;
         if (this.game.queueTech(bd, key, p) === null) return;
-      }
-      for (const key in UPGRADES) {
-        const up = UPGRADES[key];
-        if (up.building !== bd.type || p.techs.has(key) || p.age < up.age) continue;
-        if (!p.canAfford(up.cost) || !this.spendOk(b, up.cost)) continue;
-        if (this.game.queueUpgrade(bd, key, p) === null) return;
       }
     }
   }
@@ -559,14 +423,14 @@ export class AI {
    * asoma a las bases rivales —sin meterse debajo de sus torres— y después da
    * vueltas por el terreno. Sirve para descubrir el mapa y, sobre todo, para
    * ver con qué ejército cuenta el enemigo (ver `observe`). Si lo matan, no se
-   * repone: los exploradores que salgan luego del establo son tropa de combate.
+   * repone.
    */
   scoutMap(b) {
     const p = b.player;
     if (!b.scout) return;
     if (b.scout.dead || b.scout.owner !== p.id) { b.scout = null; return; }
     // En cuanto hay ejército de verdad, el explorador se suma a él.
-    if (p.age >= 2) { b.scout = null; return; }
+    if (this.army(p).length >= 10) { b.scout = null; return; }
     const s = b.scout;
     // Mientras esté ocupado —de camino, o peleando porque le han salido al
     // paso— no se le da otra orden.
@@ -893,7 +757,7 @@ export class AI {
   /**
    * Siguiente edificio a derribar, medido desde `from`. Se va a por el centro
    * urbano y la producción militar antes que por las casas, se deja para el
-   * final lo que sale caro de asaltar (torres, castillos, murallas) y, en
+   * final las casas y las granjas y, en
    * igualdad, se prefiere al jugador humano.
    */
   pickTarget(b, from) {

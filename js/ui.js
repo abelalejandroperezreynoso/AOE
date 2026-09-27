@@ -1,7 +1,7 @@
 // Interfaz de usuario: HUD, panel de órdenes y control con ratón, teclado y dedo.
 
 import {
-  UNITS, BUILDINGS, TECHS, UPGRADES, AGES, RESOURCES, RES_NAME,
+  UNITS, BUILDINGS, TECHS, RESOURCES, RES_NAME,
   BUILD_ORDER, PLAYER_COLORS,
 } from './config.js';
 import { iconFor } from './sprites.js';
@@ -9,7 +9,6 @@ import { NODE_LABELS as NODE_NAMES } from './data/overrides.js';
 import { fmtTime, clamp, dist } from './utils.js';
 
 const HOTKEYS = ['Q', 'W', 'E', 'R', 'T', 'Y', 'A', 'S', 'D', 'F', 'G', 'H', 'Z', 'X', 'C', 'V', 'B', 'N'];
-const MARKET_RATE = { sell: 0.8, buy: 1.4 };
 const QUEUE_ICONS = 6; // iconos que se dibujan de la cola; el resto los dice el contador
 // Cuánto se levanta la maqueta por encima del dedo al arrastrar un edificio.
 const DRAG_LIFT = 56;
@@ -105,7 +104,6 @@ export class UI {
     this.el.res = {};
     for (const r of RESOURCES) this.el.res[r] = id(`res-${r}`);
     this.el.pop = id('res-pop');
-    this.el.age = id('age-label');
     this.el.clock = id('clock');
     this.el.commands = id('commands');
     this.el.selInfo = id('sel-info');
@@ -910,14 +908,14 @@ export class UI {
   // --- Paneles --------------------------------------------------------------
 
   /**
-   * Huella de lo que decide *qué* botones existen: la selección, la edad y las
-   * tecnologías (una mejora terminada cambia las unidades que se ofrecen).
+   * Huella de lo que decide *qué* botones existen: la selección y las
+   * tecnologías (una investigada deja de ofrecerse).
    * Mientras no cambie, los botones se dejan en su sitio y sólo se repinta si
    * algo se puede pagar o no.
    */
   selectionSignature() {
     const p = this.game.human;
-    return `${this.game.selection.map((e) => `${e.kind}${e.id}:${e.type}`).join(',')}|${p.age}|${p.techs.size}`;
+    return `${this.game.selection.map((e) => `${e.kind}${e.id}:${e.type}`).join(',')}|${p.techs.size}`;
   }
 
   refreshSelection() {
@@ -1059,7 +1057,6 @@ export class UI {
       if (hasVillager) {
         for (const type of BUILD_ORDER) {
           const B = BUILDINGS[type];
-          if (B.age > p.age) continue;
           if (B.req && !p.hasBuilding(B.req)) continue;
           btns.push({
             icon: iconFor('building', type, p.colorIdx),
@@ -1105,7 +1102,6 @@ export class UI {
         return btns;
       }
       for (const type of B.trains || []) {
-        if (!p.unitAvailable(type)) continue;
         const U = UNITS[type];
         btns.push({
           icon: iconFor('unit', type, p.colorIdx),
@@ -1124,30 +1120,9 @@ export class UI {
           },
         });
       }
-      // Mejoras de línea disponibles en este edificio.
-      for (const key in UPGRADES) {
-        const up = UPGRADES[key];
-        if (up.building !== b.type || p.techs.has(key) || up.age > p.age) continue;
-        if (!p.unitAvailable(up.from) && !p.techs.has(key)) {
-          // Sólo se ofrece si ya tenemos el escalón previo disponible.
-          const prevOk = UNITS[up.from].age <= p.age;
-          if (!prevOk) continue;
-        }
-        btns.push({
-          icon: iconFor('unit', up.to, p.colorIdx),
-          label: up.name, cost: up.cost, upgrade: true,
-          tooltip: `${up.name}\nConvierte tus ${UNITS[up.from].name} en ${UNITS[up.to].name}.`,
-          disabled: !p.canAfford(up.cost),
-          action: () => {
-            const err = g.queueUpgrade(b, key, p);
-            if (err) { this.notify(err, 'bad'); this.audio.play('error'); }
-            this.updateAffordability();
-          },
-        });
-      }
       for (const key of B.techs || []) {
         const t = TECHS[key];
-        if (p.techs.has(key) || t.age > p.age) continue;
+        if (p.techs.has(key)) continue;
         if (t.requires && !p.techs.has(t.requires)) continue;
         btns.push({
           icon: iconFor('tech', t.name, 0),
@@ -1160,39 +1135,6 @@ export class UI {
             this.updateAffordability();
           },
         });
-      }
-      if (b.type === 'towncenter' && p.age < 3) {
-        const next = AGES[p.age + 1];
-        btns.push({
-          icon: iconFor('tech', next.short, 0),
-          label: `Avanzar a la ${next.short}`, cost: next.cost, big: true,
-          tooltip: `${next.name}\nDesbloquea nuevas unidades, edificios y mejoras.\nRequiere ${next.reqBuildings} edificio(s) de la edad actual.`,
-          disabled: !p.canAfford(next.cost),
-          action: () => {
-            const err = g.queueAge(b, p);
-            if (err) { this.notify(err, 'bad'); this.audio.play('error'); }
-            else this.notify(`Avanzando a la ${next.name}...`, 'good');
-            this.updateAffordability();
-          },
-        });
-      }
-      if (B.market) {
-        for (const r of ['food', 'wood', 'stone']) {
-          btns.push({
-            icon: iconFor('res', r, 0), label: `Vender ${RES_NAME[r]}`,
-            tooltip: `Vende 100 de ${RES_NAME[r]} a cambio de ${Math.round(100 * MARKET_RATE.sell)} de oro.`,
-            disabled: p.res[r] < 100,
-            action: () => { g.commandMarket(r, 'sell'); this.audio.play('tech'); },
-          });
-        }
-        for (const r of ['food', 'wood', 'stone']) {
-          btns.push({
-            icon: iconFor('res', r, 0), label: `Comprar ${RES_NAME[r]}`,
-            tooltip: `Compra 100 de ${RES_NAME[r]} por ${Math.round(100 * MARKET_RATE.buy)} de oro.`,
-            disabled: p.res.gold < 100 * MARKET_RATE.buy,
-            action: () => { g.commandMarket(r, 'buy'); this.audio.play('tech'); },
-          });
-        }
       }
       btns.push({
         icon: null, glyph: '☠', label: 'Demoler', danger: true,
@@ -1326,13 +1268,11 @@ export class UI {
     this.buttons = [];
   }
 
-  /** Icono y nombre de un elemento en cola, sea unidad, edad, mejora o tecnología. */
+  /** Icono y nombre de un elemento en cola, sea unidad o tecnología. */
   queueIcon(item) {
     const idx = this.game.human.colorIdx;
     switch (item.kind) {
       case 'unit': return iconFor('unit', item.key, idx);
-      case 'age': return iconFor('tech', AGES[item.key].short, 0);
-      case 'upgrade': return iconFor('unit', UPGRADES[item.key].to, idx);
       default: return iconFor('tech', TECHS[item.key].name, 0);
     }
   }
@@ -1340,8 +1280,6 @@ export class UI {
   queueLabel(item) {
     switch (item.kind) {
       case 'unit': return UNITS[item.key].name;
-      case 'age': return AGES[item.key].name;
-      case 'upgrade': return UPGRADES[item.key].name;
       default: return TECHS[item.key].name;
     }
   }
@@ -1480,7 +1418,6 @@ export class UI {
         + 'la partida se les cortará. Puedes quedarte mirando hasta que termine.</p>' : ''}
       <table class="stats">
         <tr><td>Duración</td><td>${fmtTime(g.time)}</td></tr>
-        <tr><td>Edad alcanzada</td><td>${AGES[g.human.age].name}</td></tr>
         <tr><td>Recursos recolectados</td><td>${Math.round(s.gathered)}</td></tr>
         <tr><td>Unidades entrenadas</td><td>${s.unitsTrained}</td></tr>
         <tr><td>Bajas causadas</td><td>${s.kills}</td></tr>
@@ -1505,8 +1442,6 @@ export class UI {
       this.el.pop.classList.toggle('warn', p.pop >= p.popCap);
       this.el.pop._v = pop;
     }
-    const ageTxt = AGES[p.age].name;
-    if (this.el.age._v !== ageTxt) { this.el.age.textContent = ageTxt; this.el.age._v = ageTxt; }
     const clock = fmtTime(g.time);
     if (this.el.clock._v !== clock) { this.el.clock.textContent = clock; this.el.clock._v = clock; }
 

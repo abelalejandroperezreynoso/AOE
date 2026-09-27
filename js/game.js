@@ -1,7 +1,7 @@
 // Estado global de la partida y bucle de simulación.
 
 import {
-  UNITS, BUILDINGS, TECHS, UPGRADES, AGES, RESOURCES, PLAYER_COLORS,
+  UNITS, BUILDINGS, TECHS, RESOURCES, PLAYER_COLORS,
   GATHER_RATE, DIFFICULTIES, MAX_PLAYERS,
 } from './config.js';
 import { GameMap, minMapSizeFor } from './map.js';
@@ -416,9 +416,7 @@ export class Game {
     let best = null, bestD = Infinity;
     for (const b of this.buildings) {
       if (b.owner === owner || b.dead) continue;
-      // La muralla se ataca sólo si no hay nada mejor: derribarla cuesta y no
-      // da nada a cambio.
-      const d = this.edgeDist(probe, b) + (BUILDINGS[b.type].wall ? 6 : 0);
+      const d = this.edgeDist(probe, b);
       if (d < r && d < bestD) { bestD = d; best = b; }
     }
     return best;
@@ -993,37 +991,6 @@ export class Game {
     }
   }
 
-  /** Compraventa en el mercado. dir es 'sell' o 'buy'. */
-  commandMarket(res, dir) {
-    const p = this.human;
-    if (this.isGuest) {
-      const price = Math.round(100 * (dir === 'sell' ? 0.8 : 1.4));
-      if (dir === 'sell' && p.res[res] < 100) return;
-      if (dir === 'buy' && p.res.gold < price) return;
-      this.netSend({ c: 'market', r: res, d: dir });
-      return;
-    }
-    this.tradeAt(p, res, dir);
-  }
-
-  /**
-   * Una operación de mercado: se venden 100 unidades del recurso por oro o se
-   * compran 100 pagando oro. La usan el jugador y la máquina por igual.
-   * Devuelve false si no se pudo hacer.
-   */
-  tradeAt(player, res, dir) {
-    if (res === 'gold') return false;
-    const price = Math.round(100 * (dir === 'sell' ? 0.8 : 1.4));
-    if (dir === 'sell') {
-      if (player.res[res] < 100) return false;
-      player.res[res] -= 100; player.res.gold += price;
-    } else {
-      if (player.res.gold < price) return false;
-      player.res.gold -= price; player.res[res] += 100;
-    }
-    return true;
-  }
-
   /** Rendirse. */
   commandResign() {
     if (this.isGuest) { this.netSend({ c: 'resign' }); return; }
@@ -1037,7 +1004,6 @@ export class Game {
     const def = UNITS[type];
     if (!def) return 'Unidad desconocida';
     if (this.isGuest) { this.netSend({ c: 'train', b: building.id, t: type }); return null; }
-    if (player.age < def.age) return `Requiere la ${AGES[def.age].name}`;
     if (!player.canAfford(def.cost)) return 'Recursos insuficientes';
     if (building.queue.length >= 12) return 'Cola llena';
     player.pay(def.cost);
@@ -1050,7 +1016,6 @@ export class Game {
     if (!t) return 'Tecnología desconocida';
     if (this.isGuest) { this.netSend({ c: 'tech', b: building.id, k2: key }); return null; }
     if (player.techs.has(key)) return 'Ya investigada';
-    if (player.age < t.age) return `Requiere la ${AGES[t.age].name}`;
     if (t.requires && !player.techs.has(t.requires)) return `Requiere ${TECHS[t.requires].name}`;
     if (building.queue.some((q) => q.key === key)) return 'Ya está en cola';
     if (!player.canAfford(t.cost)) return 'Recursos insuficientes';
@@ -1059,43 +1024,12 @@ export class Game {
     return null;
   }
 
-  queueUpgrade(building, key, player) {
-    const up = UPGRADES[key];
-    if (!up) return 'Mejora desconocida';
-    if (this.isGuest) { this.netSend({ c: 'upgrade', b: building.id, k2: key }); return null; }
-    if (player.techs.has(key)) return 'Ya investigada';
-    if (player.age < up.age) return `Requiere la ${AGES[up.age].name}`;
-    if (building.queue.some((q) => q.key === key)) return 'Ya está en cola';
-    if (!player.canAfford(up.cost)) return 'Recursos insuficientes';
-    player.pay(up.cost);
-    building.queue.push({ kind: 'upgrade', key, progress: 0, time: up.time });
-    return null;
-  }
-
-  queueAge(building, player) {
-    const next = player.age + 1;
-    if (next >= AGES.length) return 'Ya estás en la Edad Imperial';
-    if (this.isGuest) { this.netSend({ c: 'age', b: building.id }); return null; }
-    const age = AGES[next];
-    const req = player.countBuildings((b) => b.built && BUILDINGS[b.type].age <= player.age
-      && !['house', 'farm', 'wall', 'towncenter'].includes(b.type));
-    if (req < age.reqBuildings) return `Necesitas ${age.reqBuildings} edificios de la edad actual`;
-    if (building.queue.some((q) => q.kind === 'age')) return 'Ya estás avanzando';
-    if (!player.canAfford(age.cost)) return 'Recursos insuficientes';
-    player.pay(age.cost);
-    building.queue.push({ kind: 'age', key: next, progress: 0, time: age.time });
-    return null;
-  }
-
   cancelQueueItem(building, index) {
     if (this.isGuest) { this.netSend({ c: 'cancelq', b: building.id, i: index }); return; }
     const item = building.queue[index];
     if (!item) return;
     const player = this.players[building.owner];
-    const cost = item.kind === 'unit' ? UNITS[item.key].cost
-      : item.kind === 'tech' ? TECHS[item.key].cost
-        : item.kind === 'upgrade' ? UPGRADES[item.key].cost
-          : AGES[item.key].cost;
+    const cost = item.kind === 'unit' ? UNITS[item.key].cost : TECHS[item.key].cost;
     player.refund(cost);
     building.queue.splice(index, 1);
   }
@@ -1122,7 +1056,6 @@ export class Game {
   placeBuilding(type, tx, ty, player, builders) {
     if (!this.canPlace(type, tx, ty, player)) return 'No se puede construir aquí';
     const cost = BUILDINGS[type].cost;
-    if (player.age < BUILDINGS[type].age) return `Requiere la ${AGES[BUILDINGS[type].age].name}`;
     if (this.isGuest) {
       // Se comprueba lo evidente en local para poder avisar al momento; la
       // colocación de verdad la hace el anfitrión.

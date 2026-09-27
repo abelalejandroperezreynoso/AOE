@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Age of Realms II · Estrategia medieval en tiempo real</title>
-<meta name="description" content="Juego de estrategia en tiempo real medieval, inspirado en los clásicos: recolecta recursos, avanza de edad y conquista a tus rivales. Funciona en el navegador, sin instalación.">
+<meta name="description" content="Juego de estrategia en tiempo real medieval, inspirado en los clásicos: recolecta recursos, levanta tu aldea y conquista a tus rivales. Funciona en el navegador, sin instalación.">
 <!-- Tiñe de blanco las barras del navegador, y con ellas la franja del
      reloj y la batería del teléfono. -->
 <meta name="theme-color" content="#ffffff">
@@ -18,7 +18,7 @@
 <!-- La versión va en la URL del CSS para que el teléfono no use la copia
      guardada, y es la misma que se enseña en la letra pequeña del menú. Se
      cambia a mano en los tres sitios al tocar la maquetación. -->
-<link rel="stylesheet" href="css/style.css?v=2026.09.27-4">
+<link rel="stylesheet" href="css/style.css?v=2026.09.28-1">
 <!-- El icono: el castillo del juego, horneado por tools/make-icons.mjs.
      iOS no lee los iconos del manifiesto, sino apple-touch-icon. -->
 <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
@@ -67,7 +67,7 @@
       <!-- Qué versión se está ejecutando de verdad: en un móvil con la página
            guardada no hay otra forma de saberlo. Y el enlace a la página de
            medidas, que instalado no hay barra de direcciones. -->
-      <span class="version">v2026.09.27-4</span>
+      <span class="version">v2026.09.28-1</span>
       <a class="version" href="/diag.html">Diagnóstico</a></p>
   </div>
 </div>
@@ -288,7 +288,7 @@
       <tr><td>.</td><td>Ir al siguiente aldeano en reposo (o pulsa su ficha en la barra)</td></tr>
       <tr><td>Espacio</td><td>Centrar la cámara en la selección</td></tr>
       <tr><td>Supr</td><td>Eliminar lo seleccionado</td></tr>
-      <tr><td>P / Esc o el botón ☰</td><td>Pausa y menú: edad, tiempo, velocidad, pantalla completa, volumen y ayuda</td></tr>
+      <tr><td>P / Esc o el botón ☰</td><td>Pausa y menú: tiempo, velocidad, pantalla completa, volumen y ayuda</td></tr>
       <tr><td>F11 o el menú</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
       <tr><td>Multijugador</td><td>En Comenzar partida, modo «Con otra persona»: entra en la sala, elige a alguien e invítalo</td></tr>
       <tr><td>Catálogo</td><td>Desde el menú principal: consulta todo el juego y mira las animaciones de cada unidad; los edificios, los recursos y los colores del terreno se pueden cambiar, las cifras de las unidades no</td></tr>
@@ -321,7 +321,6 @@
       <!-- Todo lo que antes vivía en la barra superior: la barra sólo guarda
            los recursos, el reposo y este menú. -->
       <table class="stats">
-        <tr><td>Edad</td><td id="age-label">Edad Oscura</td></tr>
         <tr><td>Tiempo de partida</td><td id="clock">0:00</td></tr>
       </table>
       <div class="hoja-grupo hoja-lista">
@@ -375,6 +374,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=2026.09.27-4"></script>
+<script type="module" src="js/main.js?v=2026.09.28-1"></script>
 </body>
 </html>

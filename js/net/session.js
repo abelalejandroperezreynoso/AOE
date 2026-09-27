@@ -231,16 +231,6 @@ export class NetSession {
         if (b && b.owner === player.id) g.queueTech(b, cmd.k2, player);
         break;
       }
-      case 'upgrade': {
-        const b = g.byId.get(cmd.b);
-        if (b && b.owner === player.id) g.queueUpgrade(b, cmd.k2, player);
-        break;
-      }
-      case 'age': {
-        const b = g.byId.get(cmd.b);
-        if (b && b.owner === player.id) g.queueAge(b, player);
-        break;
-      }
       case 'cancelq': {
         const b = g.byId.get(cmd.b);
         if (b && b.owner === player.id) g.cancelQueueItem(b, cmd.i);
@@ -254,12 +244,6 @@ export class NetSession {
             ? { x: target.x ?? target.cx, y: target.y ?? target.cy, target }
             : { x: cmd.x, y: cmd.y };
         }
-        break;
-      }
-      case 'market': {
-        const price = Math.round(100 * (cmd.d === 'sell' ? 0.8 : 1.4));
-        if (cmd.d === 'sell' && player.res[cmd.r] >= 100) { player.res[cmd.r] -= 100; player.res.gold += price; }
-        else if (cmd.d === 'buy' && player.res.gold >= price) { player.res.gold -= price; player.res[cmd.r] += 100; }
         break;
       }
       case 'resign':
@@ -282,11 +266,9 @@ export class NetSession {
       const p = g.players[ps.id];
       if (!p) continue;
       p.res = ps.res;
-      p.age = ps.age;
       p.defeated = ps.defeated;
     }
-    // Las mejoras ya vienen reflejadas en el tipo de cada unidad; aquí sólo se
-    // rehacen los modificadores para que el panel muestre bien las cifras.
+    // Se rehacen los modificadores para que el panel muestre bien las cifras.
     if (g.human) rebuildMods(g.human, snap.techs);
 
     const seen = new Set();
@@ -373,7 +355,7 @@ function rebuildMods(player, techKeys) {
   player.mods = {};
   for (const key of techKeys) {
     const t = TECHS[key];
-    if (!t) continue; // las mejoras de línea no tienen modificadores
+    if (!t) continue;
     for (const e of t.effects || []) {
       const bucket = (player.mods[e.target] ||= {});
       const stat = e.pct ? `${e.stat}Pct` : e.stat;

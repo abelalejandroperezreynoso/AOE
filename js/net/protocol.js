@@ -5,13 +5,12 @@
 // diez veces por segundo y con 200 unidades el JSON sería demasiado pesado.
 // Las órdenes son texto JSON: son pocas y así se leen bien al depurar.
 
-import { UNITS, BUILDINGS, TECHS, UPGRADES } from '../config.js';
+import { UNITS, BUILDINGS, TECHS } from '../config.js';
 
 // Índices estables: ambos lados ejecutan el mismo código, así que el orden de
 // las claves coincide y se pueden mandar como un solo byte.
 export const UNIT_TYPES = Object.keys(UNITS);
 export const TECH_KEYS = Object.keys(TECHS);
-export const UPGRADE_KEYS = Object.keys(UPGRADES);
 const RES_LIST = ['food', 'wood', 'gold', 'stone'];
 
 const unitIdx = new Map(UNIT_TYPES.map((t, i) => [t, i]));
@@ -71,7 +70,6 @@ export function encodeSnapshot(game, viewer, removed, depleted) {
   w.u8(game.players.length);
   for (const p of game.players) {
     w.u8(p.id);
-    w.u8(p.age);
     for (const r of RES_LIST) w.f32(p.res[r]);
     w.u16(Math.min(65535, p.popCap));
     w.u16(Math.min(65535, p.pop));
@@ -110,12 +108,9 @@ export function encodeSnapshot(game, viewer, removed, depleted) {
     const q = (viewer && b.owner === viewer.id && b.queue) ? b.queue.slice(0, 8) : [];
     w.u8(q.length);
     for (const item of q) {
-      const kind = item.kind === 'unit' ? 0 : item.kind === 'tech' ? 1 : item.kind === 'upgrade' ? 2 : 3;
+      const kind = item.kind === 'unit' ? 0 : 1;
       w.u8(kind);
-      const key = kind === 0 ? (unitIdx.get(item.key) ?? 0)
-        : kind === 1 ? TECH_KEYS.indexOf(item.key)
-          : kind === 2 ? UPGRADE_KEYS.indexOf(item.key)
-            : item.key; // edad: el número de edad
+      const key = kind === 0 ? (unitIdx.get(item.key) ?? 0) : TECH_KEYS.indexOf(item.key);
       w.u8(Math.max(0, key));
       w.u8(Math.max(0, Math.min(255, Math.round((item.progress / item.time) * 255))));
       w.u8(item.blocked ? 1 : 0);
@@ -155,11 +150,7 @@ export function encodeSnapshot(game, viewer, removed, depleted) {
   // Tecnologías del receptor, para que su panel muestre lo ya investigado.
   const techs = viewer ? [...viewer.techs] : [];
   w.u8(Math.min(255, techs.length));
-  for (const key of techs.slice(0, 255)) {
-    const isUp = UPGRADE_KEYS.includes(key);
-    w.u8(isUp ? 1 : 0);
-    w.u8(isUp ? UPGRADE_KEYS.indexOf(key) : Math.max(0, TECH_KEYS.indexOf(key)));
-  }
+  for (const key of techs.slice(0, 255)) w.u8(Math.max(0, TECH_KEYS.indexOf(key)));
   return w.done();
 }
 
@@ -174,7 +165,7 @@ export function decodeSnapshot(buf) {
 
   const pc = r.u8();
   for (let i = 0; i < pc; i++) {
-    const p = { id: r.u8(), age: r.u8(), res: {} };
+    const p = { id: r.u8(), res: {} };
     for (const res of RES_LIST) p.res[res] = r.f32();
     p.popCap = r.u16();
     p.pop = r.u16();
@@ -207,8 +198,8 @@ export function decodeSnapshot(buf) {
     for (let k = 0; k < ql; k++) {
       const kind = r.u8(), key = r.u8(), prog = r.u8() / 255, blocked = !!r.u8();
       b.queue.push({
-        kind: ['unit', 'tech', 'upgrade', 'age'][kind],
-        key: kind === 0 ? UNIT_TYPES[key] : kind === 1 ? TECH_KEYS[key] : kind === 2 ? UPGRADE_KEYS[key] : key,
+        kind: kind === 0 ? 'unit' : 'tech',
+        key: kind === 0 ? UNIT_TYPES[key] : TECH_KEYS[key],
         progress: prog, time: 1, blocked,
       });
     }
@@ -237,10 +228,7 @@ export function decodeSnapshot(buf) {
     snap.herds.push({ id, fx, fy, owner: owner ? owner - 1 : null, amount: r.u16() });
   }
   const tc = r.u8();
-  for (let i = 0; i < tc; i++) {
-    const isUp = r.u8(), key = r.u8();
-    snap.techs.push(isUp ? UPGRADE_KEYS[key] : TECH_KEYS[key]);
-  }
+  for (let i = 0; i < tc; i++) snap.techs.push(TECH_KEYS[r.u8()]);
   return snap;
 }
 

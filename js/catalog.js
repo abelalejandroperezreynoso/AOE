@@ -1,7 +1,7 @@
 // Catálogo del juego: ver y editar unidades, edificios, recursos y terrenos.
 
 import {
-  UNITS, BUILDINGS, RESOURCE_NODES, GATHER_RATE, AGES, RES_NAME, RESOURCES, TILE_W, TILE_H,
+  UNITS, BUILDINGS, RESOURCE_NODES, GATHER_RATE, RES_NAME, RESOURCES, TILE_W, TILE_H,
 } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
@@ -206,12 +206,12 @@ export class Catalog {
   entries() {
     if (this.tab === 'unit') {
       return Object.entries(UNITS).map(([key, def]) => ({
-        key, def, name: def.name, sub: `${CLASS_NAMES[def.class] || def.class} · ${AGES[def.age].short}`,
+        key, def, name: def.name, sub: CLASS_NAMES[def.class] || def.class,
       }));
     }
     if (this.tab === 'building') {
       return Object.entries(BUILDINGS).map(([key, def]) => ({
-        key, def, name: def.name, sub: `${AGES[def.age].short} · ${def.size}x${def.size}`,
+        key, def, name: def.name, sub: `${def.size}x${def.size} casillas`,
       }));
     }
     if (this.tab === 'node') {
@@ -345,8 +345,8 @@ export class Catalog {
       const def = this.tab === 'unit' ? UNITS[key] : BUILDINGS[key];
       title.textContent = def.name;
       sub.textContent = this.tab === 'unit'
-        ? `${CLASS_NAMES[def.class] || def.class} · disponible en la ${AGES[def.age].name}`
-        : `Disponible en la ${AGES[def.age].name}`;
+        ? (CLASS_NAMES[def.class] || def.class)
+        : `Ocupa ${def.size}x${def.size} casillas`;
       box.appendChild(this.extraInfo(def));
       if (this.tab === 'unit') box.appendChild(this.animations(key, def));
       else box.appendChild(this.lupaFija(buildingSprite(key, 0, 2), key));

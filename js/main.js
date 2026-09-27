@@ -86,7 +86,7 @@ function startGame(opts, net = null) {
           : `de ${rivals.length + 1} jugadores`;
         ui.notify(`Partida ${quienes}. ¡Suerte!`, 'good');
       } else {
-        ui.notify('Reúne recursos, avanza de edad y derrota a tus rivales.', 'good');
+        ui.notify('Reúne recursos, levanta tu aldea y derrota a tus rivales.', 'good');
       }
 
       el('loading').classList.add('hidden');

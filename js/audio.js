@@ -75,10 +75,6 @@ export class Audio {
       case 'build': if (this.throttle(name, 200)) { this.tone(300, 0.12, 'triangle', 0.16, 220); this.noise(0.2, 0.1, 900); } break;
       case 'train': if (this.throttle(name, 200)) this.tone(520, 0.14, 'sine', 0.16, 180); break;
       case 'tech': this.tone(600, 0.2, 'sine', 0.18, 400); break;
-      case 'age': {
-        [392, 494, 587, 784].forEach((f, i) => setTimeout(() => this.tone(f, 0.5, 'triangle', 0.2), i * 150));
-        break;
-      }
       case 'hit': if (this.throttle(name, 70)) this.noise(0.09, 0.12, 2600, 'bandpass'); break;
       case 'bow': if (this.throttle(name, 90)) this.noise(0.07, 0.07, 3600, 'highpass'); break;
       case 'catapult': if (this.throttle(name, 200)) this.tone(140, 0.2, 'sawtooth', 0.12, -60); break;

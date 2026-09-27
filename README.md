@@ -1,8 +1,8 @@
 # Age of Realms II
 
 Juego de **estrategia medieval en tiempo real** para navegador, inspirado en los
-clásicos del género. Recolecta recursos, haz crecer tu aldea, avanza por cuatro
-edades y conquista a tus rivales.
+clásicos del género. Recolecta recursos, haz crecer tu aldea y conquista a tus
+rivales. Hay una sola edad, la Oscura: todo está disponible desde el principio.
 
 Se juega en solitario contra la máquina o **con otras personas**, hasta ocho
 jugadores, cada quien desde su dispositivo.
@@ -183,33 +183,31 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
    encima de ellas y, cuando se agotan, su aldeano las vuelve a sembrar solo si
    queda madera (si no, se queda en reposo y aparece en el contador de aldeanos
    ociosos).
-2. **Población.** Cada casa da 5 de población; el centro urbano, 5; el castillo, 20.
-3. **Edades.** Desde el centro urbano se avanza a Feudal, Castillos e Imperial.
-   Cada edad exige edificios de la anterior y desbloquea unidades, edificios y
-   mejoras nuevas.
-4. **Ejército.** El triángulo básico: los lanceros destrozan a la caballería, los
-   guerrilleros a los arqueros y la caballería a los arqueros y a la artillería.
-   Arietes y trabuquetes son para derribar edificios.
-5. **Victoria.** Gana quien destruya todo lo que tengan sus rivales.
+2. **Población.** Cada casa da 5 de población, y el centro urbano, 5.
+3. **Ejército.** El cuartel entrena la milicia. El explorador es el jinete con el
+   que empieza cada jugador: no se entrena en ningún edificio.
+4. **Victoria.** Gana quien destruya todo lo que tengan sus rivales.
 
 ## Contenido
 
-- **4 edades**, 17 tipos de unidad y 15 edificios distintos.
-- **11 tecnologías** (armas, armaduras, arquería, economía) y 7 mejoras de línea
-  que transforman las unidades ya creadas.
+- **Una sola edad**, la Oscura, con sus 3 unidades (aldeano, milicia y
+  explorador) y sus 7 edificios (centro urbano, casa, molino, granja,
+  campamento maderero, campamento minero y cuartel).
+- **1 tecnología**: el telar, en el centro urbano.
 - **Mapas aleatorios** con semilla reproducible, en cuatro tamaños y con hasta
   7 rivales (ocho jugadores, uno por color). Si el mapa elegido se queda corto
   para tanta base, se agranda solo.
 - **IA rival** al estilo del juego original: explora el mapa con el jinete
-  inicial, reparte a sus aldeanos por proporciones de recursos, ahorra para
-  subir de edad, se expande, investiga y comercia. En lo militar responde a las
+  inicial, reparte a sus aldeanos por proporciones de recursos, se expande con
+  más campamentos, granjas, cuarteles y un segundo centro urbano según crece el
+  pueblo, e investiga. En lo militar responde a las
   incursiones donde ocurren (con campana para los aldeanos), repara lo dañado,
   reconstruye lo que le derriban, concentra al ejército antes de salir, compone
   las tropas con las contras de lo que se le ha visto al enemigo y lleva cada
   oleada de objetivo en objetivo hasta arrasar la base o retirarse. Tres niveles
   de dificultad.
-- Niebla de guerra, minimapa, puntos de reunión, colas de producción, mercado de
-  recursos, control de velocidad (1x a 3x) y estadísticas finales.
+- Niebla de guerra, minimapa, puntos de reunión, colas de producción, control
+  de velocidad (1x a 3x) y estadísticas finales.
 - **Catálogo** para consultar y editar todo el juego: sus valores y los colores
   del terreno, con vista previa en vivo.
 
@@ -218,7 +216,7 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
 ```
 index.html          Estructura de la página y el HUD
 css/style.css       Interfaz, incluida la adaptación a móvil y la paleta clara
-js/config.js        Datos de juego: edades, unidades, edificios, tecnologías
+js/config.js        Datos de juego: unidades, edificios, tecnologías
 js/main.js          Menú, arranque y bucle principal
 js/game.js          Estado de la partida, simulación, combate y órdenes
 js/entities.js      Jugadores, unidades, edificios y proyectiles

@@ -1,7 +1,7 @@
 // Entidades del juego: jugadores, unidades, edificios y proyectiles.
 
 import {
-  UNITS, BUILDINGS, TECHS, UPGRADES, AGES, RESOURCES, POP_MAX,
+  UNITS, BUILDINGS, TECHS, RESOURCES, POP_MAX,
   CARRY_CAPACITY, GATHER_RATE, START_RESOURCES,
 } from './config.js';
 import { uid, clamp, dist } from './utils.js';
@@ -27,8 +27,6 @@ export class Player {
     this.isHuman = isHuman;
     this.name = name;
     this.res = { ...START_RESOURCES };
-    this.age = 0;
-    this.advancing = null;      // { progress, time } al subir de edad
     this.techs = new Set();
     this.mods = {};             // modificadores acumulados por tipo/clase
     this.units = new Set();
@@ -57,11 +55,7 @@ export class Player {
 
   buildingStat(type, key) {
     const B = BUILDINGS[type];
-    let v = B[key] ?? 0;
-    if (key === 'hp') v *= 1 + this.mod('building', 'hpPct');
-    // Las mejoras de arquería también afectan a las defensas con flechas.
-    if (B.arrows && (key === 'attack' || key === 'range')) v += this.mod('archer', key);
-    return v;
+    return B[key] ?? 0;
   }
 
   canAfford(cost) { return RESOURCES.every((r) => (this.res[r] || 0) >= (cost[r] || 0)); }
@@ -101,25 +95,6 @@ export class Player {
     }
   }
 
-  applyUpgrade(key, g) {
-    const up = UPGRADES[key];
-    if (!up) return;
-    this.techs.add(key);
-    for (const u of this.units) if (u.type === up.from) u.setType(up.to, this);
-  }
-
-  /** ¿Está disponible este tipo de unidad ahora mismo? */
-  unitAvailable(type) {
-    const d = UNITS[type];
-    if (this.age < d.age) return false;
-    // Sólo se muestra el escalón más avanzado de cada línea.
-    for (const k in UPGRADES) {
-      const up = UPGRADES[k];
-      if (up.from === type && this.techs.has(k)) return false;
-      if (up.to === type && !this.techs.has(k)) return false;
-    }
-    return true;
-  }
 }
 
 // --- Unidad -----------------------------------------------------------------
@@ -158,14 +133,6 @@ export class Unit {
     this.hp = this.maxHp;
     this.radius = UNITS[this.type].radius;
     return this;
-  }
-
-  setType(type, player) {
-    const frac = this.hp / this.maxHp;
-    this.type = type;
-    this.maxHp = player.stat(type, 'hp');
-    this.hp = this.maxHp * frac;
-    this.radius = UNITS[type].radius;
   }
 
   get def() { return UNITS[this.type]; }
@@ -732,17 +699,6 @@ export class Building {
     } else if (item.kind === 'tech') {
       player.applyTech(item.key, g);
       if (player.isHuman) { g.audio.play('tech'); g.ui.notify(`Investigación completada: ${TECHS[item.key].name}`); }
-    } else if (item.kind === 'upgrade') {
-      player.applyUpgrade(item.key, g);
-      if (player.isHuman) { g.audio.play('tech'); g.ui.notify(`Mejora completada: ${UPGRADES[item.key].name}`); }
-    } else if (item.kind === 'age') {
-      player.age++;
-      if (player.isHuman) {
-        g.audio.play('age');
-        g.ui.notify(`¡Has avanzado a la ${AGES[player.age].name}!`, 'good');
-      } else {
-        g.ui.notify(`${player.name} ha avanzado a la ${AGES[player.age].name}.`, 'warn');
-      }
     }
   }
 

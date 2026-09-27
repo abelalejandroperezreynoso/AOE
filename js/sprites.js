@@ -557,7 +557,7 @@ export function paintResource(ctx, x, y, kind, variant = 0, depleted = false) {
 
 const iconCache = new Map();
 
-/** Emblemas vectoriales para las tecnologías y los avances de edad. */
+/** Emblemas vectoriales para las tecnologías. */
 function techGlyph(ctx, sym) {
   ctx.save();
   ctx.translate(28, 28);
@@ -629,7 +629,7 @@ function techGlyph(ctx, sym) {
       ctx.fillStyle = '#3b2a17';
       ctx.fillRect(-4, 6, 8, 10);
       break;
-    default: { // números romanos de la edad
+    default: { // sin emblema propio: el texto que se le pase
       ctx.fillStyle = '#fff';
       ctx.font = '700 26px -apple-system, system-ui, sans-serif';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -639,12 +639,9 @@ function techGlyph(ctx, sym) {
   ctx.restore();
 }
 
-const TECH_SYMBOLS = {
-  Forja: 'sword', 'Fundición de hierro': 'sword', 'Armadura de escamas': 'armor',
-  'Cota de malla': 'armor', 'Armadura acolchada': 'armor', Emplumado: 'arrow',
-  'Punta de bodkin': 'arrow', Telar: 'loom', Carretilla: 'cart', 'Carretilla de mano': 'cart',
-  Almenas: 'tower', Oscura: 'I', Feudal: 'II', Castillos: 'III', Imperial: 'IV',
-};
+// Emblema de cada tecnología. Los demás dibujos de `techGlyph` se quedan para
+// cuando vuelva a haber más de una.
+const TECH_SYMBOLS = { Telar: 'loom' };
 
 /** Caja envolvente de los píxeles no transparentes (para encuadrar iconos). */
 const boundsCache = new Map();
