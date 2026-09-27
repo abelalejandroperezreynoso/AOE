@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Icono — Age of Realms II</title>
+<style>
+  body { margin: 0; background: #111; display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<!-- Dibuja el icono de la aplicación instalada. Lo usa tools/make-icons.mjs
+     para sacar los PNG de icons/; abierto a mano, enseña cómo queda.
+     ?size=512 cambia el tamaño; ?mask=1 dibuja además el círculo que recorta
+     Android, para ver que el castillo cabe entero en la zona segura. -->
+<canvas id="icon"></canvas>
+<script type="module">
+import { bake } from '../js/gfx3d/engine.js';
+import { buildingMesh } from '../js/gfx3d/buildings.js';
+
+const q = new URLSearchParams(location.search);
+const N = +(q.get('size') || 512);
+
+/** Pinta el icono en un lienzo cuadrado de N×N, sin transparencias: iOS
+ *  rellena de negro lo transparente y redondea las esquinas por su cuenta. */
+function drawIcon(canvas, N) {
+  canvas.width = canvas.height = N;
+  const ctx = canvas.getContext('2d');
+
+  // Cielo del atardecer, de azul noche arriba a dorado sobre el horizonte.
+  const sky = ctx.createLinearGradient(0, 0, 0, N);
+  sky.addColorStop(0, '#1d2a4a');
+  sky.addColorStop(0.35, '#6a5a78');
+  sky.addColorStop(0.57, '#e0a45a');
+  sky.addColorStop(0.58, '#5a8a40');
+  sky.addColorStop(1, '#2e4d22');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, N, N);
+
+  // Resplandor del sol detrás del castillo.
+  const sol = ctx.createRadialGradient(N * 0.5, N * 0.55, 0, N * 0.5, N * 0.55, N * 0.45);
+  sol.addColorStop(0, 'rgba(255, 214, 140, 0.55)');
+  sol.addColorStop(1, 'rgba(255, 214, 140, 0)');
+  ctx.fillStyle = sol;
+  ctx.fillRect(0, 0, N, N * 0.58);
+
+  // El castillo del juego, terminado y con los colores del jugador rojo,
+  // horneado a más resolución de la que usa el mapa para que no se pixele.
+  const s = bake(buildingMesh('castle', 1, 2), { res: 8, pad: 1 });
+  // Cabe en el 68 % central: el círculo de Android recorta hasta el 80 %.
+  const escala = Math.min((N * 0.68) / s.canvas.width, (N * 0.66) / s.canvas.height);
+  const w = s.canvas.width * escala, h = s.canvas.height * escala;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(s.canvas, (N - w) / 2, N * 0.84 - h, w, h);
+
+  if (q.get('mask')) {
+    ctx.strokeStyle = '#0ff';
+    ctx.lineWidth = Math.max(1, N / 256);
+    ctx.beginPath();
+    ctx.arc(N / 2, N / 2, N * 0.4, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+drawIcon(document.getElementById('icon'), N);
+window.__iconPNG = document.getElementById('icon').toDataURL('image/png');
+window.__iconReady = true; // para tools/make-icons.mjs
+</script>
+</body>
+</html>

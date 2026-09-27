@@ -9,7 +9,13 @@
      reloj y la batería del teléfono. -->
 <meta name="theme-color" content="#ffffff">
 <link rel="stylesheet" href="css/style.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏰</text></svg>">
+<!-- El icono: el castillo del juego, horneado por tools/make-icons.mjs.
+     El manifiesto sólo pone nombre e icono; `display` va en `browser` a
+     propósito para no tocar el modo de pantalla (ver CLAUDE.md, «Trampas
+     conocidas»). iOS no lee los iconos del manifiesto, sino apple-touch-icon. -->
+<link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
 </head>
 <body>
 

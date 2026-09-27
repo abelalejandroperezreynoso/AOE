@@ -665,6 +665,9 @@ js/gfx3d/GUIDE.md   Guía del sistema de arte: coordenadas, primitivas y flujo
 tools/viewer.html   Visor de modelos: cada tipo a cualquier zoom, con todas sus
                     vistas y superposición de imágenes de referencia
 tools/snapshot-models.mjs  Captura los modelos a PNG (necesita Playwright)
+tools/icon.html     Dibujo del icono de la aplicación: el castillo al atardecer
+tools/make-icons.mjs  Saca de él los PNG de icons/ (necesita Playwright)
+icons/, manifest.webmanifest  Icono y nombre del juego instalado en el móvil
 js/ai.js            IA de los rivales
 js/ui.js            HUD, panel de órdenes, ratón, teclado y táctil
 js/audio.js         Efectos de sonido sintetizados con WebAudio
