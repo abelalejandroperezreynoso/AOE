@@ -1,6 +1,10 @@
 // Mete como ciclo de andar de una orientación varios fotogramas sueltos.
 //
 //   node tools/importar-fotogramas.mjs <tipo> <cara> [--espejo] [--quieto N] [--rellenar A,B] img1 img2 ...
+//   node tools/importar-fotogramas.mjs <tipo> <cara> --quieta [--espejo] [--rellenar 0] img
+//
+// Con --quieta, la imagen es sólo la postura quieta de esa orientación (en su
+// propia hoja, <tipo>-quieta-<cara>-<color>.png); su andar no se toca.
 //
 // Cada imagen es un fotograma dibujado sobre fondo claro, aunque traiga
 // encima una cuadrícula (como las que salen del botón «Descargar PNG» de la
@@ -38,12 +42,13 @@ const args = process.argv.slice(2);
 const flag = (n) => { const i = args.indexOf(`--${n}`); if (i < 0) return false; args.splice(i, 1); return true; };
 const opt = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args.splice(i, 2)[1] : d; };
 const espejo = flag('espejo');
+const soloQuieta = flag('quieta');
 const quieto = Number(opt('quieto', '0'));
 const rellenar = opt('rellenar', '').split(',').filter(Boolean).map(Number);
 const [tipo, caraTxt, ...fuentes] = args;
 const cara = Number(caraTxt);
-if (!tipo || !fuentes.length || ![0, 1, 5, 6, 7].includes(cara)) {
-  console.error('Uso: node tools/importar-fotogramas.mjs <tipo> <cara 0|1|5|6|7> [--espejo] [--quieto N] [--rellenar A,B] img...');
+if (!tipo || !fuentes.length || ![0, 1, 5, 6, 7].includes(cara) || (soloQuieta && fuentes.length !== 1)) {
+  console.error('Uso: node tools/importar-fotogramas.mjs <tipo> <cara 0|1|5|6|7> [--espejo] [--quieto N] [--rellenar A,B] img... | --quieta img');
   process.exit(1);
 }
 
@@ -56,7 +61,7 @@ if (!anim?.altura) { console.error(`«${tipo}» no tiene altura de referencia en
 
 const imagenes = [];
 for (const f of fuentes) {
-  const tipoMime = f.endsWith('.jpg') || f.endsWith('.jpeg') ? 'jpeg' : 'png';
+  const tipoMime = f.endsWith('.jpg') || f.endsWith('.jpeg') ? 'jpeg' : f.endsWith('.webp') ? 'webp' : 'png';
   imagenes.push(`data:image/${tipoMime};base64,${(await readFile(f)).toString('base64')}`);
 }
 
@@ -219,17 +224,55 @@ const res = await page.evaluate(async ({ imagenes, altura, espejo, rellenar, col
 await browser.close();
 if (res.error) { console.error(res.error); process.exit(1); }
 
-const n = fuentes.length;
-res.hojas.forEach((h, color) => {
-  const nombre = `${tipo}-andar-${cara}-${color}.png`;
+// Las orientaciones sin dibujo propio usan el de otra: sus entradas del índice
+// son copias que apuntan a la misma hoja. Al rehacerla cambian los sitios, así
+// que las copias se rehacen también (salvo las que ya apuntan a otra hoja, como
+// una postura quieta propia).
+const copiarA = (i, desde, claves) => {
+  for (const f of [0, 1, 5, 6, 7]) {
+    if (f === cara) continue;
+    for (let color = 0; color < res.hojas.length; color++) {
+      if (indice.sprites[`u|${tipo}|${color}|${f}|0`]?.[0] !== i[color]) continue;
+      for (const k of claves) {
+        const suya = indice.sprites[`u|${tipo}|${color}|${f}|${k}`];
+        if (!suya || suya[0] === i[color]) indice.sprites[`u|${tipo}|${color}|${f}|${k}`] = desde(color, k);
+      }
+    }
+  }
+};
+const hoja = (nombre) => {
   let i = indice.hojas.indexOf(nombre);
   if (i < 0) { i = indice.hojas.length; indice.hojas.push(nombre); }
-  const e = (k) => { const [x, y, w, hh, ox, oy] = h.sitios[k]; return [i, x, y, w, hh, +(ox / indice.res).toFixed(2), +(oy / indice.res).toFixed(2)]; };
-  // Fotogramas 0..n-1: el andar; n: la postura quieta y el golpe.
-  for (let k = 0; k < n; k++) indice.sprites[`u|${tipo}|${color}|${cara}|${k}`] = e(k);
-  indice.sprites[`u|${tipo}|${color}|${cara}|${n}`] = e(quieto);
-});
-for (const [color, h] of res.hojas.entries()) await writeFile(`${DIR}/${tipo}-andar-${cara}-${color}.png`, Buffer.from(h.url.split(',')[1], 'base64'));
-indice.anim[tipo] = { ...anim, andar: [...Array(n).keys()], quieto: n, golpe: [n, n] };
+  return i;
+};
+const entrada = (i, h, k) => { const [x, y, w, hh, ox, oy] = h.sitios[k]; return [i, x, y, w, hh, +(ox / indice.res).toFixed(2), +(oy / indice.res).toFixed(2)]; };
+
+if (soloQuieta) {
+  // La quieta ha de ir aparte del golpe, que hoy también la usa.
+  if (anim.golpe?.includes(anim.quieto)) { console.error(`La quieta de «${tipo}» es también su golpe: reimporta antes el andar`); process.exit(1); }
+  res.hojas.forEach((h, color) => {
+    const nombre = `${tipo}-quieta-${cara}-${color}.png`;
+    indice.sprites[`u|${tipo}|${color}|${cara}|${anim.quieto}`] = entrada(hoja(nombre), h, 0);
+  });
+  for (const [color, h] of res.hojas.entries()) await writeFile(`${DIR}/${tipo}-quieta-${cara}-${color}.png`, Buffer.from(h.url.split(',')[1], 'base64'));
+} else {
+  const n = fuentes.length;
+  const ies = [];
+  res.hojas.forEach((h, color) => {
+    const i = hoja(`${tipo}-andar-${cara}-${color}.png`);
+    ies[color] = i;
+    // Fotogramas 0..n-1: el andar; n: el golpe; n+1: la postura quieta. Van
+    // aparte para que una orientación pueda tener quieta propia.
+    for (let k = 0; k < n; k++) indice.sprites[`u|${tipo}|${color}|${cara}|${k}`] = entrada(i, h, k);
+    indice.sprites[`u|${tipo}|${color}|${cara}|${n}`] = entrada(i, h, quieto);
+    const q = indice.sprites[`u|${tipo}|${color}|${cara}|${n + 1}`];
+    if (!q || q[0] === i) indice.sprites[`u|${tipo}|${color}|${cara}|${n + 1}`] = entrada(i, h, quieto);
+  });
+  copiarA(ies, (color, k) => indice.sprites[`u|${tipo}|${color}|${cara}|${k === n + 1 ? n : k}`], [...Array(n + 2).keys()]);
+  for (const [color, h] of res.hojas.entries()) await writeFile(`${DIR}/${tipo}-andar-${cara}-${color}.png`, Buffer.from(h.url.split(',')[1], 'base64'));
+  indice.anim[tipo] = { ...anim, andar: [...Array(n).keys()], quieto: n + 1, golpe: [n, n] };
+}
 await writeFile(`${DIR}/indice.json`, JSON.stringify(indice));
-console.log(`${tipo}: ${n} fotogramas de andar en la orientación ${cara}${espejo ? ' (volteados)' : ''}, quieto el ${quieto}`);
+console.log(soloQuieta
+  ? `${tipo}: postura quieta de la orientación ${cara}${espejo ? ' (volteada)' : ''}`
+  : `${tipo}: ${fuentes.length} fotogramas de andar en la orientación ${cara}${espejo ? ' (volteados)' : ''}, quieto el ${quieto}`);
