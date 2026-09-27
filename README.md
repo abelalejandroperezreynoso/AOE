@@ -338,6 +338,14 @@ Para depurar, el objeto de la partida está disponible en la consola como
   --rellenar 0`); los otros tres, y ← volteado, siguen siendo los de ↘. Las
   copias van fotograma a fotograma: reimportar ↘ rehace las que apuntan a su
   hoja y deja las propias de cada orientación.
+- Después, → anda de perfil con un vídeo (`aldeano-andar-e-armadura.mov`, 24
+  fotogramas por segundo, un ciclo de dos pasos cada 32): ocho fotogramas,
+  del 0 al 28 de cuatro en cuatro, guardados en
+  `assets/fuentes/aldeano-andar-e-armadura/e-0..7.png` y metidos con
+  `importar-fotogramas.mjs villager 7 --fotogramas 0,1,2,3,6,7,8,9
+  --andar-propio --rellenar 0,1,2,3,4,5,6,7` (el 4 y el 5 son el golpe y la
+  quieta). Con ocho, el paso va con el suelo: se avanza un fotograma cada
+  séptimo de casilla, unos 6,5 px de pantalla hacia →.
 - Un edificio dibujado entra con `tools/importar-edificio.mjs <tipo>
   <dibujo.png>`: busca la base (desde la esquina de abajo el contorno sube en
   pendiente 2:1 hasta donde las paredes se vuelven verticales), la escala a la
