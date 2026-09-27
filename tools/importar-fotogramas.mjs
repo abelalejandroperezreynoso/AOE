@@ -11,7 +11,7 @@
 // los de aquélla. Con --andar-propio, además, esa orientación anda sólo con
 // ellos (`andarCara` en el índice), aunque sean más o menos que los de las
 // otras. Todos los dibujos propios de una orientación van en su hoja
-// (<tipo>-andar-<cara>-<color>.png), así que se pasan todos a la vez.
+// (<tipo>-andar-<cara>-<color>.png, o -comun.png), así que se pasan todos a la vez.
 //
 // Cada imagen es un fotograma dibujado sobre fondo claro, aunque traiga
 // encima una cuadrícula (como las que salen del botón «Descargar PNG» de la
@@ -32,6 +32,10 @@
 // No va por defecto porque los huecos del aldeano, entre brazo y cuerpo o
 // entre el pico y la pierna, son de verdad y tienen que dejar ver el suelo.
 // Un fotograma que apenas tiene azul no se pinta con el color del jugador.
+// `--res R` hace la hoja a R píxeles por píxel de mundo en vez de los de serie
+// (`res` del índice, 2), y lo apunta en `resHojas`: el juego la reduce con
+// filtro y conserva el detalle del dibujo. La altura de referencia escala con
+// ella.
 //
 // Necesita el servidor local en marcha (npm start) y Playwright.
 
@@ -51,6 +55,7 @@ const opt = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args.s
 const espejo = flag('espejo');
 const soloQuieta = flag('quieta');
 const andarPropio = flag('andar-propio');
+const resHoja = Number(opt('res', '0')) || null;
 const sueltos = opt('fotogramas', null)?.split(',').map(Number);
 const quieto = Number(opt('quieto', '0'));
 const rellenar = opt('rellenar', '').split(',').filter(Boolean).map(Number);
@@ -58,7 +63,7 @@ const [tipo, caraTxt, ...fuentes] = args;
 const cara = Number(caraTxt);
 if (!tipo || !fuentes.length || ![0, 1, 5, 6, 7].includes(cara) || (soloQuieta && fuentes.length !== 1)
   || (sueltos && sueltos.length !== fuentes.length) || (andarPropio && !sueltos)) {
-  console.error('Uso: node tools/importar-fotogramas.mjs <tipo> <cara 0|1|5|6|7> [--espejo] [--quieto N] [--rellenar A,B] img... | --quieta img | --fotogramas A,B [--andar-propio] img...');
+  console.error('Uso: node tools/importar-fotogramas.mjs <tipo> <cara 0|1|5|6|7> [--espejo] [--quieto N] [--rellenar A,B] [--res R] img... | --quieta img | --fotogramas A,B [--andar-propio] img...');
   process.exit(1);
 }
 
@@ -68,6 +73,8 @@ const indice = JSON.parse(await readFile(`${DIR}/indice.json`, 'utf8'));
 const { PLAYER_COLORS } = await import('../js/config.js');
 const anim = indice.anim?.[tipo];
 if (!anim?.altura) { console.error(`«${tipo}» no tiene altura de referencia en el índice`); process.exit(1); }
+// Píxeles de hoja por píxel de mundo de las hojas que se escriben ahora.
+const R = resHoja || indice.res;
 
 const imagenes = [];
 for (const f of fuentes) {
@@ -80,7 +87,7 @@ const page = await browser.newPage();
 page.on('pageerror', (e) => console.error('ERROR EN PÁGINA:', e.message));
 await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
 
-const res = await page.evaluate(async ({ imagenes, altura, espejo, rellenar, colores }) => {
+const res = await page.evaluate(async ({ imagenes, altura, espejo, rellenar, huecoMax, colores }) => {
   const luz = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
   const sat = (r, g, b) => (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(1, Math.max(r, g, b));
   const hsl = (r, g, b) => {
@@ -183,7 +190,7 @@ const res = await page.evaluate(async ({ imagenes, altura, espejo, rellenar, col
           const o = hueco[i], x = o % w;
           for (const v of [x > 0 ? o - 1 : -1, x < w - 1 ? o + 1 : -1, o - w, o + w]) if (v >= 0 && v < w * h && !visto[v] && px[v * 4 + 3] !== 255) { visto[v] = 1; hueco.push(v); }
         }
-        if (hueco.length > 6) continue;
+        if (hueco.length > huecoMax) continue;
         // Si es del blanco del fondo, es una rendija de verdad (entre el brazo
         // y el cuerpo, por ejemplo): se deja abierta. Los brillos son grises.
         let sr = 0, sg = 0, sb = 0, st = 0;
@@ -229,8 +236,8 @@ const res = await page.evaluate(async ({ imagenes, altura, espejo, rellenar, col
     }
     hojas.push({ url: c.toDataURL('image/png'), sitios });
   }
-  return { hojas };
-}, { imagenes, altura: anim.altura, espejo, rellenar, colores: PLAYER_COLORS });
+  return { hojas, sinColor: fotos.every((f) => !f.pintar) };
+}, { imagenes, altura: anim.altura * R / indice.res, espejo, rellenar, huecoMax: Math.round(6 * (R / indice.res) ** 2), colores: PLAYER_COLORS });
 await browser.close();
 if (res.error) { console.error(res.error); process.exit(1); }
 
@@ -240,67 +247,79 @@ if (res.error) { console.error(res.error); process.exit(1); }
 // una postura quieta propia).
 // Va fotograma a fotograma: una orientación puede tener unos propios y usar
 // los de otra en el resto.
-const copiarA = (i, desde, claves) => {
+// Una entrada es de esta hoja si apunta a ella con cualquiera de sus nombres:
+// por color o común (al dejar de llevar color, pasa de uno a otro).
+const deBase = (e, base) => !!e && new RegExp(`^${base}-(\\d+|comun)\\.png$`).test(indice.hojas[e[0]]);
+const copiarA = (base, desde, claves) => {
   for (const f of [0, 1, 5, 6, 7]) {
     if (f === cara) continue;
     for (let color = 0; color < res.hojas.length; color++) {
-      const esCopia = indice.sprites[`u|${tipo}|${color}|${f}|0`]?.[0] === i[color];
+      const esCopia = deBase(indice.sprites[`u|${tipo}|${color}|${f}|0`], base);
       for (const k of claves) {
         const suya = indice.sprites[`u|${tipo}|${color}|${f}|${k}`];
-        if (suya ? suya[0] === i[color] : esCopia) indice.sprites[`u|${tipo}|${color}|${f}|${k}`] = desde(color, k);
+        if (suya ? deBase(suya, base) : esCopia) indice.sprites[`u|${tipo}|${color}|${f}|${k}`] = desde(color, k);
       }
     }
+  }
+};
+// Si ningún fotograma lleva color de jugador, las ocho hojas saldrían iguales:
+// se escribe una sola, <...>-comun.png, que el juego carga siempre (no acaba en
+// -<color>.png) y a la que apuntan los ocho colores.
+const nombreHoja = (base, color) => `${base}-${res.sinColor ? 'comun' : color}.png`;
+const escribe = async (base) => {
+  for (const [color, h] of res.hojas.entries()) {
+    if (res.sinColor && color > 0) break;
+    await writeFile(`${DIR}/${nombreHoja(base, color)}`, Buffer.from(h.url.split(',')[1], 'base64'));
   }
 };
 const hoja = (nombre) => {
   let i = indice.hojas.indexOf(nombre);
   if (i < 0) { i = indice.hojas.length; indice.hojas.push(nombre); }
+  indice.resHojas = { ...indice.resHojas };
+  if (R !== indice.res) indice.resHojas[nombre] = R; else delete indice.resHojas[nombre];
+  if (!Object.keys(indice.resHojas).length) delete indice.resHojas;
   return i;
 };
-const entrada = (i, h, k) => { const [x, y, w, hh, ox, oy] = h.sitios[k]; return [i, x, y, w, hh, +(ox / indice.res).toFixed(2), +(oy / indice.res).toFixed(2)]; };
+const entrada = (i, h, k) => { const [x, y, w, hh, ox, oy] = h.sitios[k]; return [i, x, y, w, hh, +(ox / R).toFixed(2), +(oy / R).toFixed(2)]; };
 
 if (soloQuieta) {
   // La quieta ha de ir aparte del golpe, que hoy también la usa.
   if (anim.golpe?.includes(anim.quieto)) { console.error(`La quieta de «${tipo}» es también su golpe: reimporta antes el andar`); process.exit(1); }
   res.hojas.forEach((h, color) => {
-    const nombre = `${tipo}-quieta-${cara}-${color}.png`;
+    const nombre = nombreHoja(`${tipo}-quieta-${cara}`, color);
     indice.sprites[`u|${tipo}|${color}|${cara}|${anim.quieto}`] = entrada(hoja(nombre), h, 0);
   });
-  for (const [color, h] of res.hojas.entries()) await writeFile(`${DIR}/${tipo}-quieta-${cara}-${color}.png`, Buffer.from(h.url.split(',')[1], 'base64'));
+  await escribe(`${tipo}-quieta-${cara}`);
 } else if (sueltos) {
   if (sueltos.some((k) => k === anim.quieto || anim.golpe?.includes(k))) { console.error(`Los fotogramas ${anim.golpe} y ${anim.quieto} son el golpe y la quieta`); process.exit(1); }
-  const ies = [];
   res.hojas.forEach((h, color) => {
-    const i = hoja(`${tipo}-andar-${cara}-${color}.png`);
-    ies[color] = i;
+    const i = hoja(nombreHoja(`${tipo}-andar-${cara}`, color));
     // La hoja se rehace entera: nada que apunte a ella puede quedar fuera.
     for (const [k, e] of Object.entries(indice.sprites)) {
       const [, t, c, , f] = k.split('|');
-      if (t === tipo && Number(c) === color && e[0] === i && !sueltos.includes(Number(f))) {
+      if (t === tipo && Number(c) === color && deBase(e, `${tipo}-andar-${cara}`) && !sueltos.includes(Number(f))) {
         console.error(`${k} está en la hoja de la orientación ${cara}: pasa a la vez todos sus fotogramas propios`);
         process.exit(1);
       }
     }
     sueltos.forEach((k, j) => { indice.sprites[`u|${tipo}|${color}|${cara}|${k}`] = entrada(i, h, j); });
   });
-  copiarA(ies, (color, k) => indice.sprites[`u|${tipo}|${color}|${cara}|${k}`], sueltos);
-  for (const [color, h] of res.hojas.entries()) await writeFile(`${DIR}/${tipo}-andar-${cara}-${color}.png`, Buffer.from(h.url.split(',')[1], 'base64'));
+  copiarA(`${tipo}-andar-${cara}`, (color, k) => indice.sprites[`u|${tipo}|${color}|${cara}|${k}`], sueltos);
+  await escribe(`${tipo}-andar-${cara}`);
   if (andarPropio) indice.anim[tipo] = { ...anim, andarCara: { ...anim.andarCara, [cara]: sueltos } };
 } else {
   const n = fuentes.length;
-  const ies = [];
   res.hojas.forEach((h, color) => {
-    const i = hoja(`${tipo}-andar-${cara}-${color}.png`);
-    ies[color] = i;
+    const i = hoja(nombreHoja(`${tipo}-andar-${cara}`, color));
     // Fotogramas 0..n-1: el andar; n: el golpe; n+1: la postura quieta. Van
     // aparte para que una orientación pueda tener quieta propia.
     for (let k = 0; k < n; k++) indice.sprites[`u|${tipo}|${color}|${cara}|${k}`] = entrada(i, h, k);
     indice.sprites[`u|${tipo}|${color}|${cara}|${n}`] = entrada(i, h, quieto);
     const q = indice.sprites[`u|${tipo}|${color}|${cara}|${n + 1}`];
-    if (!q || q[0] === i) indice.sprites[`u|${tipo}|${color}|${cara}|${n + 1}`] = entrada(i, h, quieto);
+    if (!q || deBase(q, `${tipo}-andar-${cara}`)) indice.sprites[`u|${tipo}|${color}|${cara}|${n + 1}`] = entrada(i, h, quieto);
   });
-  copiarA(ies, (color, k) => indice.sprites[`u|${tipo}|${color}|${cara}|${k === n + 1 ? n : k}`], [...Array(n + 2).keys()]);
-  for (const [color, h] of res.hojas.entries()) await writeFile(`${DIR}/${tipo}-andar-${cara}-${color}.png`, Buffer.from(h.url.split(',')[1], 'base64'));
+  copiarA(`${tipo}-andar-${cara}`, (color, k) => indice.sprites[`u|${tipo}|${color}|${cara}|${k === n + 1 ? n : k}`], [...Array(n + 2).keys()]);
+  await escribe(`${tipo}-andar-${cara}`);
   indice.anim[tipo] = { ...anim, andar: [...Array(n).keys()], quieto: n + 1, golpe: [n, n] };
 }
 await writeFile(`${DIR}/indice.json`, JSON.stringify(indice));

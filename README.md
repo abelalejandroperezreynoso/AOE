@@ -346,6 +346,17 @@ Para depurar, el objeto de la partida está disponible en la consola como
   --andar-propio --rellenar 0,1,2,3,4,5,6,7` (el 4 y el 5 son el golpe y la
   quieta). Con ocho, el paso va con el suelo: se avanza un fotograma cada
   séptimo de casilla, unos 6,5 px de pantalla hacia →.
+- **Resolución.** Las hojas de serie van a 2 píxeles por píxel de mundo, y en
+  el iPhone (3 de pantalla por píxel de mundo, más con zoom) se ampliaban a
+  píxel visto: se veían los bloques. Las del aldeano van ahora a 6
+  (`--res 6` en `importar-fotogramas.mjs`, apuntado en `resHojas` del
+  índice): `drawSprite` las reduce con filtro y sólo las copia a píxel visto
+  si se amplían más allá de 6. La altura de referencia (`anim.altura`, a la
+  resolución de serie) escala con ella, así que mide lo mismo en el mapa. En
+  la lupa el lienzo estándar pasa a 300×300 y la cuadrícula sólo se pinta si
+  cada píxel se ve de 4 o más. Como la armadura no lleva color de jugador, la
+  herramienta escribe una sola hoja por orientación, `-comun.png`, que se
+  carga siempre y sirve a los ocho colores.
 - Un edificio dibujado entra con `tools/importar-edificio.mjs <tipo>
   <dibujo.png>`: busca la base (desde la esquina de abajo el contorno sube en
   pendiente 2:1 hasta donde las paredes se vuelven verticales), la escala a la

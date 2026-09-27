@@ -50,7 +50,8 @@ const unir = (a, b) => (a ? {
 /*
  * Lienzo estándar de las unidades a pie: 100×100 píxeles de sprite, con los
  * pies (el ancla) centrados a lo ancho y a 88 del borde de arriba. Cabe de
- * sobra el aldeano (unos 48×86) con su sombra.
+ * sobra el aldeano (unos 48×86) con su sombra. Va en píxeles de la resolución
+ * de serie (2 por píxel de mundo): un sprite de 6 lo lleva de 300×300.
  */
 const MARCO_A_PIE = { l: 50, t: 88, r: 50, b: 12, estandar: true };
 
@@ -425,15 +426,19 @@ export class Catalog {
       if (!s) return;
       const res = s.canvas.width / s.w;
       const ax = Math.round(s.ox * res), ay = Math.round(s.oy * res);
-      const m = marco || { l: ax, t: ay, r: s.canvas.width - ax, b: s.canvas.height - ay };
+      const fm = marco && marco.estandar ? res / 2 : 1;
+      const m = marco ? { l: marco.l * fm, t: marco.t * fm, r: marco.r * fm, b: marco.b * fm, estandar: marco.estandar }
+        : { l: ax, t: ay, r: s.canvas.width - ax, b: s.canvas.height - ay };
       const W = m.l + m.r, H = m.t + m.b;
       // Aumento: el mayor entero que cabe a lo ancho, sin pasar de 360 de alto,
       // y nunca menos de 3, que por debajo la cuadrícula no deja ver nada. Si
-      // así no cabe, la tarjeta se desplaza.
+      // así no cabe, la tarjeta se desplaza. Un sprite de más resolución que
+      // la de serie ya trae detalle de sobra: cabe entero, y la cuadrícula sólo
+      // se pinta si cada píxel se ve de 4 o más.
       const ancho = Math.min(360, window.innerWidth - 72);
       let k = Math.floor((ancho * dpr) / W);
       k = Math.min(k, Math.floor((360 * dpr) / H));
-      k = Math.max(3, k);
+      k = Math.max(res > 2 ? 1 : 3, k);
       const clave = `${W}|${H}|${k}`;
       if (clave !== actual) {
         actual = clave;
@@ -447,8 +452,10 @@ export class Catalog {
       ctx.drawImage(s.canvas, (m.l - ax) * k, (m.t - ay) * k, s.canvas.width * k, s.canvas.height * k);
       // Cuadrícula completa: una línea por cada borde de píxel.
       ctx.fillStyle = 'rgba(0, 0, 0, .16)';
-      for (let x = 0; x <= W; x++) ctx.fillRect(Math.min(x * k, c.width - 1), 0, 1, c.height);
-      for (let y = 0; y <= H; y++) ctx.fillRect(0, Math.min(y * k, c.height - 1), c.width, 1);
+      if (res <= 2 || k >= 4) {
+        for (let x = 0; x <= W; x++) ctx.fillRect(Math.min(x * k, c.width - 1), 0, 1, c.height);
+        for (let y = 0; y <= H; y++) ctx.fillRect(0, Math.min(y * k, c.height - 1), c.width, 1);
+      }
 
       sufijo = datos.map(([, v]) => `-${String(v).replace(/[^\w]+/g, '') || NOMBRE_ARCHIVO[v] || ''}`).join('');
       fila('Tamaño', `${s.canvas.width} × ${s.canvas.height} píxeles`);

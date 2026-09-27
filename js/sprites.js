@@ -351,6 +351,18 @@ export function setSpriteQuality(q) {
  */
 export function drawSprite(ctx, s, x, y, scale = 1) {
   if (!s) return;
+  // Un sprite de más resolución que la de serie (las unidades dibujadas a
+  // mano) se reduce con filtro, que conserva su detalle; sólo si se amplía más
+  // allá de su resolución se copia a píxel visto.
+  if (s.res > 2) {
+    const m = ctx.getTransform();
+    const sm = ctx.imageSmoothingEnabled, q = ctx.imageSmoothingQuality;
+    ctx.imageSmoothingEnabled = Math.hypot(m.a, m.b) * scale < s.res * 1.01;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(s.canvas, x - s.ox * scale, y - s.oy * scale, s.w * scale, s.h * scale);
+    ctx.imageSmoothingEnabled = sm; ctx.imageSmoothingQuality = q;
+    return;
+  }
   ctx.drawImage(s.canvas, x - s.ox * scale, y - s.oy * scale, s.w * scale, s.h * scale);
 }
 
@@ -359,7 +371,10 @@ export function drawSprite(ctx, s, x, y, scale = 1) {
 // Relativa a este módulo, no a la página: así vale también desde tools/.
 const DIR = new URL('../assets/sprites/', import.meta.url).href;
 let indexPromise = null;
-let index = null;              // { res, hojas: [nombre], sprites: { clave: [hoja, x, y, w, h, ox, oy] } }
+// { res, resHojas: { nombre: res }, hojas: [nombre], sprites: { clave: [hoja, x, y, w, h, ox, oy] } }
+// `res` son los píxeles de hoja por píxel de mundo; una hoja con más
+// resolución lo dice en `resHojas`.
+let index = null;
 const sheets = new Map();      // nombre de hoja → Promise<HTMLImageElement>
 const loaded = new Map();      // nombre de hoja → HTMLImageElement ya decodificada
 
@@ -451,7 +466,8 @@ function slice(key) {
   const [, x, y, w, h, ox, oy] = e;
   const c = makeCanvas(w, h);
   c.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h);
-  return { canvas: c, ox, oy, w: w / index.res, h: h / index.res };
+  const res = (index.resHojas && index.resHojas[index.hojas[e[0]]]) || index.res;
+  return { canvas: c, ox, oy, w: w / res, h: h / res, res };
 }
 
 /*
@@ -468,7 +484,7 @@ function flipSprite(s) {
   ctx.translate(c.width, 0);
   ctx.scale(-1, 1);
   ctx.drawImage(s.canvas, 0, 0);
-  return { canvas: c, ox: s.w - s.ox, oy: s.oy, w: s.w, h: s.h };
+  return { canvas: c, ox: s.w - s.ox, oy: s.oy, w: s.w, h: s.h, res: s.res };
 }
 
 /**

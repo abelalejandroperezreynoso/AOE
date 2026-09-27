@@ -15,6 +15,8 @@ indice.hojas.forEach((h, i) => { if (usadas.has(i)) { mapa.set(i, nuevas.length)
 for (const e of Object.values(indice.sprites)) e[0] = mapa.get(e[0]);
 const fuera = indice.hojas.filter((_, i) => !usadas.has(i));
 indice.hojas = nuevas;
+// La resolución propia de las hojas que se van, fuera también.
+if (indice.resHojas) for (const h of fuera) delete indice.resHojas[h];
 await writeFile(`${DIR}/indice.json`, JSON.stringify(indice));
 for (const h of fuera) { await unlink(`${DIR}/${h}`).catch(() => {}); console.log(`fuera ${h}`); }
 console.log(`${nuevas.length} hojas en uso`);
