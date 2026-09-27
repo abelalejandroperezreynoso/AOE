@@ -12,6 +12,8 @@ import {
   TERRAIN_LABELS, NODE_LABELS, RATE_LABELS, READ_ONLY_KINDS,
 } from './data/overrides.js';
 
+import { marcaDeslizador } from './utils.js';
+
 const el = (id) => document.getElementById(id);
 
 const CLASS_NAMES = {
@@ -367,6 +369,7 @@ export class Catalog {
       velFps.textContent = modo.frames.length > 1 ? `${fps < 1 ? fps.toFixed(1) : Math.round(fps * 10) / 10} fotogramas/s` : '';
     };
     slider.oninput = () => { this.animSpeed = Number(slider.value); pintaVel(); };
+    marcaDeslizador(slider);
     vel.append(velTxt, slider, velFps);
     card.appendChild(vel);
 

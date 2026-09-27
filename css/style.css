@@ -369,7 +369,7 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
   margin: 14px 4px 0;
   font-size: 15px; color: #000;
 }
-.cat-anim-vel input { width: 100%; accent-color: var(--gold); }
+.cat-anim-vel input { width: 100%; }
 .cat-anim-fps { grid-column: 1 / -1; font-size: 13px; color: #8a8a8e; }
 .cat-anim-fps:empty { display: none; }
 .cat-anim-nota { margin: 14px 4px 8px; font-size: 13px; color: #8a8a8e; }
@@ -1254,7 +1254,7 @@ button.hoja-fila, label.hoja-fila {
 }
 .hoja-texto { flex: 1; letter-spacing: -.2px; }
 .hoja-valor { color: #8a8a8e; }
-.hoja-volumen input { flex: 0 1 45%; min-width: 0; accent-color: var(--gold); }
+.hoja-volumen input { flex: 0 1 45%; min-width: 0; }
 
 .hoja-insignia {
   flex: none;
@@ -1275,6 +1275,40 @@ button.hoja-fila, label.hoja-fila {
   fill: none; stroke: #c4c4c7;
   stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
 }
+
+/*
+ * Deslizadores de iOS: carril fino y gris, el tramo hasta el valor en el color
+ * de acento y una bola blanca con sombra. El tramo relleno sale de `--lleno`,
+ * que pone `marcaDeslizador` (utils.js); Firefox lo pinta solo.
+ */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  height: 28px; margin: 0; padding: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+input[type="range"]:focus { outline: none; }
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px;
+  background: linear-gradient(to right, var(--gold) 0 var(--lleno, 50%), #e3e3e8 var(--lleno, 50%) 100%);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 28px; height: 28px; margin-top: -12px;
+  border: 0; border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 .5px 4px rgba(0, 0, 0, .12), 0 6px 13px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04);
+}
+input[type="range"]::-moz-range-track { height: 4px; border-radius: 2px; background: #e3e3e8; }
+input[type="range"]::-moz-range-progress { height: 4px; border-radius: 2px; background: var(--gold); }
+input[type="range"]::-moz-range-thumb {
+  width: 28px; height: 28px;
+  border: 0; border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 .5px 4px rgba(0, 0, 0, .12), 0 6px 13px rgba(0, 0, 0, .12), 0 0 0 .5px rgba(0, 0, 0, .04);
+}
+input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rgba(160, 125, 30, .35), 0 6px 13px rgba(0, 0, 0, .12); }
 
 /* En iOS lo tocado se oscurece, no se aclara ni se hunde. */
 .overlay-hoja button:hover, .overlay-alerta button:hover { filter: none; }

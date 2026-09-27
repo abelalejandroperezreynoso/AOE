@@ -10,11 +10,19 @@ import { NetSession } from './net/session.js';
 import { Catalog } from './catalog.js';
 import { loadOverrides, adoptOverrides } from './data/overrides.js';
 import { prepareSprites } from './sprites.js';
+import { marcaDeslizador } from './utils.js';
 
 const el = (id) => document.getElementById(id);
 
 // Los valores y los retoques del catálogo, antes de que nadie lea los datos.
 loadOverrides();
+
+// Los deslizadores pintan su tramo relleno al moverse, y los que ya están en
+// la página, desde el principio.
+document.addEventListener('input', (e) => {
+  if (e.target instanceof HTMLInputElement && e.target.type === 'range') marcaDeslizador(e.target);
+});
+for (const r of document.querySelectorAll('input[type="range"]')) marcaDeslizador(r);
 
 const catalog = new Catalog();
 

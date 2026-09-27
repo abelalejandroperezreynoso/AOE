@@ -121,3 +121,15 @@ export function mix(c1, c2, t) {
 export function shade(hex, amount) {
   return mix(hex, amount > 0 ? '#ffffff' : '#000000', Math.abs(amount));
 }
+
+/**
+ * Deslizadores al estilo de iOS: el tramo relleno del carril lo pinta el CSS
+ * con `--lleno`, que dice hasta dónde llega el valor. Hay que ponerlo al
+ * crear el deslizador; al moverlo lo pone solo un aviso de main.js.
+ */
+export function marcaDeslizador(input) {
+  const min = Number(input.min) || 0;
+  const max = input.max === '' ? 100 : Number(input.max);
+  const t = max > min ? (Number(input.value) - min) / (max - min) : 0;
+  input.style.setProperty('--lleno', `${Math.max(0, Math.min(1, t)) * 100}%`);
+}
