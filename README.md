@@ -253,10 +253,8 @@ Para depurar, el objeto de la partida está disponible en la consola como
   sus SLP. Cada una tiene seis fotogramas: cuatro de andar y dos de golpe.
 - Las hojas están a 2× la resolución del mundo. Al acercar la cámara se ven los
   píxeles del sprite, como al ampliar el clásico.
-- Las hojas actuales salieron de los antiguos modelos 3D por código, horneados
-  una vez (`d04eac8`) antes de retirarlos. Para cambiar un dibujo se sustituye
-  su trozo en la hoja, con el mismo tamaño y anclaje, o se reempaqueta la hoja y
-  se actualiza el índice.
+- Para cambiar un dibujo se sustituye su trozo en la hoja, con el mismo tamaño
+  y anclaje, o se reempaqueta la hoja y se actualiza el índice.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
 - En multijugador el anfitrión manda hasta diez instantáneas por segundo en

@@ -34,8 +34,9 @@ Los mensajes de commit van en español, y dicen qué se ha comprobado.
   orientaciones (las otras tres se voltean), seis fotogramas por unidad, tres
   etapas por edificio y los ocho colores. El terreno, los iconos de
   tecnologías y el sonido siguen generándose por código.
-- Los modelos 3D por código y el taller de edificios se retiraron. El último
-  árbol que los tiene es `d04eac8`, con la herramienta que horneó las hojas.
+- Los modelos 3D por código y el taller de edificios se retiraron para no
+  volver, y se borraron también del historial: no hay commit del que
+  recuperarlos.
 - El README documenta el juego, la estructura del código y las notas técnicas.
 
 ## Verificación
@@ -65,24 +66,24 @@ No hay suite de pruebas.
 
   Gastados, y sin que la franja se fuera:
 
-  1. medir la pantalla a mano con `visualViewport` (`1506810`): la medida
+  1. medir la pantalla a mano con `visualViewport` (`fe5c2b9`): la medida
      encoge con el teclado, en iOS el teclado se cierra sin soltar el campo y
      se quedaba clavada, dejando media pantalla en negro;
   2. maquetar contra `100vh` en modo aplicación en vez de `inset: 0`
-     (`c9bf985`, y otra vez `da25624`): «solo moviste todo el contenido hacia
+     (`ef9a008`, y otra vez `7c4fd20`): «solo moviste todo el contenido hacia
      arriba, pero ahora el espaciado lo tengo abajo»;
   3. no depender del alto: el fondo al lienzo de la ventana con el fondo de
      `html`, que cubre la pantalla física entera, y las pantallas sin fondo
-     propio (`00b515e`): «no funciona».
+     propio (`8d1b470`): «no funciona».
 
-  Los revertidos son `db352fe`, `f99d0da` y `7078b5e`.
+  Los revertidos son `68d2ac7`, `00bffe4` y `435afb1`.
 
   **Lo que falta por saber, y sin ello no hay cuarto intento**: si el teléfono
   llegó a ejecutar el código nuevo. Los despliegues de agosto se persiguieron
   dos veces contra la copia guardada, y en los tres intentos el usuario ha
   respondido sin poder confirmarlo. Lo que hay que reponer primero es lo que se
   quitó con todo lo demás: el marcador de versión en la letra pequeña del menú
-  y `diag.html` (`5933907`), la página que mide en el propio aparato —sin
+  y `diag.html` (`fbbe36a`), la página que mide en el propio aparato —sin
   ninguna regla de estilo del juego, que cualquiera podría ser la culpable— y
   dice qué vale cada unidad, las zonas seguras y el modo.
 
