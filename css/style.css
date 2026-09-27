@@ -77,7 +77,10 @@ html, body {
  * la tarjeta empieza arriba y se desplaza entera.
  */
 .overlay {
-  position: fixed; inset: 0;
+  /* Absoluta y no fija, como `#app`: ver más abajo. Fuera de la partida se
+     mide contra la página; dentro (pausa, final), contra `#app`. */
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 100%;
   display: flex; align-items: flex-start; justify-content: center;
   background: var(--fondo);
   z-index: 50;
@@ -92,13 +95,15 @@ html, body {
 
 /*
  * Instalado en iOS con `black-translucent`, la página empieza detrás de la hora
- * pero WebKit sigue midiendo la ventana como si la franja ocupara sitio:
- * `inset: 0` se queda corto justo lo que mide la zona segura de arriba y abajo
- * asoma el fondo. Lo fijo se mide contra esa ventana recortada, así que se
- * alarga a mano, y sólo instalado. Ver CLAUDE.md, «Trampas conocidas».
+ * pero WebKit sigue midiendo la ventana como si la franja ocupara sitio: `100%`
+ * e `inset: 0` se quedan cortos justo lo que mide la zona segura de arriba y
+ * abajo asoma el fondo. Alargar lo fijo con un `bottom` negativo no bastó en el
+ * aparato; siendo absolutas, su alto cuenta como contenido de la página y se les
+ * devuelve lo que iOS quita, como a `#app`. Las de dentro de la partida ya lo
+ * heredan de `#app`. Ver CLAUDE.md, «Trampas conocidas».
  */
 @media (display-mode: standalone) {
-  .overlay { bottom: calc(-1 * var(--sa-top)); }
+  body > .overlay { height: calc(100% + var(--sa-top)); }
 }
 
 /* Cada modo enseña lo suyo y esconde lo del otro. */
@@ -1010,9 +1015,9 @@ button.cmd, button.qitem, button.prod { margin: 0; }
  * gris agrupado, tarjetas blancas y botones anchos. Va al final para ganar a
  * las reglas generales de botones y a las de los medios de más arriba.
  *
- * La hoja no mide la pantalla: la superposición ya ocupa la ventana con
- * `inset: 0` y la hoja la llena con `min-height: 100%` (ver «Trampas
- * conocidas» en CLAUDE.md antes de tocar alturas).
+ * La hoja no mide la pantalla: la superposición ya ocupa la página entera
+ * y la hoja la llena con `min-height: 100%` (ver «Trampas conocidas» en
+ * CLAUDE.md antes de tocar alturas).
  */
 .overlay-hoja, .overlay-alerta {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", sans-serif;

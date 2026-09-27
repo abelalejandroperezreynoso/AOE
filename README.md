@@ -272,8 +272,8 @@ Para depurar, el objeto de la partida está disponible en la consola como
   franja del reloj la decide `apple-mobile-web-app-status-bar-style` en
   `black-translucent`: el contenido pasa por debajo de la hora, que va siempre
   en blanco. Como iOS mide entonces la ventana 50 px más corta de lo que pinta,
-  `#app` es absoluto y se alarga esa zona segura, las superposiciones fijas se
-  alargan por abajo, y `main.js` devuelve la página arriba si se desplaza. La
+  `#app` es absoluto y se alarga esa zona segura, los menús y el
+  catálogo también son absolutos y se alargan igual, y `main.js` devuelve la página arriba si se desplaza. La
   historia completa, en `CLAUDE.md`.
 - La letra pequeña del menú lleva la versión (la misma que va en la URL del CSS
   y de `main.js`; se cambia a mano en `index.html` y `diag.html`) y el enlace a

@@ -103,8 +103,10 @@ No hay suite de pruebas.
   `display-mode: standalone`, de modo que su alto cuenta como contenido de la
   página y puede pasar de la ventana recortada; `html` y `body` sin
   `overflow: hidden`, y un aviso de `scroll` en `main.js` que la devuelve arriba.
-  Las `.overlay`, que siguen siendo fijas, se alargan con un `bottom` negativo
-  del mismo tamaño. El manifiesto pasa a `display: standalone`. Vuelven el
+  Las `.overlay` se alargaron primero con un `bottom` negativo sin dejar de
+  ser fijas, y en el aparato no bastó; ahora son absolutas como `#app` (las de
+  fuera de la partida, `body > .overlay`, con la misma zona segura de más; las
+  de dentro heredan el alto de `#app`) y se desplazan por dentro. El manifiesto pasa a `display: standalone`. Vuelven el
   marcador de versión en el menú y `diag.html`, que ahora pinta además en azul
   una caja con el arreglo nuevo: si en el aparato asoma azul bajo el verde, el
   arreglo llega al borde. Si esto también falla, lo primero es leer la versión
