@@ -279,7 +279,7 @@ export class Catalog {
     const ctx = c.getContext('2d');
     const MAX = 1.2; // un poco de margen alrededor
     if (this.tab !== 'terrain') {
-      const s = this.tab === 'unit' ? unitSprite(key, 0, 1, unitAnim(key).quieto)
+      const s = this.tab === 'unit' ? unitSprite(key, 0, 0, unitAnim(key).quieto)
         : this.tab === 'building' ? buildingSprite(key, 0, 2) : resourceSprite(key, 0);
       if (!s) return c;
       // Centrado por lo que se ve, no por el ancla (ver `cajaSolida`).

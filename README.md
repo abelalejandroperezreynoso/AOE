@@ -227,6 +227,7 @@ assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
 tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
 tools/importar-edificio.mjs  Mete en los atlas el dibujo de un edificio terminado
 tools/importar-direcciones.mjs  Añade a una unidad las posturas de otras orientaciones
+tools/importar-fotogramas.mjs  Mete fotogramas sueltos como el andar de una orientación
 tools/importar-terreno.mjs  Mete en los atlas losetas de terreno dibujadas
 tools/importar-arbol.mjs  Mete en los atlas el dibujo del árbol
 tools/dibujar-jinete.html  Dibuja por código al explorador (caballo y jinete)
@@ -301,6 +302,14 @@ Para depurar, el objeto de la partida está disponible en la consola como
   iguala a la altura de referencia y pinta el azul del uniforme con el color
   del jugador (`villager-dir-<color>.png`). Como es una sola postura, al andar
   alterna con ella misma un píxel más arriba; ↘ conserva su ciclo completo.
+- El andar de ↘ (y, volteado, el de ↙) es el del aldeano nuevo, con delantal y
+  pico: cuatro fotogramas sueltos, `assets/fuentes/aldeano-andar-1..4`, metidos
+  con `tools/importar-fotogramas.mjs villager 0 --espejo --quieto 1`. Vienen
+  retocados sobre la cuadrícula de la lupa: se quitan el fondo y las líneas
+  (claros y sin color), la sombra se distingue de las líneas por ser gris
+  continuo, se reducen a la altura de referencia y el azul de la ropa toma el
+  color del jugador (`villager-andar-0-<color>.png`). El retrato y las vistas
+  del catálogo usan ↘, la orientación dibujada de todas las unidades.
 - Un edificio dibujado entra con `tools/importar-edificio.mjs <tipo>
   <dibujo.png>`: busca la base (desde la esquina de abajo el contorno sube en
   pendiente 2:1 hasta donde las paredes se vuelven verticales), la escala a la

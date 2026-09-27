@@ -636,7 +636,7 @@ export function iconFor(kind, type, colorIdx = 0) {
   const ctx = c.getContext('2d');
   // Sin su hoja cargada no hay retrato: se devuelve el lienzo vacío sin
   // guardarlo, para que la próxima vez salga ya con el dibujo.
-  const s = kind === 'unit' ? unitSprite(type, colorIdx, 1, unitAnim(type).quieto)
+  const s = kind === 'unit' ? unitSprite(type, colorIdx, 0, unitAnim(type).quieto)
     : kind === 'building' ? buildingSprite(type, colorIdx, 2)
       : kind === 'node' ? resourceSprite(type, 0) : null;
   if (!s && (kind === 'unit' || kind === 'building' || kind === 'node')) return c.toDataURL();
