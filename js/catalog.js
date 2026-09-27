@@ -5,7 +5,7 @@ import {
 } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
-  drawSprite, prepareSprites, unitAnim, terrainHasBitmap,
+  drawSprite, prepareSprites, unitAnim, terrainHasBitmap, terrainSprite,
 } from './sprites.js';
 import {
   fieldsFor, getPath, setValue, reset, isChanged, defaultValue, countChanges,
@@ -298,12 +298,12 @@ export class Catalog {
       const sc = real ? Math.min(comun, fit) : fit;
       centrado(ctx, s, k, size / 2, size / 2, sc);
     } else {
-      // Terreno: un rombo con la misma textura que usa el mapa.
-      ctx.save();
-      ctx.translate(size / 2, (size - TILE_H * (size / 64)) / 2);
-      ctx.scale(size / 64, size / 64);
-      drawTerrainTile(ctx, 0, 0, key, 0.5);
-      ctx.restore();
+      // Terreno: su variante 0, a píxel visto como el resto de vistas.
+      const s = terrainSprite(key, 0);
+      if (!s) return c;
+      const sc = (size - 4) / s.w;
+      ctx.imageSmoothingEnabled = false;
+      drawSprite(ctx, s, size / 2 - (s.w / 2 - s.ox) * sc, size / 2 - (s.h / 2 - s.oy) * sc, sc);
     }
     return c;
   }
@@ -331,7 +331,8 @@ export class Catalog {
 
     if (this.tab === 'terrain') {
       title.textContent = TERRAIN_LABELS[key] || key;
-      sub.textContent = terrainHasBitmap(key) ? 'Losetas dibujadas, ocho variantes.' : 'Color con el que se pinta este terreno en el mapa.';
+      sub.textContent = terrainHasBitmap(key) ? 'Losetas dibujadas, ocho variantes.' : 'Pintado por código, ocho variantes.';
+      box.appendChild(this.lupaTerreno(key));
       box.appendChild(this.terrainForm(key));
     } else if (this.tab === 'node') {
       const def = RESOURCE_NODES[key];
@@ -476,6 +477,46 @@ export class Catalog {
     lupa.pinta(s);
     const frag = document.createDocumentFragment();
     frag.append(this.group('Lupa', [lupa.card, lupa.boton]), this.group('Imagen', [lupa.info]));
+    return frag;
+  }
+
+  /**
+   * Lupa de un terreno: una de sus ocho variantes, que se elige en la fila de
+   * debajo, con la cuadrícula, los datos y la descarga como las demás.
+   */
+  lupaTerreno(key) {
+    const lupa = this.crearLupa(key);
+    const tira = document.createElement('div');
+    tira.className = 'cat-anim-tira cat-variantes';
+    const cajas = [];
+    const elige = (v) => {
+      lupa.pinta(terrainSprite(key, v), null, [['Variante', String(v + 1)]]);
+      cajas.forEach((b, i) => b.classList.toggle('actual', i === v));
+    };
+    for (let v = 0; v < 8; v++) {
+      const box = document.createElement('div');
+      box.className = 'cat-anim-foto';
+      const s = terrainSprite(key, v);
+      const c = document.createElement('canvas');
+      const dpr = Math.min(3, window.devicePixelRatio || 1);
+      c.width = 64 * dpr; c.height = 40 * dpr;
+      c.style.width = '64px'; c.style.height = '40px';
+      if (s) {
+        const ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        const sc = (60 * dpr) / s.w;
+        ctx.drawImage(s.canvas, (c.width - s.w * sc) / 2, (c.height - s.h * sc) / 2, s.w * sc, s.h * sc);
+      }
+      const n = document.createElement('span');
+      n.textContent = v + 1;
+      box.append(c, n);
+      box.onclick = () => elige(v);
+      tira.appendChild(box);
+      cajas.push(box);
+    }
+    elige(0);
+    const frag = document.createDocumentFragment();
+    frag.append(this.group('Lupa', [lupa.card, lupa.boton]), this.group('Imagen', [lupa.info]), this.group('Variantes', [tira]));
     return frag;
   }
 

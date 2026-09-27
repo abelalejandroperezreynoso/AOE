@@ -244,6 +244,27 @@ export function drawTerrainTile(ctx, sx, sy, terrain, rnd) {
  */
 const terrCache = new Map();
 
+/**
+ * Una variante de terreno como sprite (lienzo, medidas en píxeles de mundo y
+ * ancla en el centro del rombo), para enseñarla en el catálogo: la loseta
+ * dibujada si la hay, o el rombo de código pintado a la resolución de los
+ * sprites.
+ */
+export function terrainSprite(terrain, variant = 0) {
+  if (terrainHasBitmap(terrain)) {
+    const key = `${terrain}|${variant}`;
+    let s = terrCache.get(key);
+    if (!s) { s = slice(`t|${key}`); if (s) terrCache.set(key, s); }
+    return s;
+  }
+  const res = (index && index.res) || 2;
+  const c = makeCanvas((TILE_W + 2) * res, (TILE_H + 2) * res);
+  const ctx = c.getContext('2d');
+  ctx.scale(res, res);
+  drawTerrainTile(ctx, HW + 1, 1, terrain, (variant + 0.5) / TILE_VARIANTS);
+  return { canvas: c, w: TILE_W + 2, h: TILE_H + 2, ox: HW + 1, oy: HH + 1 };
+}
+
 /** ¿Tiene este terreno losetas dibujadas? (el catálogo no ofrece su color). */
 export function terrainHasBitmap(terrain) {
   return !!(index && index.sprites[`t|${terrain}|0`]);
