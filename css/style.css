@@ -244,6 +244,50 @@ button:active { filter: brightness(.88); }
 .cat-field.fijo { cursor: default; }
 .cat-field.wide .cat-valor { padding: 4px 0 12px; font-size: 15px; line-height: 1.35; text-align: left; }
 
+/* Lupa: el sprite ampliado a aumento entero, con la cuadrícula de píxeles. */
+.cat-lupa { padding: 12px 0 0; }
+.cat-lupa canvas {
+  display: block; margin: 0 auto; max-width: calc(100% - 24px);
+  border-radius: 16px; background: #f2f2f7;
+  image-rendering: pixelated;
+}
+.cat-lupa-marco { position: relative; width: fit-content; max-width: calc(100% - 24px); margin: 0 auto; }
+.cat-lupa-marco canvas { max-width: 100%; }
+.cat-lupa-zoom { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 6px; }
+.cat-lupa-zoom button {
+  width: 36px; height: 36px; padding: 0;
+  border: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, .92);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, .15);
+  color: var(--tinta); font-size: 22px; line-height: 1;
+}
+.cat-lupa-pie { margin: 8px 16px 4px; font-size: 13px; color: #8a8a8e; text-align: center; }
+.cat-lupa-switch { border-top: .5px solid #c6c6c8; }
+/* La dirección que enseña la lupa, marcada en la rosa. */
+.cat-anim-celda.elegida { box-shadow: inset 0 0 0 2px var(--acento); }
+.cat-anim-celda:not(.centro), .cat-anim-foto { cursor: pointer; }
+.cat-anim-foto.fijo { background: var(--acento-suave); }
+
+/* Interruptor de iOS. */
+.cat-field input.interruptor {
+  -webkit-appearance: none; appearance: none;
+  flex: none; position: relative;
+  width: 51px; height: 31px; margin: 0; padding: 0;
+  border-radius: 999px;
+  background: #e9e9ea;
+  transition: background .2s;
+  cursor: pointer;
+}
+.cat-field input.interruptor::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 27px; height: 27px; border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .15), 0 1px 1px rgba(0, 0, 0, .16);
+  transition: transform .2s;
+}
+.cat-field input.interruptor:checked { background: var(--verde); }
+.cat-field input.interruptor:checked::after { transform: translateX(20px); }
+
 /* Animaciones: el modo arriba, la rosa de las ocho direcciones y la tira. */
 .cat-anim { padding: 12px; }
 .cat-anim-modos { margin-bottom: 10px; }

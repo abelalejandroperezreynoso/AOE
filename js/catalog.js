@@ -297,6 +297,7 @@ export class Catalog {
       const def = RESOURCE_NODES[key];
       title.textContent = NODE_LABELS[key] || key;
       sub.textContent = `Da ${RES_NAME[def.res]}. ${def.blocking ? 'Bloquea el paso.' : 'No bloquea el paso.'}`;
+      box.appendChild(this.lupaFija(resourceSprite(key, 0)));
       box.appendChild(this.nodeForm(key, def));
     } else {
       const def = this.tab === 'unit' ? UNITS[key] : BUILDINGS[key];
@@ -306,6 +307,7 @@ export class Catalog {
         : `Disponible en la ${AGES[def.age].name}`;
       box.appendChild(this.extraInfo(def));
       if (this.tab === 'unit') box.appendChild(this.animations(key, def));
+      else box.appendChild(this.lupaFija(buildingSprite(key, 0, 2)));
       box.appendChild(this.form(this.tab, key, def));
     }
     // Las cifras de las unidades sólo se miran: no hay nada que restablecer.
@@ -330,6 +332,129 @@ export class Catalog {
     };
     actions.appendChild(resetBtn);
     box.appendChild(actions);
+  }
+
+  // --- Lupa -----------------------------------------------------------------
+
+  /**
+   * Recuadro grande con un sprite al mayor aumento entero que quepa (cada
+   * píxel del sprite, un cuadrado de píxeles de pantalla) y, encima, la
+   * cuadrícula de sus píxeles. Devuelve la tarjeta y `pinta(s, caja)`, que la
+   * rehace: `caja` es la de centrar (ver `cajaSolida`), la misma en todos los
+   * fotogramas de una dirección para que la figura no baile.
+   */
+  crearLupa(nota) {
+    const card = document.createElement('div');
+    card.className = 'cat-lupa';
+    const c = document.createElement('canvas');
+    const W = 300, H = 300;
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    c.width = W * dpr; c.height = H * dpr;
+    c.style.width = `${W}px`; c.style.height = `${H}px`;
+    const pie = document.createElement('p');
+    pie.className = 'cat-lupa-pie';
+    // Interruptor de iOS para la cuadrícula; se recuerda en este navegador.
+    const fila = document.createElement('label');
+    fila.className = 'cat-field cat-lupa-switch';
+    const txt = document.createElement('span');
+    txt.className = 'cat-label';
+    txt.textContent = 'Cuadrícula de píxeles';
+    const sw = document.createElement('input');
+    sw.type = 'checkbox';
+    sw.className = 'interruptor';
+    let rejilla = true;
+    try { rejilla = localStorage.getItem('aor-rejilla') !== '0'; } catch { /* sin almacenamiento */ }
+    sw.checked = rejilla;
+    fila.append(txt, sw);
+    // Aumento a mano (− / +) y desplazamiento arrastrando, para los sprites
+    // grandes, que ajustados no dejan ver la cuadrícula.
+    const marco = document.createElement('div');
+    marco.className = 'cat-lupa-marco';
+    const zoom = document.createElement('div');
+    zoom.className = 'cat-lupa-zoom';
+    const menos = document.createElement('button'), mas = document.createElement('button');
+    menos.textContent = '−'; mas.textContent = '+';
+    menos.setAttribute('aria-label', 'Menos aumento'); mas.setAttribute('aria-label', 'Más aumento');
+    zoom.append(menos, mas);
+    marco.append(c, zoom);
+    card.append(marco, pie, fila);
+    let kUsuario = 0, pan = { x: 0, y: 0 }, kVisto = 1, kAjuste = 1;
+    const cambia = (d) => {
+      kUsuario = Math.max(kAjuste, Math.min(40, (kUsuario || kVisto) + d * Math.max(1, Math.round(kVisto / 4))));
+      if (kUsuario === kAjuste) { kUsuario = 0; pan = { x: 0, y: 0 }; }
+      if (ultimo) pinta(...ultimo);
+    };
+    menos.onclick = () => cambia(-1);
+    mas.onclick = () => cambia(1);
+    let arrastre = null;
+    c.addEventListener('pointerdown', (e) => { if (kUsuario) { arrastre = { x: e.clientX - pan.x, y: e.clientY - pan.y }; c.setPointerCapture(e.pointerId); } });
+    c.addEventListener('pointermove', (e) => {
+      if (!arrastre) return;
+      pan = { x: e.clientX - arrastre.x, y: e.clientY - arrastre.y };
+      if (ultimo) pinta(...ultimo);
+    });
+    c.addEventListener('pointerup', () => { arrastre = null; });
+    c.style.touchAction = 'none';
+
+    let ultimo = null;
+    const pinta = (s, caja) => {
+      ultimo = [s, caja];
+      const ctx = c.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, c.width, c.height);
+      if (!s) return;
+      const kc = caja || cajaSolida(s);
+      // Un poco de aire alrededor, más por abajo, donde va la sombra.
+      const mx = (kc.x1 - kc.x0) * 0.06, my = (kc.y1 - kc.y0) * 0.06;
+      const k0 = { x0: kc.x0 - mx, x1: kc.x1 + mx, y0: kc.y0 - my, y1: kc.y1 + my * 2 };
+      const res = s.canvas.width / s.w;         // píxeles de sprite por píxel de mundo
+      const fit = Math.min((W - 12) / (k0.x1 - k0.x0), (H - 12) / (k0.y1 - k0.y0));
+      // Píxeles de pantalla por píxel del sprite, siempre enteros.
+      kAjuste = Math.max(1, Math.floor((fit * dpr) / res));
+      const k = kUsuario || kAjuste;
+      kVisto = k;
+      const esc = (k * res) / dpr;              // CSS por píxel de mundo
+      // Esquina del sprite, ajustada a píxel de pantalla.
+      const x = Math.round((W / 2 + pan.x - ((k0.x0 + k0.x1) / 2 + s.ox) * esc) * dpr);
+      const y = Math.round((H / 2 + pan.y - ((k0.y0 + k0.y1) / 2 + s.oy) * esc) * dpr);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(s.canvas, x, y, s.canvas.width * k, s.canvas.height * k);
+      const hay = sw.checked && k >= 4;
+      if (hay) {
+        // Sólo sobre los píxeles con algo, más un borde para que se lea.
+        const d = s.canvas.getContext('2d').getImageData(0, 0, s.canvas.width, s.canvas.height).data;
+        const sw2 = s.canvas.width;
+        ctx.fillStyle = 'rgba(0, 0, 0, .18)';
+        // Sólo lo que cae dentro del recuadro.
+        const px0 = Math.max(0, Math.floor(-x / k)), px1 = Math.min(sw2, Math.ceil((c.width - x) / k));
+        const py0 = Math.max(0, Math.floor(-y / k)), py1 = Math.min(s.canvas.height, Math.ceil((c.height - y) / k));
+        for (let py = py0; py < py1; py++) {
+          for (let px = px0; px < px1; px++) {
+            if (!d[(py * sw2 + px) * 4 + 3]) continue;
+            const gx = x + px * k, gy = y + py * k;
+            ctx.fillRect(gx, gy, k, 1);
+            ctx.fillRect(gx, gy, 1, k);
+          }
+        }
+      }
+      pie.textContent = `${s.canvas.width}×${s.canvas.height} píxeles · aumento ×${k}`
+        + (sw.checked && !hay ? ' · amplía con + para ver la cuadrícula' : '')
+        + (kUsuario ? ' · arrastra para moverte' : '')
+        + (nota ? ` · ${nota}` : '');
+    };
+    sw.onchange = () => {
+      try { localStorage.setItem('aor-rejilla', sw.checked ? '1' : '0'); } catch { /* da igual */ }
+      if (ultimo) pinta(...ultimo);
+    };
+    return { card, pinta, set nota(t) { nota = t; } };
+  }
+
+  lupaFija(s) {
+    const lupa = this.crearLupa();
+    // Se pinta ya en el sitio: sin estar en la página el lienzo mide lo mismo,
+    // así que no hace falta esperar.
+    lupa.pinta(s);
+    return this.group('Lupa', [lupa.card]);
   }
 
   // --- Animaciones -----------------------------------------------------------
@@ -378,6 +503,15 @@ export class Catalog {
     }
     const centro = rosa.querySelector('.centro');
     card.appendChild(rosa);
+
+    // La lupa enseña la dirección elegida (se elige tocando su celda) con el
+    // fotograma que toque, o el que se haya fijado tocándolo en la tira.
+    const lupa = this.crearLupa();
+    let lupaCara = 0, fijo = null;
+    const NOMBRE = { 0: '↘', 1: '↓', 2: '↙', 3: '←', 4: '↖', 5: '↑', 6: '↗', 7: '→' };
+    const marcaCara = () => {
+      for (const { face, canvas } of celdas) canvas.parentNode.classList.toggle('elegida', face === lupaCara);
+    };
 
     // Velocidad, para estudiar la animación a cámara lenta. Se recuerda al
     // pasar de una unidad a otra, pero no se guarda: la partida no la usa.
@@ -447,6 +581,14 @@ export class Catalog {
       if (s && k) centrado(ctx, s, k, c._w / 2, c._h / 2, c._esc);
     };
     for (const { canvas } of celdas) prepara(canvas, 96, 104);
+    const pintaLupa = (f) => {
+      lupa.nota = `mirando ${NOMBRE[lupaCara]}, fotograma ${f}${fijo !== null ? ' (fijo)' : ''}`;
+      lupa.pinta(sprite(lupaCara, f), cajaDe.get(lupaCara));
+    };
+    for (const cel of celdas) {
+      cel.canvas.parentNode.onclick = () => { lupaCara = cel.face; marcaCara(); last = -1; };
+    }
+    marcaCara();
 
     let tiraCanvas = [];
     const eligeModo = (m) => {
@@ -469,11 +611,14 @@ export class Catalog {
         const n = document.createElement('span');
         n.textContent = f;
         box.append(c, n);
+        // Tocar un fotograma lo fija en todas las vistas; tocarlo otra vez lo suelta.
+        box.onclick = () => { fijo = fijo === f ? null : f; last = -1; };
         tira.appendChild(box);
         return box;
       });
       last = -1;
       fase = 0;
+      fijo = null;
       pintaVel();
     };
     for (const m of modos) {
@@ -492,16 +637,24 @@ export class Catalog {
       this.animRaf = requestAnimationFrame(tick);
       fase += ((now - antes) / 1000) * modo.fps * this.animSpeed;
       antes = now;
-      const i = Math.floor(fase) % modo.frames.length;
-      if (i === last) return;
-      last = i;
+      let i = Math.floor(fase) % modo.frames.length;
+      if (fijo !== null) i = Math.max(0, modo.frames.indexOf(fijo));
+      const clave = `${i}|${lupaCara}|${fijo}`;
+      if (clave === last) return;
+      last = clave;
       for (const { face, canvas } of celdas) pinta(canvas, face, modo.frames[i]);
-      tiraCanvas.forEach((b, j) => b.classList.toggle('actual', tiraCanvas.length === 1 || j === i));
+      pintaLupa(modo.frames[i]);
+      tiraCanvas.forEach((b, j) => {
+        b.classList.toggle('actual', tiraCanvas.length === 1 || j === i);
+        b.classList.toggle('fijo', fijo !== null && j === i);
+      });
     };
     eligeModo(modo);
     this.animRaf = requestAnimationFrame(tick);
 
-    return this.group('Animaciones', [card]);
+    const frag = document.createDocumentFragment();
+    frag.append(this.group('Lupa', [lupa.card]), this.group('Animaciones', [card]));
+    return frag;
   }
 
   stopAnim() {

@@ -107,6 +107,12 @@ Limitaciones conocidas:
 Desde el menú principal, **Catálogo del juego**: una ficha de cada unidad,
 edificio, recurso y tipo de terreno, con su dibujo y todos sus valores.
 
+Cada ficha tiene una **lupa**: el sprite al mayor aumento entero que cabe,
+con la **cuadrícula de sus píxeles** encima (un interruptor la quita). Con −
+y + se amplía más, y arrastrando se recorre, para los edificios grandes. En
+las unidades sigue la animación: tocar una dirección la enseña en la lupa y
+tocar un fotograma de la tira lo deja fijo.
+
 Cada unidad enseña sus **animaciones** en marcha: moverse, quieta y
 atacar (trabajar, en el aldeano), a la vez en las ocho direcciones y con sus
 fotogramas sueltos debajo. Sus cifras se pueden consultar pero **no cambiar**:
