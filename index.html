@@ -20,21 +20,47 @@
 <body>
 
 <!-- ---------- Menú principal ---------- -->
+<!-- Una hoja al estilo de iOS: sube desde abajo con las esquinas redondas,
+     fondo gris agrupado, tarjetas blancas y filas con su insignia de color.
+     Los ids son los de siempre, que main.js y ui.js los buscan. -->
 <div id="main-menu" class="overlay">
-  <div class="menu-card">
-    <h1>Age of <span>Realms</span> II</h1>
-    <p class="subtitle">Estrategia medieval en tiempo real · homenaje a los clásicos del género</p>
+  <div class="hoja">
+    <p class="hoja-titulo">Menú principal</p>
 
-    <button id="btn-new" class="primary">Comenzar partida</button>
-    <button id="btn-catalog" class="secondary">Catálogo del juego</button>
-    <button id="btn-studio" class="secondary">Taller de edificios</button>
-    <button id="btn-fullscreen-menu" class="secondary fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
-      <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
-        <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
-      </svg>
-      <span class="fs-label">Pantalla completa</span>
-    </button>
+    <section class="hoja-grupo hoja-portada">
+      <img class="hoja-icono" src="/icons/icon-512.png" alt="" width="120" height="120">
+      <h1>Age of Realms II</h1>
+      <p class="subtitle">Estrategia medieval en tiempo real · homenaje a los clásicos del género</p>
+    </section>
+
+    <button id="btn-new" class="hoja-boton">Comenzar partida</button>
+
+    <div class="hoja-grupo hoja-lista">
+      <button id="btn-catalog" class="hoja-fila">
+        <span class="hoja-insignia" style="--insignia: #f09a37">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5C6.5 4 9.5 4 12 6c2.5-2 5.5-2 8-.5V19c-2.5-1.5-5.5-1.5-8 .5-2.5-2-5.5-2-8-.5z M12 6v13.5" /></svg>
+        </span>
+        <span class="hoja-texto">Catálogo del juego</span>
+        <svg class="hoja-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6" /></svg>
+      </button>
+      <button id="btn-studio" class="hoja-fila">
+        <span class="hoja-insignia" style="--insignia: #3478f6">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V5h2.5v2h2V5h3v2h2V5H18v16 M6 11h12 M4 21h16 M10.5 21v-4a1.5 1.5 0 0 1 3 0v4" /></svg>
+        </span>
+        <span class="hoja-texto">Taller de edificios</span>
+        <svg class="hoja-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6" /></svg>
+      </button>
+      <button id="btn-fullscreen-menu" class="hoja-fila fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
+        <span class="hoja-insignia" style="--insignia: #8e8e93">
+          <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path class="fs-expand" d="M3 9V3h6M21 9V3h-6M3 15v6h6M21 15v6h-6" />
+            <path class="fs-shrink" d="M9 3v6H3M15 3v6h6M9 21v-6H3M15 21v-6h6" />
+          </svg>
+        </span>
+        <span class="hoja-texto fs-label">Pantalla completa</span>
+        <svg class="hoja-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6" /></svg>
+      </button>
+    </div>
 
     <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios. Todo el arte se genera por código.</p>
   </div>

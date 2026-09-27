@@ -1681,3 +1681,161 @@ button.cmd, button.qitem, button.prod { margin: 0; }
   .cmd img { width: 36px; height: 36px; }
   .cmd .cost { font-size: 8.5px; }
 }
+
+/* ---------- Menú principal: hoja al estilo de iOS ---------- */
+
+/*
+ * Va al final para ganar a las reglas generales de botones, tarjetas y a las
+ * de los medios de arriba. La hoja no mide la pantalla: la superposición ya
+ * ocupa la ventana con `inset: 0` y la hoja la llena con `min-height: 100%`
+ * (ver «Trampas conocidas» en CLAUDE.md antes de tocar alturas).
+ */
+#main-menu {
+  background: #d1d1d6; /* lo que asoma detrás de la hoja, como una pantalla atenuada */
+  padding: calc(14px + var(--sa-top)) var(--sa-right) 0 var(--sa-left);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+}
+#main-menu > .hoja { margin: 0 auto; }
+
+.hoja {
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  min-height: 100%;
+  background: #f2f2f7;
+  border-radius: 38px 38px 0 0;
+  box-shadow: 0 -2px 24px rgba(0, 0, 0, .12);
+  padding: 18px 16px calc(28px + var(--sa-bottom));
+  color: #000;
+  text-align: left;
+}
+
+.hoja-titulo {
+  margin: 4px 0 18px;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.2px;
+}
+
+.hoja-grupo {
+  background: #fff;
+  border-radius: 26px;
+  overflow: hidden;
+}
+
+.hoja-portada {
+  padding: 28px 20px 24px;
+  text-align: center;
+}
+.hoja-icono {
+  display: block;
+  width: 120px; height: 120px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  box-shadow: 0 8px 26px rgba(224, 164, 90, .45), 0 2px 6px rgba(0, 0, 0, .12);
+}
+.hoja h1 {
+  margin: 0 0 6px;
+  font: inherit;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -.4px;
+  color: #000;
+  text-shadow: none;
+}
+.hoja .subtitle {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.35;
+  color: #8a8a8e;
+}
+
+button.hoja-boton {
+  display: block;
+  width: 100%;
+  margin: 20px 0;
+  padding: 15px 20px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--gold);
+  color: #fff;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -.2px;
+}
+
+button.hoja-fila {
+  display: flex; align-items: center; justify-content: flex-start; gap: 14px;
+  width: 100%;
+  margin: 0;
+  padding: 0 16px;
+  min-height: 56px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #000;
+  font: inherit;
+  font-size: 17px;
+  text-align: left;
+}
+/* La raya entre filas empieza donde el texto, como en iOS: pasada la insignia
+   (16 de margen + 34 de insignia + 14 de hueco). */
+.hoja-fila + .hoja-fila { position: relative; }
+.hoja-fila + .hoja-fila::before {
+  content: "";
+  position: absolute; top: 0; left: 64px; right: 0;
+  border-top: .5px solid #c6c6c8;
+}
+
+.hoja-texto { flex: 1; letter-spacing: -.2px; }
+
+.hoja-insignia {
+  flex: none;
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: var(--insignia);
+}
+.hoja-insignia svg, .hoja-fila .fs-icon {
+  width: 20px; height: 20px;
+  fill: none; stroke: #fff;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+.hoja-chevron {
+  flex: none;
+  width: 8px; height: 14px;
+  fill: none; stroke: #c4c4c7;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* En iOS lo tocado se oscurece, no se aclara ni se hunde. */
+button.hoja-boton:hover, button.hoja-fila:hover { filter: none; }
+button.hoja-boton:active, button.hoja-fila:active { transform: none; }
+button.hoja-boton:active { filter: brightness(.85); }
+button.hoja-fila:active { background: #d1d1d6; }
+
+.hoja .legal {
+  margin: 14px 16px 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #8a8a8e;
+  text-align: center;
+}
+
+/* Con sitio de sobra (escritorio, tableta apaisada) la hoja flota en medio,
+   redonda por los cuatro lados, en vez de pegarse abajo. */
+@media (min-width: 700px) and (min-height: 700px) {
+  #main-menu { padding: 24px; }
+  #main-menu > .hoja { margin: auto; }
+  .hoja { min-height: 0; border-radius: 38px; padding-bottom: 28px; box-shadow: 0 20px 60px rgba(0, 0, 0, .18); }
+}
+
+/* Apaisado en el teléfono: falta alto, así que la portada se aprieta. */
+@media (max-height: 520px) {
+  .hoja-portada { padding: 16px 20px 14px; }
+  .hoja-icono { width: 72px; height: 72px; margin-bottom: 10px; }
+  .hoja h1 { font-size: 24px; }
+  button.hoja-boton { margin: 14px 0; }
+}
