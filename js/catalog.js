@@ -337,124 +337,98 @@ export class Catalog {
   // --- Lupa -----------------------------------------------------------------
 
   /**
-   * Recuadro grande con un sprite al mayor aumento entero que quepa (cada
-   * píxel del sprite, un cuadrado de píxeles de pantalla) y, encima, la
-   * cuadrícula de sus píxeles. Devuelve la tarjeta y `pinta(s, caja)`, que la
-   * rehace: `caja` es la de centrar (ver `cajaSolida`), la misma en todos los
-   * fotogramas de una dirección para que la figura no baile.
+   * Recuadro con un sprite a aumento entero (cada píxel del sprite, un
+   * cuadrado de píxeles de pantalla) y la cuadrícula de todos sus píxeles, del
+   * tamaño de la imagen. Aparte, una tarjeta con sus datos.
+   *
+   * `pinta(s, marco, datos)` la rehace. `marco` es el rectángulo común a los
+   * fotogramas que se van a enseñar, en píxeles del sprite desde su ancla
+   * ({ l, t, r, b }): así el lienzo no cambia de tamaño entre fotogramas y la
+   * figura no baila. `datos` son filas extra para la tarjeta ([rótulo, valor]).
    */
-  crearLupa(nota) {
+  crearLupa() {
     const card = document.createElement('div');
     card.className = 'cat-lupa';
     const c = document.createElement('canvas');
-    const W = 300, H = 300;
+    card.appendChild(c);
     const dpr = Math.min(3, window.devicePixelRatio || 1);
-    c.width = W * dpr; c.height = H * dpr;
-    c.style.width = `${W}px`; c.style.height = `${H}px`;
-    const pie = document.createElement('p');
-    pie.className = 'cat-lupa-pie';
-    // Interruptor de iOS para la cuadrícula; se recuerda en este navegador.
-    const fila = document.createElement('label');
-    fila.className = 'cat-field cat-lupa-switch';
-    const txt = document.createElement('span');
-    txt.className = 'cat-label';
-    txt.textContent = 'Cuadrícula de píxeles';
-    const sw = document.createElement('input');
-    sw.type = 'checkbox';
-    sw.className = 'interruptor';
-    let rejilla = true;
-    try { rejilla = localStorage.getItem('aor-rejilla') !== '0'; } catch { /* sin almacenamiento */ }
-    sw.checked = rejilla;
-    fila.append(txt, sw);
-    // Aumento a mano (− / +) y desplazamiento arrastrando, para los sprites
-    // grandes, que ajustados no dejan ver la cuadrícula.
-    const marco = document.createElement('div');
-    marco.className = 'cat-lupa-marco';
-    const zoom = document.createElement('div');
-    zoom.className = 'cat-lupa-zoom';
-    const menos = document.createElement('button'), mas = document.createElement('button');
-    menos.textContent = '−'; mas.textContent = '+';
-    menos.setAttribute('aria-label', 'Menos aumento'); mas.setAttribute('aria-label', 'Más aumento');
-    zoom.append(menos, mas);
-    marco.append(c, zoom);
-    card.append(marco, pie, fila);
-    let kUsuario = 0, pan = { x: 0, y: 0 }, kVisto = 1, kAjuste = 1;
-    const cambia = (d) => {
-      kUsuario = Math.max(kAjuste, Math.min(40, (kUsuario || kVisto) + d * Math.max(1, Math.round(kVisto / 4))));
-      if (kUsuario === kAjuste) { kUsuario = 0; pan = { x: 0, y: 0 }; }
-      if (ultimo) pinta(...ultimo);
-    };
-    menos.onclick = () => cambia(-1);
-    mas.onclick = () => cambia(1);
-    let arrastre = null;
-    c.addEventListener('pointerdown', (e) => { if (kUsuario) { arrastre = { x: e.clientX - pan.x, y: e.clientY - pan.y }; c.setPointerCapture(e.pointerId); } });
-    c.addEventListener('pointermove', (e) => {
-      if (!arrastre) return;
-      pan = { x: e.clientX - arrastre.x, y: e.clientY - arrastre.y };
-      if (ultimo) pinta(...ultimo);
-    });
-    c.addEventListener('pointerup', () => { arrastre = null; });
-    c.style.touchAction = 'none';
 
-    let ultimo = null;
-    const pinta = (s, caja) => {
-      ultimo = [s, caja];
+    const filas = new Map();
+    const info = document.createElement('div');
+    const fila = (rotulo, valor) => {
+      let v = filas.get(rotulo);
+      if (!v) {
+        const row = document.createElement('div');
+        row.className = 'cat-field fijo';
+        const n = document.createElement('span');
+        n.className = 'cat-label';
+        n.textContent = rotulo;
+        v = document.createElement('span');
+        v.className = 'cat-valor';
+        row.append(n, v);
+        info.appendChild(row);
+        filas.set(rotulo, v);
+      }
+      v.textContent = valor;
+    };
+
+    let actual = '';
+    const pinta = (s, marco, datos = []) => {
+      if (!s) return;
+      const res = s.canvas.width / s.w;
+      const ax = Math.round(s.ox * res), ay = Math.round(s.oy * res);
+      const m = marco || { l: ax, t: ay, r: s.canvas.width - ax, b: s.canvas.height - ay };
+      const W = m.l + m.r, H = m.t + m.b;
+      // Aumento: el mayor entero que cabe a lo ancho, sin pasar de 360 de alto,
+      // y nunca menos de 3, que por debajo la cuadrícula no deja ver nada. Si
+      // así no cabe, la tarjeta se desplaza.
+      const ancho = Math.min(360, window.innerWidth - 72);
+      let k = Math.floor((ancho * dpr) / W);
+      k = Math.min(k, Math.floor((360 * dpr) / H));
+      k = Math.max(3, k);
+      const clave = `${W}|${H}|${k}`;
+      if (clave !== actual) {
+        actual = clave;
+        c.width = W * k; c.height = H * k;
+        c.style.width = `${c.width / dpr}px`; c.style.height = `${c.height / dpr}px`;
+      }
       const ctx = c.getContext('2d');
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, c.width, c.height);
-      if (!s) return;
-      const kc = caja || cajaSolida(s);
-      // Un poco de aire alrededor, más por abajo, donde va la sombra.
-      const mx = (kc.x1 - kc.x0) * 0.06, my = (kc.y1 - kc.y0) * 0.06;
-      const k0 = { x0: kc.x0 - mx, x1: kc.x1 + mx, y0: kc.y0 - my, y1: kc.y1 + my * 2 };
-      const res = s.canvas.width / s.w;         // píxeles de sprite por píxel de mundo
-      const fit = Math.min((W - 12) / (k0.x1 - k0.x0), (H - 12) / (k0.y1 - k0.y0));
-      // Píxeles de pantalla por píxel del sprite, siempre enteros.
-      kAjuste = Math.max(1, Math.floor((fit * dpr) / res));
-      const k = kUsuario || kAjuste;
-      kVisto = k;
-      const esc = (k * res) / dpr;              // CSS por píxel de mundo
-      // Esquina del sprite, ajustada a píxel de pantalla.
-      const x = Math.round((W / 2 + pan.x - ((k0.x0 + k0.x1) / 2 + s.ox) * esc) * dpr);
-      const y = Math.round((H / 2 + pan.y - ((k0.y0 + k0.y1) / 2 + s.oy) * esc) * dpr);
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(s.canvas, x, y, s.canvas.width * k, s.canvas.height * k);
-      const hay = sw.checked && k >= 4;
-      if (hay) {
-        // Sólo sobre los píxeles con algo, más un borde para que se lea.
-        const d = s.canvas.getContext('2d').getImageData(0, 0, s.canvas.width, s.canvas.height).data;
-        const sw2 = s.canvas.width;
-        ctx.fillStyle = 'rgba(0, 0, 0, .18)';
-        // Sólo lo que cae dentro del recuadro.
-        const px0 = Math.max(0, Math.floor(-x / k)), px1 = Math.min(sw2, Math.ceil((c.width - x) / k));
-        const py0 = Math.max(0, Math.floor(-y / k)), py1 = Math.min(s.canvas.height, Math.ceil((c.height - y) / k));
-        for (let py = py0; py < py1; py++) {
-          for (let px = px0; px < px1; px++) {
-            if (!d[(py * sw2 + px) * 4 + 3]) continue;
-            const gx = x + px * k, gy = y + py * k;
-            ctx.fillRect(gx, gy, k, 1);
-            ctx.fillRect(gx, gy, 1, k);
-          }
-        }
-      }
-      pie.textContent = `${s.canvas.width}×${s.canvas.height} píxeles · aumento ×${k}`
-        + (sw.checked && !hay ? ' · amplía con + para ver la cuadrícula' : '')
-        + (kUsuario ? ' · arrastra para moverte' : '')
-        + (nota ? ` · ${nota}` : '');
+      ctx.drawImage(s.canvas, (m.l - ax) * k, (m.t - ay) * k, s.canvas.width * k, s.canvas.height * k);
+      // Cuadrícula completa: una línea por cada borde de píxel.
+      ctx.fillStyle = 'rgba(0, 0, 0, .16)';
+      for (let x = 0; x <= W; x++) ctx.fillRect(Math.min(x * k, c.width - 1), 0, 1, c.height);
+      for (let y = 0; y <= H; y++) ctx.fillRect(0, Math.min(y * k, c.height - 1), c.width, 1);
+
+      fila('Tamaño', `${s.canvas.width} × ${s.canvas.height} píxeles`);
+      fila('Lienzo', `${W} × ${H} píxeles`);
+      fila('Aumento', `× ${k}`);
+      for (const [r, v] of datos) fila(r, v);
     };
-    sw.onchange = () => {
-      try { localStorage.setItem('aor-rejilla', sw.checked ? '1' : '0'); } catch { /* da igual */ }
-      if (ultimo) pinta(...ultimo);
-    };
-    return { card, pinta, set nota(t) { nota = t; } };
+    return { card, info, pinta };
+  }
+
+  /** Marco común de varios sprites, en píxeles del sprite desde su ancla. */
+  static marcoDe(sprites) {
+    let m = null;
+    for (const s of sprites) {
+      if (!s) continue;
+      const res = s.canvas.width / s.w;
+      const ax = Math.round(s.ox * res), ay = Math.round(s.oy * res);
+      const q = { l: ax, t: ay, r: s.canvas.width - ax, b: s.canvas.height - ay };
+      m = m ? { l: Math.max(m.l, q.l), t: Math.max(m.t, q.t), r: Math.max(m.r, q.r), b: Math.max(m.b, q.b) } : q;
+    }
+    return m;
   }
 
   lupaFija(s) {
     const lupa = this.crearLupa();
-    // Se pinta ya en el sitio: sin estar en la página el lienzo mide lo mismo,
-    // así que no hace falta esperar.
     lupa.pinta(s);
-    return this.group('Lupa', [lupa.card]);
+    const frag = document.createDocumentFragment();
+    frag.append(this.group('Lupa', [lupa.card]), this.group('Imagen', [lupa.info]));
+    return frag;
   }
 
   // --- Animaciones -----------------------------------------------------------
@@ -581,9 +555,18 @@ export class Catalog {
       if (s && k) centrado(ctx, s, k, c._w / 2, c._h / 2, c._esc);
     };
     for (const { canvas } of celdas) prepara(canvas, 96, 104);
+    // Marco de la lupa por dirección: el de todos sus fotogramas juntos.
+    const marcoDe = new Map();
+    for (let face = 0; face < 8; face++) {
+      const todos = [];
+      for (const m of modos) for (const f of m.frames) todos.push(sprite(face, f));
+      marcoDe.set(face, Catalog.marcoDe(todos));
+    }
     const pintaLupa = (f) => {
-      lupa.nota = `mirando ${NOMBRE[lupaCara]}, fotograma ${f}${fijo !== null ? ' (fijo)' : ''}`;
-      lupa.pinta(sprite(lupaCara, f), cajaDe.get(lupaCara));
+      lupa.pinta(sprite(lupaCara, f), marcoDe.get(lupaCara), [
+        ['Dirección', NOMBRE[lupaCara]],
+        ['Fotograma', fijo !== null ? `${f} (fijo)` : String(f)],
+      ]);
     };
     for (const cel of celdas) {
       cel.canvas.parentNode.onclick = () => { lupaCara = cel.face; marcaCara(); last = -1; };
@@ -653,7 +636,7 @@ export class Catalog {
     this.animRaf = requestAnimationFrame(tick);
 
     const frag = document.createDocumentFragment();
-    frag.append(this.group('Lupa', [lupa.card]), this.group('Animaciones', [card]));
+    frag.append(this.group('Lupa', [lupa.card]), this.group('Imagen', [lupa.info]), this.group('Animaciones', [card]));
     return frag;
   }
 
