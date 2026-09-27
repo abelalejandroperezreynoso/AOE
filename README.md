@@ -111,6 +111,9 @@ Cada ficha tiene una **lupa**: el sprite a aumento entero con la **cuadrícula
 de todos sus píxeles**, del tamaño de la imagen, y aparte una tarjeta con sus
 datos (tamaño, lienzo, aumento y, en las unidades, dirección y fotograma). El
 aumento nunca baja de ×3; los edificios grandes no caben y la lupa se desplaza.
+Las unidades a pie van siempre en un **lienzo estándar de 100×100** píxeles,
+con los pies centrados a lo ancho y a 88 del borde de arriba, así que toda
+plantilla descargada mide igual.
 En las unidades sigue la animación: tocar una dirección la enseña en la lupa y
 tocar un fotograma de la tira lo deja fijo. **Descargar PNG** guarda lo que
 enseña la lupa, con su cuadrícula (en el teléfono, por el menú de compartir,
@@ -310,6 +313,9 @@ Para depurar, el objeto de la partida está disponible en la consola como
   continuo, se reducen a la altura de referencia y el azul de la ropa toma el
   color del jugador (`villager-andar-0-<color>.png`). El retrato y las vistas
   del catálogo usan ↘, la orientación dibujada de todas las unidades.
+  Mientras no haya dibujo de las demás orientaciones, el aldeano usa ese
+  mismo andar en todas (las de la izquierda, volteadas), para que sea siempre
+  el mismo personaje; `tools/podar-indice.mjs` quitó las hojas del soldado.
 - Un edificio dibujado entra con `tools/importar-edificio.mjs <tipo>
   <dibujo.png>`: busca la base (desde la esquina de abajo el contorno sube en
   pendiente 2:1 hasta donde las paredes se vuelven verticales), la escala a la

@@ -47,6 +47,13 @@ function cajaSolida(s) {
 const unir = (a, b) => (a ? {
   x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1),
 } : b);
+/*
+ * Lienzo estándar de las unidades a pie: 100×100 píxeles de sprite, con los
+ * pies (el ancla) centrados a lo ancho y a 88 del borde de arriba. Cabe de
+ * sobra el aldeano (unos 48×86) con su sombra.
+ */
+const MARCO_A_PIE = { l: 50, t: 88, r: 50, b: 12, estandar: true };
+
 // Las flechas de dirección, en palabras para el nombre del archivo.
 const NOMBRE_ARCHIVO = { '↘': 'sureste', '↓': 'sur', '↙': 'suroeste', '←': 'oeste', '↖': 'noroeste', '↑': 'norte', '↗': 'noreste', '→': 'este' };
 
@@ -444,7 +451,7 @@ export class Catalog {
 
       sufijo = datos.map(([, v]) => `-${String(v).replace(/[^\w]+/g, '') || NOMBRE_ARCHIVO[v] || ''}`).join('');
       fila('Tamaño', `${s.canvas.width} × ${s.canvas.height} píxeles`);
-      fila('Lienzo', `${W} × ${H} píxeles`);
+      fila('Lienzo', m.estandar ? `${W} × ${H} estándar` : `${W} × ${H} píxeles`);
       fila('Aumento', `× ${k}`);
       for (const [r, v] of datos) fila(r, v);
     };
@@ -560,6 +567,7 @@ export class Catalog {
 
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const sprite = (face, f) => unitSprite(key, 0, face, f);
+    const aPie = def.class !== 'cavalry' && def.class !== 'siege';
     /** Medidas que caben todas las poses, desde los pies, en píxeles de mundo. */
     /*
      * Una caja por dirección, la de todos sus fotogramas juntos: centrar cada
@@ -601,7 +609,9 @@ export class Catalog {
     for (let face = 0; face < 8; face++) {
       const todos = [];
       for (const m of modos) for (const f of m.frames) todos.push(sprite(face, f));
-      marcoDe.set(face, Catalog.marcoDe(todos));
+      // Las unidades a pie van siempre en el lienzo estándar de 100×100, con
+      // los pies en el mismo sitio: así toda plantilla descargada mide igual.
+      marcoDe.set(face, aPie ? { ...MARCO_A_PIE } : Catalog.marcoDe(todos));
     }
     const pintaLupa = (f) => {
       lupa.pinta(sprite(lupaCara, f), marcoDe.get(lupaCara), [
