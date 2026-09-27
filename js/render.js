@@ -488,15 +488,15 @@ export class Renderer {
 
   drawUnit(ctx, u) {
     const g = this.game;
-    const an = unitAnim(u.type);
+    // Orientación en octantes; si viene de una instantánea vieja sin ella, se
+    // reconstruye del par dir/atrás.
+    const face = u.face !== undefined ? u.face : (u.dir > 0 ? (u.back ? 6 : 0) : (u.back ? 4 : 2));
+    const an = unitAnim(u.type, face);
     const frame = u.attackAnim > 0
       ? an.golpe[u.attackAnim > 0.25 ? 0 : 1]
       : (u.moving ? an.andar[Math.floor(u.anim) % an.andar.length] : an.quieto);
     const colorIdx = g.players[u.owner].colorIdx;
     const [mx, my] = this.worldToCanvas(u.x, u.y);
-    // Orientación en octantes; si viene de una instantánea vieja sin ella, se
-    // reconstruye del par dir/atrás.
-    const face = u.face !== undefined ? u.face : (u.dir > 0 ? (u.back ? 6 : 0) : (u.back ? 4 : 2));
     if (this.sharp) paintUnit(ctx, mx, my, u.type, colorIdx, face, frame);
     else drawSprite(ctx, unitSprite(u.type, colorIdx, face, frame), mx, my);
 

@@ -328,6 +328,16 @@ Para depurar, el objeto de la partida está disponible en la consola como
   golpe: la de ↓ (`aldeano-quieta-s-armadura.webp`) entra con
   `importar-fotogramas.mjs villager 1 --quieta --rellenar 0` en
   `villager-quieta-1-<color>.png`, y se conserva al reimportar ↘.
+- ↓ anda con sus tres dibujos de frente (`aldeano-andar-s-1..3-armadura.jpg`:
+  pies juntos y las dos zancadas, la segunda volteada de la tercera), con
+  `importar-fotogramas.mjs villager 1 --fotogramas 0,1,2 --andar-propio
+  --rellenar 0,1,2`: `andarCara` en el índice le da su propia lista de
+  fotogramas, y `unitAnim(tipo, cara)` la devuelve (las volteadas usan la de
+  la suya). → tiene de perfil sólo el fotograma 0
+  (`aldeano-andar-e-1-armadura.webp`, con `villager 7 --fotogramas 0
+  --rellenar 0`); los otros tres, y ← volteado, siguen siendo los de ↘. Las
+  copias van fotograma a fotograma: reimportar ↘ rehace las que apuntan a su
+  hoja y deja las propias de cada orientación.
 - Un edificio dibujado entra con `tools/importar-edificio.mjs <tipo>
   <dibujo.png>`: busca la base (desde la esquina de abajo el contorno sube en
   pendiente 2:1 hasta donde las paredes se vuelven verticales), la escala a la

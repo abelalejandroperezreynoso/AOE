@@ -2,9 +2,16 @@
 //
 //   node tools/importar-fotogramas.mjs <tipo> <cara> [--espejo] [--quieto N] [--rellenar A,B] img1 img2 ...
 //   node tools/importar-fotogramas.mjs <tipo> <cara> --quieta [--espejo] [--rellenar 0] img
+//   node tools/importar-fotogramas.mjs <tipo> <cara> --fotogramas A,B [--andar-propio] [...] img1 img2
 //
 // Con --quieta, la imagen es sólo la postura quieta de esa orientación (en su
 // propia hoja, <tipo>-quieta-<cara>-<color>.png); su andar no se toca.
+// Con --fotogramas, las imágenes sustituyen sólo esos fotogramas de andar de
+// una orientación que hasta ahora usaba los de otra; los demás siguen siendo
+// los de aquélla. Con --andar-propio, además, esa orientación anda sólo con
+// ellos (`andarCara` en el índice), aunque sean más o menos que los de las
+// otras. Todos los dibujos propios de una orientación van en su hoja
+// (<tipo>-andar-<cara>-<color>.png), así que se pasan todos a la vez.
 //
 // Cada imagen es un fotograma dibujado sobre fondo claro, aunque traiga
 // encima una cuadrícula (como las que salen del botón «Descargar PNG» de la
@@ -43,12 +50,15 @@ const flag = (n) => { const i = args.indexOf(`--${n}`); if (i < 0) return false;
 const opt = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args.splice(i, 2)[1] : d; };
 const espejo = flag('espejo');
 const soloQuieta = flag('quieta');
+const andarPropio = flag('andar-propio');
+const sueltos = opt('fotogramas', null)?.split(',').map(Number);
 const quieto = Number(opt('quieto', '0'));
 const rellenar = opt('rellenar', '').split(',').filter(Boolean).map(Number);
 const [tipo, caraTxt, ...fuentes] = args;
 const cara = Number(caraTxt);
-if (!tipo || !fuentes.length || ![0, 1, 5, 6, 7].includes(cara) || (soloQuieta && fuentes.length !== 1)) {
-  console.error('Uso: node tools/importar-fotogramas.mjs <tipo> <cara 0|1|5|6|7> [--espejo] [--quieto N] [--rellenar A,B] img... | --quieta img');
+if (!tipo || !fuentes.length || ![0, 1, 5, 6, 7].includes(cara) || (soloQuieta && fuentes.length !== 1)
+  || (sueltos && sueltos.length !== fuentes.length) || (andarPropio && !sueltos)) {
+  console.error('Uso: node tools/importar-fotogramas.mjs <tipo> <cara 0|1|5|6|7> [--espejo] [--quieto N] [--rellenar A,B] img... | --quieta img | --fotogramas A,B [--andar-propio] img...');
   process.exit(1);
 }
 
@@ -228,14 +238,16 @@ if (res.error) { console.error(res.error); process.exit(1); }
 // son copias que apuntan a la misma hoja. Al rehacerla cambian los sitios, así
 // que las copias se rehacen también (salvo las que ya apuntan a otra hoja, como
 // una postura quieta propia).
+// Va fotograma a fotograma: una orientación puede tener unos propios y usar
+// los de otra en el resto.
 const copiarA = (i, desde, claves) => {
   for (const f of [0, 1, 5, 6, 7]) {
     if (f === cara) continue;
     for (let color = 0; color < res.hojas.length; color++) {
-      if (indice.sprites[`u|${tipo}|${color}|${f}|0`]?.[0] !== i[color]) continue;
+      const esCopia = indice.sprites[`u|${tipo}|${color}|${f}|0`]?.[0] === i[color];
       for (const k of claves) {
         const suya = indice.sprites[`u|${tipo}|${color}|${f}|${k}`];
-        if (!suya || suya[0] === i[color]) indice.sprites[`u|${tipo}|${color}|${f}|${k}`] = desde(color, k);
+        if (suya ? suya[0] === i[color] : esCopia) indice.sprites[`u|${tipo}|${color}|${f}|${k}`] = desde(color, k);
       }
     }
   }
@@ -255,6 +267,25 @@ if (soloQuieta) {
     indice.sprites[`u|${tipo}|${color}|${cara}|${anim.quieto}`] = entrada(hoja(nombre), h, 0);
   });
   for (const [color, h] of res.hojas.entries()) await writeFile(`${DIR}/${tipo}-quieta-${cara}-${color}.png`, Buffer.from(h.url.split(',')[1], 'base64'));
+} else if (sueltos) {
+  if (sueltos.some((k) => k === anim.quieto || anim.golpe?.includes(k))) { console.error(`Los fotogramas ${anim.golpe} y ${anim.quieto} son el golpe y la quieta`); process.exit(1); }
+  const ies = [];
+  res.hojas.forEach((h, color) => {
+    const i = hoja(`${tipo}-andar-${cara}-${color}.png`);
+    ies[color] = i;
+    // La hoja se rehace entera: nada que apunte a ella puede quedar fuera.
+    for (const [k, e] of Object.entries(indice.sprites)) {
+      const [, t, c, , f] = k.split('|');
+      if (t === tipo && Number(c) === color && e[0] === i && !sueltos.includes(Number(f))) {
+        console.error(`${k} está en la hoja de la orientación ${cara}: pasa a la vez todos sus fotogramas propios`);
+        process.exit(1);
+      }
+    }
+    sueltos.forEach((k, j) => { indice.sprites[`u|${tipo}|${color}|${cara}|${k}`] = entrada(i, h, j); });
+  });
+  copiarA(ies, (color, k) => indice.sprites[`u|${tipo}|${color}|${cara}|${k}`], sueltos);
+  for (const [color, h] of res.hojas.entries()) await writeFile(`${DIR}/${tipo}-andar-${cara}-${color}.png`, Buffer.from(h.url.split(',')[1], 'base64'));
+  if (andarPropio) indice.anim[tipo] = { ...anim, andarCara: { ...anim.andarCara, [cara]: sueltos } };
 } else {
   const n = fuentes.length;
   const ies = [];
@@ -275,4 +306,5 @@ if (soloQuieta) {
 await writeFile(`${DIR}/indice.json`, JSON.stringify(indice));
 console.log(soloQuieta
   ? `${tipo}: postura quieta de la orientación ${cara}${espejo ? ' (volteada)' : ''}`
+  : sueltos ? `${tipo}: fotogramas ${sueltos} de la orientación ${cara}${andarPropio ? ', que anda sólo con ellos' : ''}`
   : `${tipo}: ${fuentes.length} fotogramas de andar en la orientación ${cara}${espejo ? ' (volteados)' : ''}, quieto el ${quieto}`);

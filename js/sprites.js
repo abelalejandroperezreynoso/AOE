@@ -414,19 +414,25 @@ export async function prepareSprites(colors = [0]) {
  * que enseña quieta y los dos de golpear o trabajar. Las que no digan otra
  * cosa en el índice son las de siempre: andar del 0 al 3, quieta en el 0 y
  * golpe en el 4 y el 5. En el índice, `andar` puede ser un número (del 0 a
- * ese menos uno) o la lista de fotogramas, por si alguno sobra.
+ * ese menos uno) o la lista de fotogramas, por si alguno sobra, y
+ * `andarCara` da la lista propia de una orientación que tenga otro número de
+ * fotogramas ({ "1": [0, 1, 2] }). Las volteadas usan la de la suya.
  */
 const ANIM_DE_SERIE = { andar: [0, 1, 2, 3], quieto: 0, golpe: [4, 5] };
 const animCache = new Map();
 
-export function unitAnim(type) {
+export function unitAnim(type, face = 0) {
   const a = index && index.anim && index.anim[type];
   if (!a) return ANIM_DE_SERIE;
-  let r = animCache.get(type);
+  face = ((Math.round(face) % 8) + 8) % 8;
+  const cara = MIRROR[face] ?? face;
+  const clave = `${type}|${cara}`;
+  let r = animCache.get(clave);
   if (!r) {
-    const andar = Array.isArray(a.andar) ? a.andar : [...Array(a.andar || 4).keys()];
+    const propia = a.andarCara && a.andarCara[cara];
+    const andar = propia || (Array.isArray(a.andar) ? a.andar : [...Array(a.andar || 4).keys()]);
     r = { andar, quieto: a.quieto ?? 0, golpe: a.golpe || [a.quieto ?? 0, a.quieto ?? 0] };
-    animCache.set(type, r);
+    animCache.set(clave, r);
   }
   return r;
 }

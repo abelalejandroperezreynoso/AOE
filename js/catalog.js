@@ -537,11 +537,13 @@ export class Catalog {
    */
   animations(key, def) {
     const an = unitAnim(key);
+    // Los fotogramas de cada modo, por dirección: una orientación puede tener
+    // su propio número de fotogramas de andar.
     const modos = [
       { label: def.class === 'siege' || def.class === 'cavalry' ? 'Moverse' : 'Andar',
-        frames: an.andar, fps: def.speed * 7 },
-      { label: 'Quieta', frames: [an.quieto], fps: 1 },
-      { label: key === 'villager' ? 'Trabajar' : 'Atacar', frames: an.golpe, fps: 4 },
+        framesDe: (face) => unitAnim(key, face).andar, fps: def.speed * 7 },
+      { label: 'Quieta', framesDe: () => [an.quieto], fps: 1 },
+      { label: key === 'villager' ? 'Trabajar' : 'Atacar', framesDe: () => an.golpe, fps: 4 },
     ];
     let modo = modos[0];
 
@@ -581,6 +583,10 @@ export class Catalog {
     const lupa = this.crearLupa(key);
     let lupaCara = 0, fijo = null;
     const NOMBRE = { 0: '↘', 1: '↓', 2: '↙', 3: '←', 4: '↖', 5: '↑', 6: '↗', 7: '→' };
+    const MIRANDO = {
+      0: 'abajo a la derecha', 1: 'abajo', 2: 'abajo a la izquierda', 3: 'a la izquierda',
+      4: 'arriba a la izquierda', 5: 'arriba', 6: 'arriba a la derecha', 7: 'a la derecha',
+    };
     const marcaCara = () => {
       for (const { face, canvas } of celdas) canvas.parentNode.classList.toggle('elegida', face === lupaCara);
     };
@@ -601,7 +607,7 @@ export class Catalog {
     const pintaVel = () => {
       velTxt.textContent = `Velocidad ${Math.round(this.animSpeed * 100)} %`;
       const fps = modo.fps * this.animSpeed;
-      velFps.textContent = modo.frames.length > 1 ? `${fps < 1 ? fps.toFixed(1) : Math.round(fps * 10) / 10} fotogramas/s` : '';
+      velFps.textContent = modo.framesDe(lupaCara).length > 1 ? `${fps < 1 ? fps.toFixed(1) : Math.round(fps * 10) / 10} fotogramas/s` : '';
     };
     slider.oninput = () => { this.animSpeed = Number(slider.value); pintaVel(); };
     marcaDeslizador(slider);
@@ -628,7 +634,7 @@ export class Catalog {
     let anchoMax = 1, altoMax = 1;
     for (let face = 0; face < 8; face++) {
       let k = null;
-      for (const m of modos) for (const f of m.frames) { const s = sprite(face, f); if (s) k = unir(k, cajaSolida(s)); }
+      for (const m of modos) for (const f of m.framesDe(face)) { const s = sprite(face, f); if (s) k = unir(k, cajaSolida(s)); }
       if (!k) continue;
       cajaDe.set(face, k);
       anchoMax = Math.max(anchoMax, k.x1 - k.x0);
@@ -658,7 +664,7 @@ export class Catalog {
     const marcoDe = new Map();
     for (let face = 0; face < 8; face++) {
       const todos = [];
-      for (const m of modos) for (const f of m.frames) todos.push(sprite(face, f));
+      for (const m of modos) for (const f of m.framesDe(face)) todos.push(sprite(face, f));
       // Las unidades a pie van siempre en el lienzo estándar de 100×100, con
       // los pies en el mismo sitio: así toda plantilla descargada mide igual.
       marcoDe.set(face, aPie ? { ...MARCO_A_PIE } : Catalog.marcoDe(todos));
@@ -669,41 +675,53 @@ export class Catalog {
         ['Fotograma', fijo !== null ? `${f} (fijo)` : String(f)],
       ]);
     };
-    for (const cel of celdas) {
-      cel.canvas.parentNode.onclick = () => { lupaCara = cel.face; marcaCara(); last = -1; };
-    }
-    marcaCara();
 
+    // La tira enseña los fotogramas de la dirección elegida. `fijo` es la
+    // posición tocada en ella; las demás direcciones enseñan la misma posición
+    // de su ciclo.
     let tiraCanvas = [];
-    const eligeModo = (m) => {
-      modo = m;
-      for (const b of seg.children) b.classList.toggle('active', b._modo === m);
-      centro.textContent = m.label;
-      const distintos = new Set(m.frames).size;
-      h.textContent = m.frames.length > 1 && distintos === 1
-        ? `Sin dibujos propios: se queda en la postura del fotograma ${m.frames[0]}`
-        : m.frames.length > 1
-          ? `Fotogramas, mirando abajo a la derecha (${m.frames.length})`
-          : 'Fotograma, mirando abajo a la derecha';
+    const pintaTira = () => {
+      const fs = modo.framesDe(lupaCara);
+      const distintos = new Set(fs).size;
+      const mirando = MIRANDO[lupaCara];
+      h.textContent = fs.length > 1 && distintos === 1
+        ? `Sin dibujos propios: se queda en la postura del fotograma ${fs[0]}`
+        : fs.length > 1
+          ? `Fotogramas, mirando ${mirando} (${fs.length})`
+          : `Fotograma, mirando ${mirando}`;
       tira.innerHTML = '';
-      tiraCanvas = (distintos === 1 ? [m.frames[0]] : m.frames).map((f) => {
+      tiraCanvas = (distintos === 1 ? [fs[0]] : fs).map((f, j) => {
         const box = document.createElement('div');
         box.className = 'cat-anim-foto';
         const c = document.createElement('canvas');
         prepara(c, 56, 64);
-        pinta(c, 0, f);
+        pinta(c, lupaCara, f);
         const n = document.createElement('span');
         n.textContent = f;
         box.append(c, n);
         // Tocar un fotograma lo fija en todas las vistas; tocarlo otra vez lo suelta.
-        box.onclick = () => { fijo = fijo === f ? null : f; last = -1; };
+        box.onclick = () => { fijo = fijo === j ? null : j; last = -1; };
         tira.appendChild(box);
         return box;
       });
       last = -1;
+      pintaVel();
+    };
+    for (const cel of celdas) {
+      cel.canvas.parentNode.onclick = () => {
+        if (lupaCara === cel.face) return;
+        lupaCara = cel.face; marcaCara(); fijo = null; pintaTira();
+      };
+    }
+    marcaCara();
+
+    const eligeModo = (m) => {
+      modo = m;
+      for (const b of seg.children) b.classList.toggle('active', b._modo === m);
+      centro.textContent = m.label;
       fase = 0;
       fijo = null;
-      pintaVel();
+      pintaTira();
     };
     for (const m of modos) {
       const b = document.createElement('button');
@@ -721,13 +739,14 @@ export class Catalog {
       this.animRaf = requestAnimationFrame(tick);
       fase += ((now - antes) / 1000) * modo.fps * this.animSpeed;
       antes = now;
-      let i = Math.floor(fase) % modo.frames.length;
-      if (fijo !== null) i = Math.max(0, modo.frames.indexOf(fijo));
-      const clave = `${i}|${lupaCara}|${fijo}`;
+      const paso = fijo !== null ? fijo : Math.floor(fase);
+      const clave = `${paso}|${lupaCara}|${fijo}`;
       if (clave === last) return;
       last = clave;
-      for (const { face, canvas } of celdas) pinta(canvas, face, modo.frames[i]);
-      pintaLupa(modo.frames[i]);
+      const de = (face) => { const fs = modo.framesDe(face); return fs[paso % fs.length]; };
+      for (const { face, canvas } of celdas) pinta(canvas, face, de(face));
+      pintaLupa(de(lupaCara));
+      const i = paso % modo.framesDe(lupaCara).length;
       tiraCanvas.forEach((b, j) => {
         b.classList.toggle('actual', tiraCanvas.length === 1 || j === i);
         b.classList.toggle('fijo', fijo !== null && j === i);
