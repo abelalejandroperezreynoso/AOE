@@ -9,7 +9,7 @@ import {
 } from './sprites.js';
 import {
   fieldsFor, getPath, setValue, reset, isChanged, defaultValue, countChanges,
-  TERRAIN_LABELS, NODE_LABELS, RATE_LABELS,
+  TERRAIN_LABELS, NODE_LABELS, RATE_LABELS, READ_ONLY_KINDS,
 } from './data/overrides.js';
 
 const el = (id) => document.getElementById(id);
@@ -106,6 +106,7 @@ export class Catalog {
   }
 
   close() {
+    this.stopAnim();
     el('catalog').classList.add('hidden');
     el('main-menu').classList.remove('hidden');
   }
@@ -209,8 +210,11 @@ export class Catalog {
     if (this.tab === 'unit') {
       const s = unitSprite(key, 0, 1, unitAnim(key).quieto);
       if (!s) return c;
-      const sc = real ? size / (60 * MAX) : Math.min(size / (s.w - 4), size / (s.h - 4)) * 1.05;
-      drawSprite(ctx, s, size / 2, size - 6, sc);
+      // A escala común para comparar tamaños, salvo que no quepa (el caballero).
+      const fit = Math.min(size / (s.w - 4), size / (s.h - 4)) * 1.05;
+      const sc = real ? Math.min(size / (60 * MAX), (size - 8) / s.h) : fit;
+      // Por los pies, dejando sitio a lo que asoma por debajo (patas, sombra).
+      drawSprite(ctx, s, size / 2, size - 4 - (s.h - s.oy) * sc, sc);
     } else if (this.tab === 'building') {
       const s = buildingSprite(key, 0, 2);
       if (!s) return c;
@@ -236,6 +240,7 @@ export class Catalog {
   // --- Ficha -----------------------------------------------------------------
 
   renderDetail() {
+    this.stopAnim();
     const box = el('catalog-detail');
     box.innerHTML = '';
     const key = this.selected;
@@ -269,8 +274,11 @@ export class Catalog {
         ? `${CLASS_NAMES[def.class] || def.class} · disponible en la ${AGES[def.age].name}`
         : `Disponible en la ${AGES[def.age].name}`;
       box.appendChild(this.extraInfo(def));
+      if (this.tab === 'unit') box.appendChild(this.animations(key, def));
       box.appendChild(this.form(this.tab, key, def));
     }
+    // Las cifras de las unidades sólo se miran: no hay nada que restablecer.
+    if (READ_ONLY_KINDS.has(this.tab)) return;
 
     const actions = document.createElement('div');
     actions.className = 'cat-actions';
@@ -291,6 +299,156 @@ export class Catalog {
     };
     actions.appendChild(resetBtn);
     box.appendChild(actions);
+  }
+
+  // --- Animaciones -----------------------------------------------------------
+
+  /**
+   * Todas las animaciones de una unidad, en marcha: se elige cuál (moverse,
+   * quieta o golpe) y se ve a la vez en las ocho direcciones, puestas como en
+   * una rosa de los vientos, con sus fotogramas sueltos debajo. Se mueven al
+   * ritmo de la partida: al andar, siete fotogramas por casilla recorrida.
+   */
+  animations(key, def) {
+    const an = unitAnim(key);
+    const modos = [
+      { label: def.class === 'siege' || def.class === 'cavalry' ? 'Moverse' : 'Andar',
+        frames: an.andar, fps: def.speed * 7 },
+      { label: 'Quieta', frames: [an.quieto], fps: 1 },
+      { label: key === 'villager' ? 'Trabajar' : 'Atacar', frames: an.golpe, fps: 4 },
+    ];
+    let modo = modos[0];
+
+    const card = document.createElement('div');
+    card.className = 'cat-anim';
+    const seg = document.createElement('div');
+    seg.className = 'hoja-segmentos cat-anim-modos';
+    card.appendChild(seg);
+
+    // Rosa de las ocho orientaciones: 0 mira abajo a la derecha y van en el
+    // sentido de las agujas del reloj (ver `unitSprite`).
+    const ROSA = [[4, '↖'], [5, '↑'], [6, '↗'], [3, '←'], null, [7, '→'], [2, '↙'], [1, '↓'], [0, '↘']];
+    const rosa = document.createElement('div');
+    rosa.className = 'cat-anim-rosa';
+    const celdas = [];
+    for (const r of ROSA) {
+      const cell = document.createElement('div');
+      cell.className = 'cat-anim-celda';
+      if (r) {
+        const c = document.createElement('canvas');
+        const tag = document.createElement('span');
+        tag.textContent = r[1];
+        cell.append(c, tag);
+        celdas.push({ face: r[0], canvas: c });
+      } else {
+        cell.classList.add('centro');
+      }
+      rosa.appendChild(cell);
+    }
+    const centro = rosa.querySelector('.centro');
+    card.appendChild(rosa);
+
+    const h = document.createElement('p');
+    h.className = 'cat-anim-nota';
+    card.appendChild(h);
+    const tira = document.createElement('div');
+    tira.className = 'cat-anim-tira';
+    card.appendChild(tira);
+
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const sprite = (face, f) => unitSprite(key, 0, face, f);
+    /** Medidas que caben todas las poses, desde los pies, en píxeles de mundo. */
+    const medidas = () => {
+      let lado = 1, arriba = 1, abajo = 1;
+      for (const m of modos) {
+        for (const f of m.frames) {
+          for (const face of [0, 1, 5, 6, 7]) {
+            const s = sprite(face, f);
+            if (!s) continue;
+            lado = Math.max(lado, s.ox, s.w - s.ox);
+            arriba = Math.max(arriba, s.oy);
+            abajo = Math.max(abajo, s.h - s.oy);
+          }
+        }
+      }
+      return { lado, arriba, abajo };
+    };
+    const M = medidas();
+    /** Prepara un lienzo de w×h CSS y la escala entera que le toca. */
+    const prepara = (c, w, hh) => {
+      c.width = Math.round(w * dpr); c.height = Math.round(hh * dpr);
+      c.style.width = `${w}px`; c.style.height = `${hh}px`;
+      const fit = Math.min(w / (2 * M.lado), hh / (M.arriba + M.abajo));
+      // Un píxel del sprite (medio de mundo) en un número entero de píxeles de
+      // pantalla, para que se vea nítido.
+      const k = Math.max(1, Math.floor(fit * dpr / 2));
+      const esc = (k * 2) / dpr;
+      c._esc = esc;
+      c._x = w / 2;
+      c._y = M.arriba * esc + (hh - (M.arriba + M.abajo) * esc) / 2;
+    };
+    const pinta = (c, face, f) => {
+      const ctx = c.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.imageSmoothingEnabled = false;
+      drawSprite(ctx, sprite(face, f), c._x, c._y, c._esc);
+    };
+    for (const { canvas } of celdas) prepara(canvas, 96, 104);
+
+    let tiraCanvas = [];
+    const eligeModo = (m) => {
+      modo = m;
+      for (const b of seg.children) b.classList.toggle('active', b._modo === m);
+      centro.textContent = m.label;
+      const distintos = new Set(m.frames).size;
+      h.textContent = m.frames.length > 1 && distintos === 1
+        ? `Sin dibujos propios: se queda en la postura del fotograma ${m.frames[0]}`
+        : m.frames.length > 1
+          ? `Fotogramas, mirando abajo a la derecha (${m.frames.length})`
+          : 'Fotograma, mirando abajo a la derecha';
+      tira.innerHTML = '';
+      tiraCanvas = (distintos === 1 ? [m.frames[0]] : m.frames).map((f) => {
+        const box = document.createElement('div');
+        box.className = 'cat-anim-foto';
+        const c = document.createElement('canvas');
+        prepara(c, 56, 64);
+        pinta(c, 0, f);
+        const n = document.createElement('span');
+        n.textContent = f;
+        box.append(c, n);
+        tira.appendChild(box);
+        return box;
+      });
+      last = -1;
+    };
+    for (const m of modos) {
+      const b = document.createElement('button');
+      b.textContent = m.label;
+      b._modo = m;
+      b.onclick = () => eligeModo(m);
+      seg.appendChild(b);
+    }
+
+    let last = -1;
+    const t0 = performance.now();
+    const tick = (now) => {
+      this.animRaf = requestAnimationFrame(tick);
+      const i = Math.floor(((now - t0) / 1000) * modo.fps) % modo.frames.length;
+      if (i === last) return;
+      last = i;
+      for (const { face, canvas } of celdas) pinta(canvas, face, modo.frames[i]);
+      tiraCanvas.forEach((b, j) => b.classList.toggle('actual', tiraCanvas.length === 1 || j === i));
+    };
+    eligeModo(modo);
+    this.animRaf = requestAnimationFrame(tick);
+
+    return this.group('Animaciones', [card]);
+  }
+
+  stopAnim() {
+    cancelAnimationFrame(this.animRaf);
+    this.animRaf = 0;
   }
 
   /** Datos que no se editan pero conviene ver (bonus, qué entrena, etc.). */
@@ -363,6 +521,20 @@ export class Catalog {
   }
 
   field(kind, key, def, f) {
+    if (READ_ONLY_KINDS.has(kind)) {
+      // Sólo se enseña: rótulo y valor, sin campo que editar.
+      const row = document.createElement('div');
+      row.className = 'cat-field fijo' + (f.wide ? ' wide' : '');
+      const name = document.createElement('span');
+      name.className = 'cat-label';
+      name.textContent = f.label;
+      const value = document.createElement('span');
+      value.className = 'cat-valor';
+      const v = getPath(def, f.key);
+      value.textContent = f.unit && f.type === 'number' ? `${v} ${f.unit}` : v;
+      row.append(name, value);
+      return row;
+    }
     const row = document.createElement('label');
     row.className = 'cat-field' + (f.wide ? ' wide' : '');
     const name = document.createElement('span');

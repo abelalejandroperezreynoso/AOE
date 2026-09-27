@@ -340,6 +340,42 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 .cat-actions .hoja-boton { margin: 0; }
 
+/* Valores que sólo se miran (las cifras de las unidades). */
+.cat-valor { flex: none; color: #8a8a8e; font-size: 17px; text-align: right; }
+.cat-field.fijo { cursor: default; }
+.cat-field.wide .cat-valor { padding: 4px 0 12px; font-size: 15px; line-height: 1.35; text-align: left; }
+
+/* Animaciones: el modo arriba, la rosa de las ocho direcciones y la tira. */
+.cat-anim { padding: 12px; }
+.cat-anim-modos { margin-bottom: 10px; }
+.cat-anim-rosa {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  max-width: 330px; margin: 0 auto;
+}
+.cat-anim-celda {
+  position: relative;
+  display: grid; place-items: center;
+  min-height: 104px;
+  border-radius: 16px; background: #f2f2f7;
+}
+.cat-anim-celda canvas { display: block; }
+.cat-anim-celda span {
+  position: absolute; left: 8px; top: 5px;
+  font-size: 13px; color: #8a8a8e;
+}
+.cat-anim-celda.centro { background: none; font-size: 15px; font-weight: 600; color: #3c3c43; }
+.cat-anim-nota { margin: 14px 4px 8px; font-size: 13px; color: #8a8a8e; }
+.cat-anim-tira { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-anim-foto {
+  position: relative;
+  border-radius: 12px; background: #f2f2f7;
+  box-shadow: inset 0 0 0 2px transparent;
+}
+.cat-anim-foto canvas { display: block; }
+.cat-anim-foto span { position: absolute; left: 6px; top: 3px; font-size: 11px; color: #8a8a8e; }
+/* El fotograma que se está viendo ahora mismo en la rosa. */
+.cat-anim-foto.actual { box-shadow: inset 0 0 0 2px var(--gold); }
+
 /* --- Pantalla ancha: lista y ficha lado a lado --- */
 @media (min-width: 780px) and (min-height: 600px) {
   .overlay-hoja > .hoja.catalogo { margin: auto; }

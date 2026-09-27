@@ -167,7 +167,15 @@ export function countChanges() {
 
 const isHexColor = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
 
+/*
+ * Las cifras de las unidades son fijas: el catálogo las enseña pero no deja
+ * cambiarlas. Por eso aquí no pasa ninguna, ni al editar ni las que alguien
+ * hubiera guardado antes ni las que mande un anfitrión en multijugador.
+ */
+export const READ_ONLY_KINDS = new Set(['unit']);
+
 function sanitize(kind, type, key, value) {
+  if (READ_ONLY_KINDS.has(kind)) return null;
   if (kind === 'terrain') return isHexColor(value) ? value.toLowerCase() : null;
   if (kind === 'rate') {
     if (String(value).trim() === '') return null;

@@ -107,9 +107,15 @@ Limitaciones conocidas:
 Desde el menú principal, **Catálogo del juego**: una ficha de cada unidad,
 edificio, recurso y tipo de terreno, con su dibujo y todos sus valores.
 
-Los valores **se pueden editar ahí mismo**: coste, tiempo, puntos de vida,
-ataque, armadura, alcance, velocidad, visión, cantidad de los yacimientos,
-velocidad de recolección y el color de cada terreno. Cada campo modificado se
+Cada unidad enseña sus **animaciones** en marcha: moverse, quieta y
+atacar (trabajar, en el aldeano), a la vez en las ocho direcciones y con sus
+fotogramas sueltos debajo. Sus cifras se pueden consultar pero **no cambiar**:
+son fijas, y no se aplica ninguna que se hubiera guardado antes ni la que
+mande un anfitrión.
+
+Lo demás **se puede editar ahí mismo**: coste, tiempo, puntos de vida, ataque,
+armadura y alcance de los edificios, cantidad de los yacimientos, velocidad de
+recolección y el color de cada terreno. Cada campo modificado se
 resalta y, al pasar el ratón por su nombre, indica cuál era el valor original.
 Hay un botón para restablecer un elemento suelto y otro para dejarlo todo como
 venía de fábrica.
