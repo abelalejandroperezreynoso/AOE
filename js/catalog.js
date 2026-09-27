@@ -459,6 +459,13 @@ export class Catalog {
     return { card, info, boton, pinta };
   }
 
+  /** La sección de la lupa, con el botón de descarga aparte, bajo la tarjeta. */
+  grupoLupa(lupa) {
+    const sec = this.group('Lupa', [lupa.card]);
+    sec.appendChild(lupa.boton);
+    return sec;
+  }
+
   /** Marco común de varios sprites, en píxeles del sprite desde su ancla. */
   static marcoDe(sprites) {
     let m = null;
@@ -476,7 +483,7 @@ export class Catalog {
     const lupa = this.crearLupa(nombre);
     lupa.pinta(s);
     const frag = document.createDocumentFragment();
-    frag.append(this.group('Lupa', [lupa.card, lupa.boton]), this.group('Imagen', [lupa.info]));
+    frag.append(this.grupoLupa(lupa), this.group('Imagen', [lupa.info]));
     return frag;
   }
 
@@ -516,7 +523,7 @@ export class Catalog {
     }
     elige(0);
     const frag = document.createDocumentFragment();
-    frag.append(this.group('Lupa', [lupa.card, lupa.boton]), this.group('Imagen', [lupa.info]), this.group('Variantes', [tira]));
+    frag.append(this.grupoLupa(lupa), this.group('Imagen', [lupa.info]), this.group('Variantes', [tira]));
     return frag;
   }
 
@@ -728,7 +735,7 @@ export class Catalog {
     this.animRaf = requestAnimationFrame(tick);
 
     const frag = document.createDocumentFragment();
-    frag.append(this.group('Lupa', [lupa.card, lupa.boton]), this.group('Imagen', [lupa.info]), this.group('Animaciones', [card]));
+    frag.append(this.grupoLupa(lupa), this.group('Imagen', [lupa.info]), this.group('Animaciones', [card]));
     return frag;
   }
 
