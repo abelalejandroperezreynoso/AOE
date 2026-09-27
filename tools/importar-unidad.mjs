@@ -1,6 +1,7 @@
 // Importa una hoja de animación dibujada para una unidad y la mete en los atlas.
 //
 //   node tools/importar-unidad.mjs <tipo> <hoja.png> [--quieto N] [--golpe A,B]
+//                                  [--andar 0,1,2,...]
 //
 // La hoja trae los fotogramas de andar en fila, sobre fondo transparente, con
 // la figura mirando abajo a la derecha (la orientación 0) y una sombra gris
@@ -39,9 +40,12 @@ const opt = (name, def) => {
 };
 const quieto = Number(opt('quieto', '0'));
 const golpe = opt('golpe', `${quieto},${quieto}`).split(',').map(Number);
+// Los fotogramas que recorre al andar, si no son todos: uno repetido en la
+// hoja se nota como un tropiezo en cada zancada.
+const andarLista = opt('andar', null);
 const [tipo, fuente] = args;
 if (!tipo || !fuente) {
-  console.error('Uso: node tools/importar-unidad.mjs <tipo> <hoja.png> [--quieto N] [--golpe A,B]');
+  console.error('Uso: node tools/importar-unidad.mjs <tipo> <hoja.png> [--quieto N] [--golpe A,B] [--andar 0,1,...]');
   process.exit(1);
 }
 
@@ -51,9 +55,11 @@ const indice = JSON.parse(await readFile(`${DIR}/indice.json`, 'utf8'));
 const { PLAYER_COLORS } = await import('../js/config.js');
 
 // La altura de pies a cabeza de la unidad que se sustituye, en píxeles de hoja.
+// Se apunta en el índice la primera vez: si se tomara de lo ya importado, cada
+// reimportación la movería un poco.
 const vieja = indice.sprites[`u|${tipo}|0|0|0`];
 if (!vieja) { console.error(`No hay sprites de «${tipo}» en el índice`); process.exit(1); }
-const altura = vieja[6] * indice.res;
+const altura = indice.anim?.[tipo]?.altura ?? vieja[6] * indice.res;
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 const page = await browser.newPage();
@@ -199,7 +205,8 @@ res.hojas.forEach((h, color) => {
     for (const cara of CARAS) indice.sprites[`u|${tipo}|${color}|${cara}|${f}`] = e;
   });
 });
-indice.anim = { ...(indice.anim || {}), [tipo]: { andar: res.n, quieto, golpe } };
+const andar = andarLista ? andarLista.split(',').map(Number) : res.n;
+indice.anim = { ...(indice.anim || {}), [tipo]: { andar, quieto, golpe, altura } };
 
 for (const [color, h] of res.hojas.entries()) {
   await writeFile(`${DIR}/${tipo}-${color}.png`, Buffer.from(h.url.split(',')[1], 'base64'));

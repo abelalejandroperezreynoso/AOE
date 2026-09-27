@@ -263,9 +263,12 @@ Para depurar, el objeto de la partida está disponible en la consola como
   herramienta ancla en el centro de la sombra, la iguala en altura a la unidad
   que sustituye, pinta el verde del uniforme con el color de cada jugador y
   escribe una hoja por color (`<tipo>-<color>.png`) y su animación en el
-  índice (`anim`: fotogramas de andar, el de quieto y los de golpe). Si sólo
-  hay una orientación dibujada, vale para las ocho (las de la izquierda,
-  volteadas). Así entró el aldeano, desde `assets/fuentes/aldeano-andar.png`.
+  índice (`anim`: los fotogramas que recorre al andar, el de quieto, los de
+  golpe y la altura de referencia). Si sólo hay una orientación dibujada, vale
+  para las ocho (las de la izquierda, volteadas). Así entró el aldeano, desde
+  `assets/fuentes/aldeano-andar.png`, con `--quieto 4 --andar 0,1,2,3,4`: el
+  sexto fotograma de esa hoja es casi igual que el primero (difieren en un
+  11 %) y, dejándolo, el aldeano se paraba un instante en cada zancada.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
 - En multijugador el anfitrión manda hasta diez instantáneas por segundo en

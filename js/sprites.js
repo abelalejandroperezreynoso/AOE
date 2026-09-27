@@ -357,15 +357,25 @@ export async function prepareSprites(colors = [0]) {
 }
 
 /*
- * Animación de cada unidad: cuántos fotogramas tiene al andar (del 0 en
- * adelante), cuál enseña quieta y cuáles al golpear o trabajar. Las que no
- * digan otra cosa en el índice son las de siempre: cuatro de andar, quieta en
- * el 0 y golpe en el 4 y el 5.
+ * Animación de cada unidad: los fotogramas que recorre al andar, en orden, el
+ * que enseña quieta y los dos de golpear o trabajar. Las que no digan otra
+ * cosa en el índice son las de siempre: andar del 0 al 3, quieta en el 0 y
+ * golpe en el 4 y el 5. En el índice, `andar` puede ser un número (del 0 a
+ * ese menos uno) o la lista de fotogramas, por si alguno sobra.
  */
-const ANIM_DE_SERIE = { andar: 4, quieto: 0, golpe: [4, 5] };
+const ANIM_DE_SERIE = { andar: [0, 1, 2, 3], quieto: 0, golpe: [4, 5] };
+const animCache = new Map();
 
 export function unitAnim(type) {
-  return (index && index.anim && index.anim[type]) || ANIM_DE_SERIE;
+  const a = index && index.anim && index.anim[type];
+  if (!a) return ANIM_DE_SERIE;
+  let r = animCache.get(type);
+  if (!r) {
+    const andar = Array.isArray(a.andar) ? a.andar : [...Array(a.andar || 4).keys()];
+    r = { andar, quieto: a.quieto ?? 0, golpe: a.golpe || [a.quieto ?? 0, a.quieto ?? 0] };
+    animCache.set(type, r);
+  }
+  return r;
 }
 
 /**

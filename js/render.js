@@ -491,7 +491,7 @@ export class Renderer {
     const an = unitAnim(u.type);
     const frame = u.attackAnim > 0
       ? an.golpe[u.attackAnim > 0.25 ? 0 : 1]
-      : (u.moving ? (Math.floor(u.anim) % an.andar) : an.quieto);
+      : (u.moving ? an.andar[Math.floor(u.anim) % an.andar.length] : an.quieto);
     const colorIdx = g.players[u.owner].colorIdx;
     const [mx, my] = this.worldToCanvas(u.x, u.y);
     // Orientación en octantes; si viene de una instantánea vieja sin ella, se
