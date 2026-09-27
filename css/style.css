@@ -38,12 +38,18 @@
      sólo el valor de partida: la barra inferior crece y encoge con lo que hay
      dentro, y watchBars() reescribe --bottom-total con lo que mide de verdad. */
   --top-total: calc(var(--bar-h) + var(--sa-top));
-  --bottom-total: calc(var(--bottom-h) + var(--sa-bottom));
+  --bottom-total: calc(var(--bottom-h) + max(8px, var(--bar-suelo)));
   /* Suelo de la barra inferior: por debajo de esto la ficha de selección
      empieza a recortar lo que enseña. */
   --bottom-min: var(--bottom-h);
 
   --prod-h: 46px; /* alto total de la tira de producción, con bordes y relleno */
+
+  /* Lo que la barra inferior deja por debajo de sus botones. No la zona segura
+     entera (34 px en el iPhone, casi un botón de hueco): basta con que los
+     botones no pisen la raya de inicio, que ocupa los últimos 13 px. Donde no
+     hay zona segura vale 0 y cada regla pone su relleno de siempre. */
+  --bar-suelo: max(0px, calc(var(--sa-bottom) - 20px));
 }
 
 * { box-sizing: border-box; }
@@ -656,10 +662,10 @@ body.producing #notifications { top: calc(var(--top-total) + var(--prod-h) + 6px
   /* Se adapta a su contenido: sin selección no hay órdenes que enseñar y no
      tiene sentido reservarles sitio. El lienzo se entera por watchBars(). */
   height: auto;
-  min-height: calc(var(--bottom-min) + var(--sa-bottom));
+  min-height: calc(var(--bottom-min) + max(8px, var(--bar-suelo)));
   display: flex;
   gap: 8px;
-  padding: 8px calc(8px + var(--sa-right)) calc(8px + var(--sa-bottom)) calc(8px + var(--sa-left));
+  padding: 8px calc(8px + var(--sa-right)) max(8px, var(--bar-suelo)) calc(8px + var(--sa-left));
   background: rgba(242, 242, 247, .96);
   -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
   border-top: .5px solid var(--raya);
@@ -939,7 +945,7 @@ button.cmd, button.qitem, button.prod { margin: 0; }
 
   #bottombar {
     flex-wrap: wrap; gap: 5px;
-    padding: 5px calc(5px + var(--sa-right)) calc(5px + var(--sa-bottom)) calc(5px + var(--sa-left));
+    padding: 5px calc(5px + var(--sa-right)) max(5px, var(--bar-suelo)) calc(5px + var(--sa-left));
   }
   /* Se ciñe a lo que enseña: ya no hay ninguna caja al lado que igualar. */
   #selection-panel { width: 100%; padding: 4px 7px; gap: 3px; order: 1; }
