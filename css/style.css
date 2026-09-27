@@ -227,6 +227,12 @@ button:active { filter: brightness(.88); }
 }
 .cat-grid { display: block; border-radius: 26px; overflow: hidden; background: #fff; }
 
+/* Modelo 3D: una tarjeta con la explicación, los ajustes y los botones. */
+.cat-modelo .cat-grid { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 16px; }
+.cat-modelo .hoja-boton { margin: 0; }
+.cat-modelo-nota { margin: 0; font-size: 14px; line-height: 1.4; color: #3a3a3c; }
+.cat-modelo-aviso { margin: 0; font-size: 13px; line-height: 1.35; color: #8a8a8e; }
+
 .cat-field {
   position: relative;
   display: flex; align-items: center; justify-content: space-between; gap: 12px;

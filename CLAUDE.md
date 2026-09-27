@@ -42,6 +42,13 @@ Los mensajes de commit van en español, y dicen qué se ha comprobado.
 - Los modelos 3D por código y el taller de edificios se retiraron para no
   volver, y se borraron también del historial: no hay commit del que
   recuperarlos.
+- Otra cosa son los **modelos 3D importados** (`js/modelo3d.js`): un `.obj`
+  hecho fuera se pinta una vez en isométrico y se recorta en sprites del
+  formato de siempre; en la partida no hay nada en 3D. Se importan en el
+  catálogo (sección Modelo 3D de la ficha abierta), que los enseña al momento
+  sólo en esa sesión, y entran en el juego con
+  `tools/importar-modelo.mjs <paquete.zip>`, el paquete que descarga el
+  catálogo con el modelo y sus ajustes.
 - El README documenta el juego, la estructura del código y las notas técnicas.
 
 ## Verificación

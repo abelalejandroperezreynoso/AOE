@@ -132,9 +132,39 @@ resalta y, al pasar el ratón por su nombre, indica cuál era el valor original.
 Hay un botón para restablecer un elemento suelto y otro para dejarlo todo como
 venía de fábrica.
 
+### Modelos 3D
+
+Las fichas de unidades, edificios y recursos tienen una sección **Modelo 3D**:
+**Importar modelo 3D** pide un `.obj` con su `.mtl` (o un `.zip` con los dos)
+y el juego lo pinta él mismo en su perspectiva isométrica y lo recorta en
+sprites, que sustituyen a los de lo que esté abierto:
+
+- **Edificio**: se encaja en su huella y salen las tres etapas (cimientos,
+  obra y terminado, cortando el modelo a distintas alturas) en los ocho
+  colores.
+- **Unidad**: se ajusta a la altura de la que sustituye y sale en sus
+  direcciones. Un `.obj` no trae movimiento: andar, estar quieta y golpear son
+  el mismo dibujo.
+- **Recurso**: cabe en una casilla y salen cuatro variantes, girado de 90 en
+  90 grados. Lo agotado sigue siendo lo de antes.
+
+Los materiales que se llamen *jugador* (o *equipo*, *player*, *team*) toman el
+color de cada bando. Si no hay ninguno, el color va en un banderín (edificios)
+o en un aro a los pies (unidades). Las texturas aún no se usan: cada material
+sale con su color liso. **Z arriba / Y arriba** elige qué eje del modelo es la
+vertical (Z en 3ds Max y Blender; con el otro sale tumbado) y **Girar 90°**
+lo orienta.
+
+Lo importado se ve al momento en el catálogo y en las partidas de esa sesión,
+sólo en ese aparato; al recargar vuelve lo de siempre. Para que quede en el
+juego de todos, **Descargar paquete** guarda un `.zip` con el modelo y los
+ajustes elegidos (`ajustes.json`), que se mete en los atlas con
+`node tools/importar-modelo.mjs modelo-<clave>.zip` y un commit: pinta con el
+mismo código, así que sale igual que en la vista previa.
+
 Detalles a tener en cuenta:
 
-- Los cambios se guardan **en ese navegador** y se aplican a las **partidas
+- Los cambios de valores se guardan **en ese navegador** y se aplican a las **partidas
   nuevas**, no a una que ya esté en marcha.
 - En **multijugador manda quien invita**: sus valores se usan en todos los
   dispositivos, de modo que todos ven y juegan con las mismas cifras.
@@ -224,9 +254,11 @@ js/map.js           Generación del mapa y de los recursos
 js/path.js          Búsqueda de caminos A* sobre la rejilla
 js/render.js        Renderizador isométrico y niebla de guerra
 js/sprites.js       Sprites: carga de los atlas, terreno a mano e iconos
+js/modelo3d.js      Modelos 3D: lee .obj/.mtl/.zip y los pinta en sprites
 assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
 tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
 tools/importar-edificio.mjs  Mete en los atlas el dibujo de un edificio terminado
+tools/importar-modelo.mjs  Mete en los atlas un modelo 3D del catálogo
 tools/importar-direcciones.mjs  Añade a una unidad las posturas de otras orientaciones
 tools/importar-fotogramas.mjs  Mete fotogramas sueltos como el andar (o la quieta) de una orientación
 tools/importar-posturas.mjs  Mete posturas sueltas de pixel art, una por orientación
@@ -381,6 +413,18 @@ Para depurar, el objeto de la partida está disponible en la consola como
   los cimientos y la obra siguen con los de antes. Las barras de vida y de
   producción se colocan encima de lo más alto de cada dibujo. Así entró el
   centro urbano, desde `assets/fuentes/centro-urbano.png`.
+- Un modelo 3D se pinta sin motor ni librerías (`js/modelo3d.js`): el `.zip`
+  se abre con `DecompressionStream`, los polígonos del `.obj` se parten en
+  triángulos y se rasterizan con búfer de profundidad a triple resolución, con
+  la misma proyección del mapa (`x = 45,25·e`, `y = −22,63·n − 39,19·h`
+  píxeles de mundo por casilla). La luz viene de la derecha y de arriba, cada
+  vértice con su normal (vuelta hacia la cámara si el modelo la trae al
+  revés), y la sombra es el modelo proyectado en el suelo según ese sol. Se
+  reduce a píxeles duros con un contorno oscuro, como los dibujos, a 4 píxeles
+  de hoja por píxel de mundo (`resHojas`). `tools/importar-modelo.mjs` quita
+  del índice lo que tenía ese elemento, escribe `<clave>-modelo-<color>.png`
+  y retira las hojas que se quedan sin uso; el paquete se guarda en
+  `assets/fuentes/<clave>-modelo.zip`.
 - El explorador está dibujado por código (`tools/dibujar-jinete.html`): caballo
   y jinete son piezas simples (elipsoides, cápsulas y cajas) con un esqueleto
   que anima el trote en pares diagonales y el golpe de espada. Se ven con la

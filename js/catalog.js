@@ -6,7 +6,9 @@ import {
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
   drawSprite, prepareSprites, unitAnim, terrainHasBitmap, terrainSprite,
+  sustituirSprites, quitarSustitucion, alturaDeUnidad,
 } from './sprites.js';
+import { reunirArchivos, leerModelo, spritesDeModelo, escribirZip, RES_MODELO } from './modelo3d.js';
 import {
   fieldsFor, getPath, setValue, reset, isChanged, defaultValue, countChanges,
   TERRAIN_LABELS, NODE_LABELS, RATE_LABELS, READ_ONLY_KINDS,
@@ -102,6 +104,8 @@ export class Catalog {
   constructor() {
     this.tab = 'unit';
     this.selected = null;
+    // Modelos 3D importados en esta sesión, por prefijo de sus sprites.
+    this.modelos = new Map();
     this.filter = '';
     this.bind();
   }
@@ -340,6 +344,7 @@ export class Catalog {
       title.textContent = NODE_LABELS[key] || key;
       sub.textContent = `Da ${RES_NAME[def.res]}. ${def.blocking ? 'Bloquea el paso.' : 'No bloquea el paso.'}`;
       box.appendChild(this.lupaFija(resourceSprite(key, 0), key));
+      box.appendChild(this.seccionModelo('node', key));
       box.appendChild(this.nodeForm(key, def));
     } else {
       const def = this.tab === 'unit' ? UNITS[key] : BUILDINGS[key];
@@ -350,6 +355,7 @@ export class Catalog {
       box.appendChild(this.extraInfo(def));
       if (this.tab === 'unit') box.appendChild(this.animations(key, def));
       else box.appendChild(this.lupaFija(buildingSprite(key, 0, 2), key));
+      box.appendChild(this.seccionModelo(this.tab, key));
       box.appendChild(this.form(this.tab, key, def));
     }
     // Las cifras de las unidades sólo se miran: no hay nada que restablecer.
@@ -471,6 +477,143 @@ export class Catalog {
     const sec = this.group('Lupa', [lupa.card]);
     sec.appendChild(lupa.boton);
     return sec;
+  }
+
+  // --- Modelo 3D ---------------------------------------------------------------
+
+  /**
+   * Importar un modelo 3D para lo que esté abierto: se eligen el .obj y su
+   * .mtl (o un .zip con ellos), se pinta en isométrico con modelo3d.js y sus
+   * sprites sustituyen a los de este elemento mientras dure la sesión, aquí y
+   * en las partidas. Para que llegue al juego de todos se descarga el paquete
+   * —el modelo con los ajustes elegidos— y se mete con
+   * tools/importar-modelo.mjs, que lo pinta igual.
+   */
+  seccionModelo(tipo, key) {
+    const prefijo = `${{ unit: 'u', building: 'b', node: 'r' }[tipo]}|${key}|`;
+    const estado = this.modelos.get(prefijo);
+    const filas = [];
+
+    const nota = document.createElement('p');
+    nota.className = 'cat-modelo-nota';
+    nota.textContent = estado
+      ? `${estado.nombre}: ${estado.modelo.tris.length} triángulos. Se ve así en esta sesión; para que quede en el juego, descarga el paquete y pásalo.`
+      : 'Sustituye su dibujo por el de un modelo .obj (con su .mtl, o todo en un .zip). Los materiales que se llamen «jugador» toman el color de cada bando.';
+    filas.push(nota);
+    for (const aviso of estado?.avisos || []) {
+      const p = document.createElement('p');
+      p.className = 'cat-modelo-aviso';
+      p.textContent = aviso;
+      filas.push(p);
+    }
+
+    const entrada = document.createElement('input');
+    entrada.type = 'file';
+    entrada.multiple = true;
+    entrada.accept = '.obj,.mtl,.zip';
+    entrada.hidden = true;
+    const elegir = document.createElement('button');
+    elegir.className = 'hoja-boton' + (estado ? ' tenue' : '');
+    elegir.textContent = estado ? 'Elegir otro modelo' : 'Importar modelo 3D';
+    elegir.onclick = () => entrada.click();
+    entrada.onchange = async () => {
+      if (!entrada.files.length) return;
+      elegir.disabled = true;
+      elegir.textContent = 'Leyendo…';
+      try {
+        const archivos = await reunirArchivos([...entrada.files]);
+        const modelo = leerModelo(archivos);
+        const medida = tipo === 'building' ? { size: BUILDINGS[key].size }
+          : tipo === 'unit' ? { altura: await alturaDeUnidad(key) } : {};
+        this.modelos.set(prefijo, { archivos, modelo, medida, nombre: modelo.nombre, eje: 'z', giro: 0 });
+        await this.aplicarModelo(tipo, key, prefijo);
+      } catch (err) {
+        console.error(err);
+        elegir.disabled = false;
+        elegir.textContent = 'Importar modelo 3D';
+        nota.textContent = `No se pudo leer: ${err.message}`;
+      }
+    };
+    filas.push(entrada);
+
+    if (estado) {
+      // Qué eje del modelo va hacia arriba: Z en 3ds Max y Blender, Y en el
+      // estándar del .obj. Se ve enseguida cuál es: con el otro sale tumbado.
+      const ejes = document.createElement('div');
+      ejes.className = 'hoja-segmentos';
+      for (const [eje, txt] of [['z', 'Z arriba'], ['y', 'Y arriba']]) {
+        const b = document.createElement('button');
+        b.textContent = txt;
+        b.classList.toggle('active', estado.eje === eje);
+        b.onclick = () => { estado.eje = eje; this.aplicarModelo(tipo, key, prefijo); };
+        ejes.appendChild(b);
+      }
+      filas.push(ejes);
+      const girar = document.createElement('button');
+      girar.className = 'hoja-boton tenue';
+      girar.textContent = `Girar 90° (ahora ${estado.giro}°)`;
+      girar.onclick = () => { estado.giro = (estado.giro + 90) % 360; this.aplicarModelo(tipo, key, prefijo); };
+      filas.push(girar);
+    }
+    filas.push(elegir);
+    if (estado) {
+      const bajar = document.createElement('button');
+      bajar.className = 'hoja-boton';
+      bajar.textContent = 'Descargar paquete';
+      bajar.onclick = () => this.descargarPaquete(tipo, key, estado);
+      const quitar = document.createElement('button');
+      quitar.className = 'hoja-boton tenue peligro';
+      quitar.textContent = 'Quitar el modelo';
+      quitar.onclick = () => {
+        this.modelos.delete(prefijo);
+        quitarSustitucion(prefijo);
+        this.renderList();
+      };
+      filas.push(bajar, quitar);
+    }
+    const sec = this.group('Modelo 3D', filas);
+    sec.classList.add('cat-modelo');
+    return sec;
+  }
+
+  /** Pinta el modelo con sus ajustes y pone sus sprites en lugar de los de siempre. */
+  async aplicarModelo(tipo, key, prefijo) {
+    const estado = this.modelos.get(prefijo);
+    // Un respiro para que el botón diga «Leyendo…» antes de ponerse a pintar.
+    await new Promise((r) => setTimeout(r, 30));
+    const { sprites, anim, avisos } = spritesDeModelo(estado.modelo, {
+      tipo, clave: key, medida: estado.medida, eje: estado.eje, giro: estado.giro,
+    });
+    estado.avisos = avisos;
+    sustituirSprites(prefijo, sprites, RES_MODELO, anim);
+    this.renderList();
+    this.showDetail();
+  }
+
+  /**
+   * El paquete que se mete en el juego: el modelo tal cual llegó y
+   * `ajustes.json` con lo elegido aquí. tools/importar-modelo.mjs lo lee.
+   */
+  descargarPaquete(tipo, key, estado) {
+    const enc = new TextEncoder();
+    const ajustes = { tipo, clave: key, eje: estado.eje, giro: estado.giro, medida: estado.medida };
+    const blob = escribirZip({ ...estado.archivos, 'ajustes.json': enc.encode(JSON.stringify(ajustes, null, 2)) });
+    const archivo = `modelo-${key}.zip`;
+    const file = new File([blob], archivo, { type: 'application/zip' });
+    (async () => {
+      if (navigator.canShare && navigator.canShare({ files: [file] }) && matchMedia('(pointer: coarse)').matches) {
+        try { await navigator.share({ files: [file], title: archivo }); return; } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+      }
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = archivo;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    })();
   }
 
   /** Marco común de varios sprites, en píxeles del sprite desde su ancla. */

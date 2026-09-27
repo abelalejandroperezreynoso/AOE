@@ -382,6 +382,60 @@ const resCache = new Map();
 const unitCache = new Map();
 const buildCache = new Map();
 
+/*
+ * Sprites provisionales: los de un modelo 3D recién importado en el catálogo
+ * (ver modelo3d.js). Tapan a los del índice de un elemento entero —todas sus
+ * claves, `u|milicia|…`— mientras dure la sesión, en el catálogo y en las
+ * partidas que se empiecen; al recargar vuelven los de siempre. Lo agotado de
+ * un recurso no lo tapan: un modelo no trae cómo queda.
+ */
+const provisionales = new Map(); // prefijo → { sprites: { clave: { canvas, ox, oy } }, res, anim }
+
+function provisionalDe(clave) {
+  for (const [prefijo, p] of provisionales) {
+    if (clave.startsWith(prefijo) && !(prefijo.startsWith('r|') && clave.endsWith('|1'))) return p;
+  }
+  return null;
+}
+
+function olvidarRecortes() {
+  unitCache.clear(); buildCache.clear(); resCache.clear(); animCache.clear();
+}
+
+/**
+ * Pone los sprites de un modelo en lugar de los de un elemento: `prefijo` es
+ * `u|<tipo>|`, `b|<tipo>|` o `r|<tipo>|`; `sprites`, lo que devuelve
+ * `spritesDeModelo`; `res`, sus píxeles de hoja por píxel de mundo.
+ */
+export function sustituirSprites(prefijo, sprites, res, anim = null) {
+  provisionales.set(prefijo, { sprites, res, anim });
+  olvidarRecortes();
+}
+
+export function quitarSustitucion(prefijo) {
+  if (provisionales.delete(prefijo)) olvidarRecortes();
+}
+
+export const tieneSustitucion = (prefijo) => provisionales.has(prefijo);
+
+/**
+ * Altura de una unidad de los pies a la cabeza, en píxeles de mundo, según el
+ * índice (no los provisionales): la medida a la que se ajusta un modelo que la
+ * sustituya. La que apuntó tools/importar-unidad.mjs, o la del primer sprite.
+ */
+export async function alturaDeUnidad(type) {
+  await loadIndex();
+  const a = index.anim?.[type]?.altura;
+  if (a) return a / index.res;
+  return index.sprites[`u|${type}|0|0|0`]?.[6] ?? 38;
+}
+
+/** ¿Hay sprite con esta clave, provisional o del índice? */
+function existe(clave) {
+  const p = provisionalDe(clave);
+  return p ? !!p.sprites[clave] : !!(index && index.sprites[clave]);
+}
+
 function loadIndex() {
   if (!indexPromise) {
     indexPromise = fetch(DIR + 'indice.json')
@@ -437,7 +491,7 @@ const ANIM_DE_SERIE = { andar: [0, 1, 2, 3], quieto: 0, golpe: [4, 5] };
 const animCache = new Map();
 
 export function unitAnim(type, face = 0) {
-  const a = index && index.anim && index.anim[type];
+  const a = provisionales.get(`u|${type}|`)?.anim || (index && index.anim && index.anim[type]);
   if (!a) return ANIM_DE_SERIE;
   face = ((Math.round(face) % 8) + 8) % 8;
   const cara = MIRROR[face] ?? face;
@@ -458,6 +512,11 @@ export function unitAnim(type, face = 0) {
  * quien dibuja se salta ese objeto hasta que esté.
  */
 function slice(key) {
+  const p = provisionalDe(key);
+  if (p) {
+    const s = p.sprites[key];
+    return s ? { canvas: s.canvas, ox: s.ox, oy: s.oy, w: s.canvas.width / p.res, h: s.canvas.height / p.res, res: p.res } : null;
+  }
   if (!index) { loadIndex().catch(() => {}); return null; }
   const e = index.sprites[key];
   if (!e) return null;
@@ -500,7 +559,7 @@ export function unitSprite(type, colorIdx, face = 1, f = 0) {
   if (s) return s;
   // Las que miran a la izquierda salen volteadas, salvo que tengan dibujo propio.
   const src = MIRROR[face];
-  if (src !== undefined && !(index && index.sprites[`u|${key}`])) {
+  if (src !== undefined && !existe(`u|${key}`)) {
     const base = unitSprite(type, colorIdx, src, f);
     s = base && flipSprite(base);
   } else {
