@@ -5,7 +5,6 @@ import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, HW, HH,
   drawSprite, paintUnit, paintBuilding, paintResource, setSpriteQuality, drawTerrainSprite,
 } from './sprites.js';
-import { LOOK } from './data/appearance.js';
 import { clamp, dist } from './utils.js';
 
 const Z_PX = 18; // píxeles de altura por unidad de "z" en el mundo
@@ -398,11 +397,11 @@ export class Renderer {
   /**
    * Los animales domesticados llevan collar del color de su dueño, con su
    * cascabel. Va encima del sprite y a su misma escala: las medidas salen de
-   * cómo está dibujada la oveja (cuerpo centrado en (0,-12) y cabeza en
-   * (-11,-17) desde el centro del rombo, ver `drawResource` en sprites.js).
+   * cómo está dibujada la oveja en su sprite (cuerpo centrado en (0,-12) y
+   * cabeza en (-11,-17) desde el centro del rombo).
    */
   drawCollar(ctx, mx, my, n) {
-    const s = (LOOK.node[n.kind] && LOOK.node[n.kind].scale) || 1;
+    const s = 1; // la oveja viene horneada a su tamaño de serie
     const col = PLAYER_COLORS[this.game.players[n.owner].colorIdx];
     /*
      * Punto del cuello: donde la cabeza se junta con el cuerpo, que es el borde

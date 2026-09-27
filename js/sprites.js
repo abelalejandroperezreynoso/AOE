@@ -1,18 +1,11 @@
-// Sprites del juego. Las unidades, los edificios y los recursos son renders
-// isométricos 2D horneados a partir de modelos 3D procedurales (js/gfx3d/),
-// como los pre-renderizados del clásico: el modelo se rasteriza una vez por
-// combinación de tipo, color, orientación y fotograma, y la partida sólo copia
-// mapas de bits. El terreno se sigue pintando a mano con la API de Canvas.
-// No hay imágenes externas: todo se genera por código.
+// Sprites del juego. Las unidades, los edificios y los recursos son imágenes:
+// atlas PNG en assets/sprites/ con un índice (indice.json) que dice dónde está
+// cada sprite y por dónde se ancla. Se cargan por color de jugador, sólo los
+// que hacen falta, y la partida no empieza hasta tenerlos (`prepareSprites`).
+// El terreno se sigue pintando con la API de Canvas.
 
 import { TILE_W, TILE_H, UNITS } from './config.js';
 import { shade, mix } from './utils.js';
-import { bake } from './gfx3d/engine.js';
-import { unitMesh } from './gfx3d/units.js';
-import { buildingMesh } from './gfx3d/buildings.js';
-import { designMesh } from './gfx3d/parts.js';
-import { modelForBuilding } from './data/designs.js';
-import { nodeMesh } from './gfx3d/nodes.js';
 
 const HW = TILE_W / 2; // 32
 const HH = TILE_H / 2; // 16
@@ -285,7 +278,7 @@ export function drawTerrainSprite(ctx, sx, sy, terrain, rnd) {
 /*
  * `quality` es cuántos píxeles se hornean por píxel de mundo para el TERRENO,
  * que se sigue dibujando de forma vectorial y gana nitidez al acercar la
- * cámara. Los sprites pre-renderizados no dependen de ella: se hornean una vez
+ * cámara. Los sprites de los atlas no dependen de ella: vienen horneados
  * a resolución fija (2×) y, si la cámara amplía más, se ven sus píxeles, que es
  * exactamente como envejecía el clásico al acercarse.
  */
@@ -293,7 +286,7 @@ let quality = 1;
 
 export function spriteQuality() { return quality; }
 
-/** Cambiarla invalida los rombos horneados del terreno; los sprites 3D valen. */
+/** Cambiarla invalida los rombos horneados del terreno; los sprites valen. */
 export function setSpriteQuality(q) {
   q = Math.max(1, Math.min(3, Math.round(q * 2) / 2));
   if (q === quality) return;
@@ -307,20 +300,88 @@ export function setSpriteQuality(q) {
  * darle a `drawImage` el tamaño de destino.
  */
 export function drawSprite(ctx, s, x, y, scale = 1) {
+  if (!s) return;
   ctx.drawImage(s.canvas, x - s.ox * scale, y - s.oy * scale, s.w * scale, s.h * scale);
 }
 
-// --- Sprites pre-renderizados ------------------------------------------------
+// --- Sprites de los atlas -----------------------------------------------------
+
+// Relativa a este módulo, no a la página: así vale también desde tools/.
+const DIR = new URL('../assets/sprites/', import.meta.url).href;
+let indexPromise = null;
+let index = null;              // { res, hojas: [nombre], sprites: { clave: [hoja, x, y, w, h, ox, oy] } }
+const sheets = new Map();      // nombre de hoja → Promise<HTMLImageElement>
+const loaded = new Map();      // nombre de hoja → HTMLImageElement ya decodificada
 
 const resCache = new Map();
 const unitCache = new Map();
 const buildCache = new Map();
 
+function loadIndex() {
+  if (!indexPromise) {
+    indexPromise = fetch(DIR + 'indice.json')
+      .then((r) => { if (!r.ok) throw new Error(`indice.json: ${r.status}`); return r.json(); })
+      .then((j) => { index = j; return j; })
+      .catch((err) => { indexPromise = null; throw err; });
+  }
+  return indexPromise;
+}
+
+function loadSheet(name) {
+  let p = sheets.get(name);
+  if (!p) {
+    p = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => { loaded.set(name, img); resolve(img); };
+      img.onerror = () => { sheets.delete(name); reject(new Error(`No se pudo cargar ${name}`)); };
+      img.src = DIR + name;
+    });
+    sheets.set(name, p);
+  }
+  return p;
+}
+
+/**
+ * Carga lo que hace falta para dibujar con estos colores de jugador: el índice,
+ * los recursos y las hojas de unidades y edificios de cada color. Lo que ya
+ * esté cargado no se vuelve a pedir.
+ */
+export async function prepareSprites(colors = [0]) {
+  await loadIndex();
+  const names = ['recursos.png'];
+  for (const c of new Set(colors)) names.push(`unidades-${c}.png`, `edificios-${c}.png`);
+  await Promise.all(names.map(loadSheet));
+}
+
+/** Hoja en la que vive un sprite según su clave. */
+function sheetFor(key) {
+  if (key[0] === 'r') return 'recursos.png';
+  const color = key.split('|')[2];
+  return `${key[0] === 'u' ? 'unidades' : 'edificios'}-${color}.png`;
+}
+
+/**
+ * Recorta un sprite de su atlas a un lienzo propio, con sus medidas y anclaje
+ * en píxeles de mundo. Si su hoja aún no ha llegado devuelve null (y la pide):
+ * quien dibuja se salta ese objeto hasta que esté.
+ */
+function slice(key) {
+  if (!index) { loadIndex().catch(() => {}); return null; }
+  const e = index.sprites[key];
+  if (!e) return null;
+  const img = loaded.get(index.hojas[e[0]]);
+  if (!img) { loadSheet(sheetFor(key)).catch(() => {}); return null; }
+  const [, x, y, w, h, ox, oy] = e;
+  const c = makeCanvas(w, h);
+  c.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h);
+  return { canvas: c, ox, oy, w: w / index.res, h: h / index.res };
+}
+
 /*
- * Espejo de orientaciones: como en los SLP del original, se hornean cinco
- * vistas y las tres que miran al otro lado salen volteadas. El volteo es sobre
- * el eje vertical de pantalla, que en el mundo intercambia u y v: la 2 sale de
- * la 0, la 3 de la 7 y la 4 de la 6.
+ * Espejo de orientaciones: como en los SLP del original, hay cinco vistas y
+ * las tres que miran al otro lado salen volteadas. El volteo es sobre el eje
+ * vertical de pantalla, que en el mundo intercambia u y v: la 2 sale de la 0,
+ * la 3 de la 7 y la 4 de la 6.
  */
 const MIRROR = { 2: 0, 3: 7, 4: 6 };
 
@@ -336,7 +397,7 @@ function flipSprite(s) {
 /**
  * Sprite de una unidad: tipo, color de jugador, orientación 0-7 (0 = +u del
  * mundo, hacia abajo-derecha de la pantalla) y fotograma (0-3 andar, 4-5
- * ataque). Anclado a los pies.
+ * ataque). Anclado a los pies. Null mientras su hoja no haya llegado.
  */
 export function unitSprite(type, colorIdx, face = 1, f = 0) {
   face = ((Math.round(face) % 8) + 8) % 8;
@@ -344,10 +405,13 @@ export function unitSprite(type, colorIdx, face = 1, f = 0) {
   let s = unitCache.get(key);
   if (s) return s;
   const src = MIRROR[face];
-  s = src !== undefined
-    ? flipSprite(unitSprite(type, colorIdx, src, f))
-    : bake(unitMesh(type, colorIdx, face, f));
-  unitCache.set(key, s);
+  if (src !== undefined) {
+    const base = unitSprite(type, colorIdx, src, f);
+    s = base && flipSprite(base);
+  } else {
+    s = slice(`u|${key}`);
+  }
+  if (s) unitCache.set(key, s);
   return s;
 }
 
@@ -359,26 +423,13 @@ export function paintUnit(ctx, x, y, type, colorIdx, face, f) {
   ctx.imageSmoothingEnabled = sm;
 }
 
-/**
- * Malla de un edificio: la construye su código en buildings.js, salvo que en el
- * taller le hayan hecho otro modelo. A partir de ahí el camino es el mismo:
- * mismo horneado, misma luz, mismo contorno, así que en la partida no se
- * distingue un edificio re-vestido de uno de serie.
- */
-function meshForBuilding(type, colorIdx, stage) {
-  const design = modelForBuilding(type);
-  return design
-    ? designMesh(design, colorIdx, stage)
-    : buildingMesh(type, colorIdx, stage);
-}
-
 /** Sprite de un edificio en una etapa de obra, anclado a la esquina superior. */
 export function buildingSprite(type, colorIdx, stage = 2) {
   const key = `${type}|${colorIdx}|${stage}`;
   let s = buildCache.get(key);
   if (s) return s;
-  s = bake(meshForBuilding(type, colorIdx, stage));
-  buildCache.set(key, s);
+  s = slice(`b|${key}`);
+  if (s) buildCache.set(key, s);
   return s;
 }
 
@@ -394,8 +445,8 @@ export function resourceSprite(kind, variant = 0, depleted = false) {
   const key = `${kind}|${variant}|${depleted ? 1 : 0}`;
   let s = resCache.get(key);
   if (s) return s;
-  s = bake(nodeMesh(kind, variant, depleted));
-  resCache.set(key, s);
+  s = slice(`r|${key}`);
+  if (s) resCache.set(key, s);
   return s;
 }
 
@@ -532,9 +583,14 @@ export function iconFor(kind, type, colorIdx = 0) {
   if (url) return url;
   const c = makeCanvas(56, 56);
   const ctx = c.getContext('2d');
+  // Sin su hoja cargada no hay retrato: se devuelve el lienzo vacío sin
+  // guardarlo, para que la próxima vez salga ya con el dibujo.
+  const s = kind === 'unit' ? unitSprite(type, colorIdx, 1, 0)
+    : kind === 'building' ? buildingSprite(type, colorIdx, 2)
+      : kind === 'node' ? resourceSprite(type, 0) : null;
+  if (!s && (kind === 'unit' || kind === 'building' || kind === 'node')) return c.toDataURL();
   if (kind === 'unit') {
     // Retrato de medio cuerpo: así se distinguen el yelmo y el arma de cada unidad.
-    const s = unitSprite(type, colorIdx, 1, 0);
     const b = tightBounds(s.canvas, `u${key}`);
     const cls = UNITS[type].class;
     const crop = cls === 'siege' ? 1 : 0.66;
@@ -543,13 +599,11 @@ export function iconFor(kind, type, colorIdx = 0) {
     ctx.drawImage(s.canvas, b.x, b.y, b.w, ch,
       28 - (b.w * sc) / 2, 30 - (ch * sc) / 2, b.w * sc, ch * sc);
   } else if (kind === 'building') {
-    const s = buildingSprite(type, colorIdx, 2);
     const b = tightBounds(s.canvas, `b${key}`);
     const sc = Math.min(52 / b.w, 50 / b.h);
     ctx.drawImage(s.canvas, b.x, b.y, b.w, b.h,
       28 - (b.w * sc) / 2, 54 - b.h * sc, b.w * sc, b.h * sc);
   } else if (kind === 'node') {
-    const s = resourceSprite(type, 0);
     const b = tightBounds(s.canvas, `n${key}`);
     const sc = Math.min(52 / b.w, 50 / b.h);
     ctx.drawImage(s.canvas, b.x, b.y, b.w, b.h,
@@ -578,9 +632,9 @@ export function iconFor(kind, type, colorIdx = 0) {
 }
 
 /**
- * Vacía todos los cachés de dibujo. Hay que llamarla cuando se cambian datos
- * del juego desde el catálogo: los sprites se guardan por tipo y color, así
- * que si cambia el aspecto de un objeto hay que volver a hornearlo.
+ * Vacía todos los cachés de dibujo. Hay que llamarla cuando se cambian los
+ * colores del terreno desde el catálogo, que se hornean con ellos. Las hojas
+ * de sprites cargadas se quedan: sólo se vuelven a recortar.
  */
 export function clearSpriteCaches() {
   tileCache.clear();

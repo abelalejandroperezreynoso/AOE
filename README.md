@@ -7,17 +7,13 @@ edades y conquista a tus rivales.
 Se juega en solitario contra la máquina o **con otras personas**, hasta ocho
 jugadores, cada quien desde su dispositivo.
 
-El juego es HTML, CSS y JavaScript modular puro, sin compilación. Todo el arte
-(unidades, edificios, terreno, iconos) y todo el sonido se **generan por código**
-en tiempo de ejecución, así que pesa unos pocos cientos de kilobytes y no
-descarga ningún recurso externo.
+El juego es HTML, CSS y JavaScript modular puro, sin compilación.
 
-El arte sigue la técnica de los clásicos del género: las unidades, los
-edificios y los recursos son **modelos 3D de polígonos bajos pre-renderizados a
-sprites isométricos 2D**. Los modelos se construyen por código, un rasterizador
-propio los hornea con luz, sombra arrojada y contorno al cargar (y bajo
-demanda), y la partida sólo copia mapas de bits: el aspecto de render de
-estudio del original, sin un solo fichero de imagen.
+Las unidades, los edificios y los recursos son **sprites isométricos**: atlas
+PNG en `assets/sprites/`, como los pre-renderizados de los clásicos del género.
+Cada hoja lleva un color de jugador, y la partida sólo descarga las de los
+colores que juegan (con dos jugadores, unos 2,6 MB). El terreno, los iconos de
+las tecnologías y todo el sonido se siguen generando por código.
 
 ## Jugar
 
@@ -105,9 +101,6 @@ Limitaciones conocidas:
   herramientas del navegador podría ver el mapa entero. En pantalla la niebla
   de guerra funciona con normalidad para cada jugador.
 - No hay equipos ni alianzas: todos contra todos.
-- Los modelos del taller que se reparten al empezar tienen un tope de tamaño; si
-  el anfitrión hubiera rehecho muchísimos edificios y muy recargados, los últimos
-  se quedarían con su aspecto de siempre en esa partida.
 
 ## Catálogo del juego
 
@@ -121,28 +114,6 @@ resalta y, al pasar el ratón por su nombre, indica cuál era el valor original.
 Hay un botón para restablecer un elemento suelto y otro para dejarlo todo como
 venía de fábrica.
 
-### Aspecto
-
-Cada ficha empieza por una sección **Aspecto** con la que se cambia cómo se
-dibuja el objeto, no sólo sus cifras. La vista previa se rehace al instante,
-mientras se arrastra el selector de color:
-
-- **Unidades**: piel, calzas, yelmo, metal de las armas, madera de los mangos,
-  montura de la caballería, ruedas de las máquinas de asedio y su **tamaño**
-  (de 0,6 a 1,6 veces el normal).
-- **Edificios**: muros, tejado, madera, puerta, basamento, chimenea, tierra y
-  cultivo de la granja, empedrado, mostradores y toldos del mercado, y los
-  detalles propios de cada uno (el fuego de la herrería, la tela del molino,
-  el emblema de los edificios militares). No llevan tamaño: su huella la fija
-  la cuadrícula.
-- **Recursos**: tronco y hojas del árbol, roca y vetas de las minas, mata y
-  bayas, cuerpo, cabeza, patas y cuerna de los animales, además del tamaño.
-
-Sólo aparecen los campos que ese objeto usa de verdad: a un lancero no se le
-pregunta por la montura. Los edificios se pintan en tres tonos por material
-(cara al sol, cara base y sombra); mientras un color no se toque se usan los
-tonos originales, elegidos a mano, y en cuanto se cambia se derivan del nuevo.
-
 Detalles a tener en cuenta:
 
 - Los cambios se guardan **en ese navegador** y se aplican a las **partidas
@@ -151,422 +122,6 @@ Detalles a tener en cuenta:
   dispositivos, de modo que todos ven y juegan con las mismas cifras.
 - Los valores se validan y se recortan a un rango razonable, así que no es
   posible dejar el juego en un estado inservible desde el catálogo.
-
-## Taller de edificios
-
-Desde el menú principal, **Taller de edificios**: un editor 3D dentro del propio
-juego para **rehacerle el modelo a los edificios que ya trae**. Aquí no se
-inventan edificios nuevos: se elige uno —la casa, el molino, el castillo— y se
-le hace otra cara. Lo que cuesta, lo que aguanta y lo que hace lo sigue poniendo
-el juego (y el catálogo, si se retoca allí), así que el taller cambia cómo se ve
-una partida sin poder desequilibrarla. Y siempre se puede **restablecer**.
-
-**Lo primero al entrar es elegir el edificio**: una parrilla con todos los del
-juego, en el mismo orden de la barra de obra, cada uno con la cara que tenga
-ahora mismo y una línea que dice de quién es esa cara —la original del juego, la
-que trae hecha el juego o la que le has hecho tú—. Al elegir uno se pone en la
-mesa; **Elegir otro** vuelve a la parrilla, y desde ella se sale al menú. Esa
-parrilla es la única lista de edificios que hay: elegido uno, la mesa habla
-sólo de él.
-
-En la pestaña **Edificio** está lo que se puede hacer con el que hay puesto:
-**Compartir** lo saca como texto, **Importar** pega uno que te hayan pasado y
-**Restablecer** le devuelve la cara que tenía. Debajo, su ficha —huella, edad,
-coste, resistencia— y, plegado, empezar de nuevo por otra plantilla.
-
-Las **piezas del modelo** también viven en una hoja, ésta **a media pantalla**:
-debajo se eligen, con cada una dibujada como está puesta y su color al lado, y
-encima se sigue viendo el modelo, que se recoloca solo en lo que la hoja deja
-libre. Se abre con **Pieza**, y elegir no la cierra, para poder ir mirando.
-
-### Las tres capas
-
-El taller trabaja en tres alturas, y conviene tenerlas claras porque cada una se
-guarda en un sitio distinto y se comporta de otra manera:
-
-| capa | qué es | dónde vive | quién la puede cambiar |
-| ---- | ------ | ---------- | ---------------------- |
-| **1. Pieza individual** | la caja, el cilindro, el tejado, las almenas… | código (`PARTS`, en `js/gfx3d/parts.js`) | nadie desde el juego: son parte del programa |
-| **2. Pieza del taller** | varias de la capa 1 colocadas y guardadas con un nombre | datos: tabla `custom_parts` | quien juega, desde el taller |
-| **3. Edificio** | piezas de la capa 1 y de la capa 2, mezcladas | datos: tabla `building_models` | quien juega, desde el taller |
-
-Las reglas que hacen que esto se sostenga:
-
-- **Se baja de capa, nunca se sube ni se salta.** Un edificio lleva piezas de
-  las capas 1 y 2; una pieza del taller lleva sólo de la 1. Una pieza del taller
-  **no puede llevar otra pieza del taller**, así que no hay forma de que una se
-  contenga a sí misma ni de que el dibujo entre en bucle. El validador tira
-  cualquier `mia:` que aparezca dentro de una pieza.
-- **La capa 2 se guarda por referencia, no copiada.** El edificio anota la clave
-  (`mia:reja`) y el tamaño de la caja en la que la mete; lo que hay dentro lo
-  pone la pieza al dibujar. Por eso rehacer una pieza cambia de golpe todos los
-  edificios que la lleven. Lo que no cambia es la caja: la pieza nueva se ajusta
-  al hueco que ya tenía puesto, que es lo que evita que retocar una pieza
-  descoloque veinte edificios.
-- **Una referencia sin resolver no es un modelo roto.** Si un edificio menciona
-  una pieza que en este dispositivo todavía no está —las piezas aún no han
-  llegado de la nube, o el navegador es otro— el modelo **la conserva**: no se
-  dibuja mientras falte y vuelve a verse en cuanto la pieza esté. Si se tirara,
-  el modelo se guardaría pelado y al subir se llevaría la pieza por delante en
-  el edificio de todo el mundo. En el taller sale en la lista como «Pieza que
-  falta», se puede mover y estirar como cualquier otra —dónde va es del edificio,
-  no de la pieza— y se puede quitar, que es lo único que no se puede deshacer
-  solo.
-- **Cada capa tiene su tope**: 60 piezas dentro de una del taller, 40 piezas del
-  taller en total, 200 piezas en un edificio.
-
-Las tres capas y sus fronteras están comprobadas de punta a punta; el guion de
-validación vive fuera del repositorio, pero lo que comprueba es esto mismo,
-punto por punto.
-
-### Piezas compuestas, y cómo deshacerlas
-
-Unas cuantas piezas del juego no son un cuerpo sino varios: las almenas son un
-antepecho y sus merlones, el torreón un fuste con su cornisa y sus almenas, la
-escalinata sus peldaños, la cerca postes y travesaños, la pila sus troncos.
-Puestas en un modelo se mueven y se estiran de una vez, que es lo cómodo casi
-siempre; pero cuando lo que se quiere es correr *un* merlón, no hay por dónde
-cogerlo.
-
-En la ficha de esas piezas sale **«Descomponer en piezas sueltas»**: las cambia
-por las piezas del taller que dibujan lo mismo —cajas y vigas—, cada una con su
-sitio y su tamaño, y desde ahí se tocan de una en una como cualquier otra. Lo
-que se ve no cambia, sólo aparece por dónde cogerlo; y como es un cambio más del
-modelo, deshacer lo devuelve a una pieza.
-
-Va en `explode(p)` dentro de la entrada de `PARTS`, al lado de su `build()`.
-Dos cosas no sobreviven al viaje: lo que está *pintado* sobre un cuerpo en vez
-de ser un cuerpo —la saetera del torreón, que el taller avisa de que se pierde—
-y los medios tonos con los que el constructor separa unas partes de otras (el
-antepecho de las almenas, un pelo más oscuro que sus merlones), porque una pieza
-del taller lleva un material entero, no un tono.
-
-### Piezas propias
-
-Además de vestir los edificios, el taller deja **hacer piezas nuevas**. Una
-pieza del juego —la caja, el cilindro, el tejado— es código y no cambia; una
-pieza propia es **datos**: unas cuantas piezas del juego colocadas y guardadas
-con un nombre. Se hacen en la segunda mitad de la parrilla de entrada, «Piezas
-del taller», con las mismas herramientas y las mismas barras que un edificio.
-
-Debajo va el catálogo de las que trae el juego. Ésas no se pueden cambiar —son
-código—, pero tocar una empieza una pieza del taller con ella dentro, que es lo
-más parecido a editarlas y por donde se empieza casi siempre: se parte de la
-caja o del tejado y se le añade lo que haga falta.
-
-Ese catálogo va partido en dos, y la hoja de **Añadir** lo repite: **básicas**
-—las de un solo cuerpo: caja, ladrillo, tabla, cuña, cilindro, tubo, cúpula,
-los dos tejados, bóveda, faldón, teja, escama, viga, arco, rueda, aro y barril— y
-**compuestas**
-—las que ya traen varias en una: almenas, torreón, puerta, ventana, estandarte,
-escalinata, cerca, pila de troncos—. Las básicas van delante porque son con las que se hace lo demás: haciendo una pieza del
-taller se busca el detalle, y el detalle sale de formas sueltas. Ahí están los
-cuerpos que no hacían falta para los edificios de serie y sí para el detalle: la
-**cuña** (rampas, contrafuertes, chaflanes), el **tubo** (pozos, brocales,
-chimeneas), la **bóveda** (túneles, naves, puentes, tejados curvos), el **arco**
-de medio punto (puertas de muralla, acueductos, soportales) y el **aro** (cercos,
-zunchos, argollas). Y los de poner a mano lo que un cuerpo entero deja liso:
-el **ladrillo**, que no es una caja pequeña sino un ladrillo con su junta —una
-losa fina y más apagada debajo, y el cuerpo un pelo metido—, de modo que uno
-encima de otro se leen como dos y no como un bloque; la **tabla**, que es lo
-mismo para un muro de madera —una tabla con su ranura, la sombra que deja
-contra la de al lado—, y que corre la ranura por su lado largo: tumbada la
-lleva abajo, como el solape de un chilla, y de pie por un canto, como una
-empalizada, así que la misma pieza forra en hiladas o en tablas verticales sin
-más que estirarla; y la **teja**, un canal
-curvo con su grueso, para correr una hilada duplicándola o para hacer un
-tejadillo o un caballete agrandándola. Y con ella la **escama**, que es la otra
-teja: la plana de frente en medio punto —pizarra, cola de castor— con el lomo un
-poco abombado, la que se solapa por hiladas, cada una a media escama de la de
-abajo, hasta cubrir el faldón como las escamas de un pez. El bombeo no es
-adorno: es lo que le saca el brillo por arriba y la sombra en el solape, que sin
-él un tejado así se ve como una pared lisa con rayas. Las compuestas
-siguen ahí detrás, que a veces son justo el atajo que hace falta, y cualquiera
-de ellas se puede meter y descomponer para quedarse con sus trozos.
-
-Lo que las hace útiles es que quedan **enlazadas**: una pieza puesta en un
-edificio no es una copia, es la pieza. Cambiarla cambia de golpe todos los
-edificios que la lleven —y, con el taller compartido, para todo el que juegue—.
-La ficha de cada pieza dice a cuántos edificios afecta antes de tocar nada, y
-quitarla avisa de cuántos se quedarían sin ella.
-
-Van en su propia tabla, `custom_parts` (migración en `supabase/migrations/`), y
-se leen **antes** que los modelos: si un edificio lleva una pieza propia y ésa
-no estuviera dada de alta, el validador de modelos la tiraría por no existir.
-
-Los límites: cuarenta piezas propias, sesenta piezas del juego dentro de cada
-una, y **no se anidan** —una pieza propia se compone sólo con las de serie—, que
-así ninguna puede contenerse a sí misma. Al colocarla nace con la talla que
-tenga modelada y desde ahí se estira, se gira y se coloca como cualquier otra.
-
-Añadir una pieza abre una **hoja que sube desde abajo**, al modo de iOS: fondo
-velado, esquinas de arriba redondeadas y asa. Dentro, el catálogo entero con
-**cada pieza dibujada como va a colocarse** —horneada igual que en la partida y
-con la paleta del modelo que se está haciendo—, que es lo que se mira para
-decidir; antes era un menú con el nombre y un glifo y había que saberse de
-memoria qué era cada cosa. Se cierra eligiendo, tocando el velo o con Escape.
-
-Un modelo se arma con **piezas** —cajas, ladrillos, tablas, cilindros, cúpulas,
-tejados a dos y a cuatro aguas, faldones, vigas, ruedas, almenas, torreones,
-puertas, ventanas, estandartes, escalinatas, cercas, pilas de troncos y
-barriles— colocadas sobre
-la huella que ese edificio ocupa en el mapa, que es la que manda.
-
-Los edificios que aún llevan su aspecto de siempre se ven en la mesa, pero su
-modelo está escrito en código y no hecho de piezas, así que no se puede abrir y
-retocar: se **empieza por una plantilla** (en blanco, cabaña, torreón,
-cobertizo o casa grande) y desde ahí queda como se quiera. La plantilla se
-ajusta sola a la huella del edificio, mida lo que mida.
-
-La mesa de trabajo va despejada a propósito: encima del modelo sólo hay cuatro
-controles —Añadir, deshacer, Vista y Guía—, y lo demás sale en **menús desplegables** —**Añadir** abre la caja de
-piezas y **Vista** el giro, el encaje, la rejilla y el color del jugador—.
-Al elegir un edificio **se llega con todo plegado**: no hay más que el modelo, a
-toda la tarjeta, y una tira de pestañas al lado. Es como se entra a mirarlo.
-Tocar cualquier pestaña saca las herramientas, la vista previa, la columna de
-edificios y el panel; el botón de la esquina, o volver a tocar la pestaña que ya
-está puesta, lo pliega otra vez. Mientras no se toque el zoom ni el encuadre a
-mano, el modelo se vuelve a encajar solo cada vez que la mesa cambia de alto;
-en cuanto se toca, manda lo que haya puesto quien modela.
-
-Para colocar:
-
-- **Se coloca con los botones**: tocar una pieza en el modelo la elige y nada
-  más —arrastrarla no la mueve—, y las flechas de su barra la empujan un paso
-  de rejilla. Así el modelo no se descoloca de un roce al mirarlo, y un paso
-  siempre cae en la rejilla. El arrastre es siempre de la vista: arrastrar
-  mueve el encuadre y la rueda acerca y aleja, se empiece encima de una pieza,
-  de la imagen guía o del fondo.
-- Al elegir una pieza salen sus **dos barras**, con la misma hechura —grupos
-  redondeados de dos filas, al modo de los mandos agrupados de iOS—: **abajo,
-  dónde se pone**; **arriba, qué se le hace**.
-- **Abajo**: las cuatro flechas **en cruz de dos por dos** la empujan un paso de
-  rejilla en la dirección que se ve; subir y bajar van **uno encima de otro**;
-  **girar** a un lado y a otro va en una columna con el **eje** al lado; y
-  **estirar y encoger**
-  tiene una columna por lado —ancho, largo y alto—, con las flechas dobles
-  apuntando por el mismo diagonal por el que crece ese lado en la mesa. Las
-  piezas no llaman igual a sus lados —la caja tiene ancho y fondo, el cilindro
-  radios, la viga largo y grueso—, así que cada botón toca el campo que a esa
-  pieza le hace de ese lado, los dos radios del cilindro a la vez para que no
-  se vuelva cono. En unas cuantas manda la forma y no el nombre del campo: la
-  rueda es un disco de canto, así que lo que mide de alto es su diámetro y lo
-  que mide de fondo es el grueso de la tabla; el aro está tumbado y es al
-  revés; la pila de troncos crece por troncos, así que bajarle el alto es
-  quitarle una fila; y la viga nace de pie, así que lo que mide de alto es su
-  largo. Que un mismo campo lleve dos lados no es un descuido: en
-  una pieza redonda el ancho y el fondo son la misma medida, y más vale que los
-  dos botones hagan lo que dicen a que uno esté apagado sin explicación. Sólo
-  se apaga el lado que la pieza de verdad no tiene: el fondo de las redondas y
-  el ancho de la pila y del estandarte. **El alto lo tienen todas**, que es lo
-  que se toca a cada rato. La barra es una
-  rejilla de ocho columnas, así que cabe igual en un teléfono pequeño que en
-  uno grande.
-- **Estirar y encoger van a tres velocidades**: mientras el lado mide más de
-  0,2 cada toque es de 0,05; de ahí para abajo, de 0,01; y por debajo de 0,01,
-  de una milésima, que es hasta donde llegan las piezas. Así un muro se recorta
-  a zancadas, un listón o el marco de una ventana se afinan desde la misma
-  barra sin que el paso gordo se lleve media pieza de un golpe, y una lámina
-  —el agua de un pilón, la sombra de un toldo, una cúpula aplastada hasta hacer
-  de charco— sigue adelgazando cuando ya no se ve el escalón. Los botones de la
-  ficha dan ese mismo paso, y escribir el número a mano vale para cualquier
-  valor de la rejilla: lo afinado se guarda tal cual, no se redondea al volver.
-  Cuando un lado toca su tope —el suelo de 0,001 o el techo del campo— su botón
-  se apaga, para que se vea que por ahí ya no hay más. **La teja y la escama
-  llevan el alto en dos campos** —el bombeo montado sobre la plancha—, así que
-  ahí el botón del alto se pasa al grueso en cuanto aplana el bombeo: primero
-  le quita la curva y después el canto, hasta dejarla en papel.
-- **Girar** vuelve la pieza **45° por toque** —la diagonal en un toque, el
-  cuarto de vuelta en dos— y cae siempre en el múltiplo más cercano, como las
-  flechas caen en la rejilla. El botón del lado dice **sobre qué eje**, y se
-  cambia tocándolo: **Z**, la pieza da vueltas de pie; **X**, se tumba hacia
-  los lados; **Y**, hacia delante y atrás. Los tres valen para **cualquier**
-  pieza: los giros sobre X y sobre Y se le dan a la pieza ya construida,
-  alrededor de su ancla, así que una viga se acuesta sobre su base y no se va a
-  otro sitio. Sobre la Z manda el ángulo propio de la pieza cuando lo tiene
-  —una caja gira por donde giraba— y, cuando no, ese mismo giro de fuera: así
-  también giran las que antes no podían, del tejado a la escalinata. Los
-  ángulos intermedios, de cinco en cinco, se ponen en la ficha de la pieza, que
-  enseña los tres.
-- **Arriba**: **deshacer y rehacer**, **añadir** —abre el catálogo de piezas— y
-  **duplicar**, el **color de la pieza** y **borrarla**, el **tamaño de
-  partida** y, en la punta, en su propia columna, la **imagen guía**: arriba sus ajustes y abajo **ocultarla y
-  volver a verla**, que es lo que se hace a cada rato mientras se calca —mirar
-  cómo va el modelo sin la imagen encima— y no puede costar abrir un menú. Es
-  lo único de esta barra que no es de la pieza sino de la mesa, y está aquí
-  porque es lo que se busca con el modelo delante: se calca con la hoja
-  plegada, para ver la imagen a lo grande, y entonces el desplegable de las
-  herramientas no está. El botón
-  del color enseña el material que lleva y despliega los demás con su muestra,
-  para cambiarlo de un toque. Sus botones miden lo mismo que los de abajo porque
-  comparten su rejilla. Con la mesa muy corta —la hoja desplegada en un
-  teléfono pequeño— esta barra se aparta: lo suyo está también en la barra de
-  herramientas y en la ficha de la pieza, y lo de abajo, que es colocar, no
-  está en ninguna otra parte. Los iconos están dibujados a
-  trazo, todos con el mismo grosor, y borrar se distingue por el color del
-  icono y no por un botón rojo entero. El **tamaño y el giro de partida** —la
-  regla— dejan puesta la pieza elegida como saldrán las siguientes de su clase:
-  se estira una caja hasta dar con el poste que hace falta, se guarda, y a
-  partir de ahí cada caja nace ya siendo ese poste. Guarda lo que mide y su
-  forma —ancho, fondo, alto, radios, grueso, pendiente, lados— y cómo está
-  puesta —su ángulo, los tres giros de fuera y el eje o la cara de las que se
-  ponen a lo largo de algo—, nunca dónde está ni de qué color es, que eso es de
-  cada pieza. Lo del giro no es un adorno: una hilada de tejas se corre por
-  donde se corre, y una empalizada va toda hacia el mismo lado; volver a
-  girarlas una a una era el mismo trabajo que volver a medirlas. Va en el
-  navegador, no en el modelo —es cómo trabaja quien modela, no cómo es el
-  edificio—, y el mismo menú la devuelve a como viene del catálogo. Sin pieza
-  elegida no hay barra de abajo:
-  al poner un edificio en la mesa se llega a verlo, no con una pieza cogida de
-  antemano. La de arriba sí está desde el principio, porque lo que no es de la
-  pieza —deshacer, añadir, la guía— hace falta antes de que haya ninguna; lo
-  que sí lo es se queda apagado hasta que la haya.
-- **Girar vista** enseña el modelo desde otro lado sin tocar el edificio, que
-  para eso la cámara del juego es fija.
-- **Guía** —en las herramientas, y también en la barra de arriba de la pieza—
-  pone una imagen de referencia —una foto, un dibujo, un boceto con
-  transparencia— para copiarla: aparece **de pie sobre la huella**, al ancho de
-  las casillas del edificio, y por delante del modelo a media opacidad, para
-  que no la tapen las piezas. Se le regula la opacidad y el tamaño, se puede
-  mandar detrás para calcar encima, y **se coloca con los mismos botones que
-  las piezas**, y se elige igual que ellas: **tocándola**. Elegida, la barra de
-  abajo es suya, con pieza elegida o sin ella; **tocar el suelo la suelta**, y
-  tocar una pieza también, que entonces los botones son de la pieza. Se toca
-  después de las piezas, no antes: ocupa media mesa y si no taparía todo lo que
-  hay debajo. La cruceta y subir y bajar la empujan por la pantalla lo
-  mismo que empujarían una pieza —un paso de rejilla, así que la rejilla de
-  **Vista** también manda aquí: fina para ajustarla, media casilla para
-  llevarla de un lado a otro—, y el primer par de estirar la **agranda y la
-  achica** un tanto por ciento cada toque, que una imagen crece entera. Los
-  otros dos lados y el giro se apagan: no son suyos. Mientras está elegida,
-  la imagen lleva **un contorno** —de puntos, con las cuatro esquinas en trazo
-  seguido y del mismo color con que se resalta la pieza elegida— por encima del
-  modelo, aunque la guía esté detrás: es lo que dice, sin leer nada, quién se
-  lleva los botones. Cuando esté en su sitio, **Bloquear la imagen** hace por
-  su nombre lo mismo que tocar el suelo: la deja fija y devuelve los botones a
-  la pieza.
-  **Ocultarla** —el ojo de la barra de arriba, o su casilla en el menú— la
-  aparta de la vista sin quitarla: no se dibuja, no se lleva los botones y
-  sigue guardada con su sitio y su tamaño, esperando al mismo botón. Se
-  guarda en ese navegador, achicada, hasta que se quite. Las flechas del
-  teclado y las de la barra giran con la vista: siempre empujan hacia donde
-  apuntan en la pantalla, y a la guía, que no está sobre el suelo sino de pie
-  delante, la empujan hacia donde apunta el icono sin más vuelta.
-- Con **teclado**: flechas para mover (con **Alt**, arriba y abajo), **Mayús**
-  para ir de cuatro en cuatro, **Supr** borra y **Ctrl+Z** deshace.
-- Mientras la vista se mueve o la pieza va cambiando, la mesa pinta las caras
-  ordenadas de lejos a cerca, que es rápido y responde al dedo al instante; **en
-  cuanto se queda quieta, hornea el modelo de verdad** y enseña ese sprite. Lo que se ve con la vista quieta es,
-  píxel a píxel, lo que se verá en la partida —sombra y contorno incluidos—, así
-  que no hay sorpresas al construirlo. Debajo están además las **tres etapas de
-  obra horneadas** a tamaño de partida: cimientos, en obra y terminado. Las de
-  en medio salen solas, no hay que modelarlas.
-- En **Edificio** está la ficha de lo que pone el juego —huella, edad, coste,
-  resistencia y qué hace—, para tenerla delante mientras se modela. Ahí no se
-  toca nada de eso: sus números se retocan en el **catálogo**. Lo que hay ahí es
-  **Restablecer** (devolverle su cara anterior) y **Empezar de nuevo** por otra
-  plantilla.
-- En **Colores** se le da color a cada material que use. El **color del
-  jugador** no se elige: lo pone quien construya el edificio, así que conviene
-  darle a alguna pieza (un estandarte, un paño) ese material.
-
-### En móvil y tablet
-
-El taller cabe en un teléfono sin renunciar a nada:
-
-- El taller va **de borde a borde**, sin tarjeta ni marco: deja el mismo hueco
-  por los cuatro lados —una sola ficha, `--marco`— y llega hasta el canto de
-  abajo. Arriba sí respeta la zona segura, que es donde está el reloj.
-- Las **esquinas de abajo copian las del teléfono**. No hay forma de
-  preguntarle al navegador cuánto redondea la pantalla, así que se reconoce el
-  modelo por lo que mide —del SE, con los cantos rectos, al 16 Pro Max— y la
-  curva sale concéntrica con la suya: el radio de la pantalla menos el marco.
-  Un modelo que no esté en la lista se lleva un valor intermedio, que un canto
-  de más o de menos no rompe nada.
-- **Los mandos, arriba; el modelo, abajo.** Bajo la cabecera van las pestañas
-  —Pieza, que abre su hoja, y Edificio—, el panel y las
-  herramientas, y el modelo se lleva de una pieza todo lo que queda. Al pie del
-  propio lienzo va la barra de la pieza elegida, cuando hay una. De los paneles sólo se ve uno a la vez, y
-  se **pliegan** con el botón de la esquina o tocando otra vez la pestaña que
-  ya está puesta: entonces el modelo pasa del 43 % de la pantalla al 89 %. En
-  apaisado la tira de pestañas se pone de pie a la derecha.
-- **Un dedo** elige la pieza que toca y, arrastrando, mueve la vista; para
-  colocarla están las flechas de su barra. **Dos dedos** acercan, alejan y
-  mueven la vista.
-- Los toques tienen **margen**: si no aciertas de lleno en una pieza se coge la
-  que tengas más cerca, que un dedo tapa más de lo que apunta. El margen es de
-  toda su silueta, no sólo de su punto de anclaje, y dentro de él **manda la
-  pieza que ya estuviera elegida**: fallar por unos píxeles junto a la que
-  estás colocando no la suelta ni salta a la de al lado. Para cambiar de pieza
-  se toca encima, que un acierto de lleno siempre gana; y para soltarla, en el
-  suelo, lejos de todo.
-- Los números llevan botones de **menos y más** para afinar sin sacar el
-  teclado.
-
-Lo que se hace aquí se guarda **en ese navegador** y se ve al momento en la
-partida y en el catálogo, que además deja retocarle los colores a cualquier
-edificio. Un modelo puede llegar a 200 piezas.
-
-### El taller compartido
-
-Con un proyecto de **Supabase** detrás, los modelos dejan de ser de un navegador:
-se guardan en una tabla y **los ve todo el mundo**, en cualquier dispositivo.
-Rehaces el molino en el móvil y sale rehecho en el ordenador y en el juego de
-quien entre. En la cinta de arriba del taller se ve en qué anda («al día», «sin
-enviar», «sin conexión»).
-
-Sigue habiendo copia en el navegador, así que el juego arranca al instante y se
-puede modelar sin cobertura: lo que hagas se guarda aquí y sale en cuanto haya
-conexión. Los modelos que trae el código (`builtin-designs.js`) son el suelo:
-por debajo de lo que diga la nube, y por encima el aspecto original.
-
-Se configura en dos pasos, y están explicados en
-[`supabase/README.md`](supabase/README.md): aplicar las migraciones de
-`supabase/migrations/` —una tabla para los modelos y otra para las piezas— (si
-el proyecto está conectado a este repositorio, se aplican solas) y poner la dirección del proyecto y la clave *anon public* en
-`js/data/cloud-config.js`. **Con esos dos valores en blanco el juego funciona
-exactamente como siempre**, guardando sólo en el navegador.
-
-Tal y como está montado, cualquiera que abra el juego puede rehacer o
-restablecer cualquier edificio: no hay cuentas ni clave de edición. La tabla sí
-impide que entre basura (edificio conocido, tope de piezas y de tamaño), y el
-juego valida pieza a pieza al leer.
-
-### Compartir el modelo de un edificio
-
-Un modelo es sólo datos, así que cabe en una línea de texto y viaja por donde
-sea:
-
-- **Compartir** saca el modelo del edificio que tengas puesto como texto, con
-  botones para copiarlo al portapapeles o descargarlo como fichero.
-- **Importar** hace lo contrario: se pega el texto y ese modelo pasa a ser la
-  cara del edificio que tengas puesto, se hiciera para el que se hiciera —se
-  ajusta solo a su huella—. Así el mismo modelo sirve para vestir el molino o el
-  cuartel, y es también la forma de llevarse una cara de un edificio a otro.
-  Pasa por el mismo validador que todo lo demás, de modo que un texto raro se
-  queda en un edificio soso y nunca en una partida rota.
-
-Y para que un modelo deje de ser de un navegador y **le llegue a todo el
-mundo**, su texto se pega en `js/data/builtin-designs.js`. Los de ese fichero
-viajan con el código: se aplican al arrancar en cualquier dispositivo, sin que
-nadie importe nada. Hay como mucho uno por edificio, y si quien juega le hace el
-suyo a ese mismo edificio, el suyo manda mientras lo tenga.
-
-La **casa** del juego es justo eso: su modelo sale del taller, con la ficha de
-siempre (25 de madera, +5 de población, dos casillas).
-
-Detalles a tener en cuenta:
-
-- Al guardar en el taller manda el modelo sobre los colores de **ese** edificio:
-  se retiran los retoques de aspecto que el catálogo tuviera puestos encima (sus
-  números, y los del resto del juego, no se tocan).
-- En **multijugador manda quien invita**: las caras de sus edificios viajan a los
-  demás al empezar la partida y todos ven lo mismo en el mapa —también las que
-  trae el juego, por si los dos lados no van con la misma versión—. Las propias
-  vuelven al recargar la página, y nada de lo adoptado se sube a la nube.
-- La nube se consulta **con el menú delante**, al arrancar y al abrir el taller,
-  nunca a mitad de partida: un edificio no puede cambiar de dibujo de un
-  fotograma al siguiente.
 
 ## Cómo se juega
 
@@ -635,11 +190,8 @@ Arrastrar mueve la cámara y pellizcar acerca o aleja.
   de dificultad.
 - Niebla de guerra, minimapa, puntos de reunión, colas de producción, mercado de
   recursos, control de velocidad (1x a 3x) y estadísticas finales.
-- **Catálogo** para consultar y editar todo el juego: sus valores y también el
-  aspecto de cada objeto, con vista previa en vivo.
-- **Taller de edificios**: modelado 3D dentro del juego para rehacerle la cara a
-  cualquier edificio del juego, sin tocar lo que cuesta ni lo que hace. Con un
-  proyecto de Supabase detrás, lo que se hace ahí lo ve todo el mundo.
+- **Catálogo** para consultar y editar todo el juego: sus valores y los colores
+  del terreno, con vista previa en vivo.
 
 ## Estructura del código
 
@@ -653,18 +205,8 @@ js/entities.js      Jugadores, unidades, edificios y proyectiles
 js/map.js           Generación del mapa y de los recursos
 js/path.js          Búsqueda de caminos A* sobre la rejilla
 js/render.js        Renderizador isométrico y niebla de guerra
-js/sprites.js       Sprites: terreno a mano y horneado/caché de los renders 3D
-js/studio.js        Taller de edificios: editor 3D dentro del juego
-js/gfx3d/engine.js  Rasterizador 3D por software: proyección dimétrica, z-buffer,
-                    luz, sombras y horneado a sprite
-js/gfx3d/units.js   Modelos 3D de las unidades, con posturas y 8 orientaciones
-js/gfx3d/buildings.js Modelos 3D de los edificios y sus etapas de obra
-js/gfx3d/nodes.js   Modelos 3D de árboles, minas, bayas y animales
-js/gfx3d/parts.js   Piezas del taller: el modelo de un edificio hecho de datos
-js/gfx3d/GUIDE.md   Guía del sistema de arte: coordenadas, primitivas y flujo
-tools/viewer.html   Visor de modelos: cada tipo a cualquier zoom, con todas sus
-                    vistas y superposición de imágenes de referencia
-tools/snapshot-models.mjs  Captura los modelos a PNG (necesita Playwright)
+js/sprites.js       Sprites: carga de los atlas, terreno a mano e iconos
+assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
 tools/icon.html     Dibujo del icono de la aplicación: el castillo al atardecer
 tools/make-icons.mjs  Saca de él los PNG de icons/ (necesita Playwright)
 icons/, manifest.webmanifest  Icono y nombre del juego instalado en el móvil
@@ -672,14 +214,7 @@ js/ai.js            IA de los rivales
 js/ui.js            HUD, panel de órdenes, ratón, teclado y táctil
 js/audio.js         Efectos de sonido sintetizados con WebAudio
 js/catalog.js       Catálogo: fichas y edición de los datos del juego
-js/data/appearance.js Colores y tamaño con los que se dibuja cada objeto
 js/data/overrides.js  Valores editados: validación, guardado y aplicación
-js/data/pieces.js    Piezas propias: almacén, validación y nube
-js/data/designs.js  Modelos del taller: validación, guardado y aplicación
-js/data/builtin-designs.js  Modelos de edificio que vienen con el juego
-js/data/cloud.js    El taller compartido: los modelos, contra la API de Supabase
-js/data/cloud-config.js  A qué proyecto de Supabase se conecta (o a ninguno)
-supabase/migrations/  Las tablas de modelos y piezas, y sus permisos
 js/lobby-ui.js      Pantalla de la sala de espera
 js/net/lobby.js     Cliente de la sala y conexión WebRTC entre navegadores
 js/net/protocol.js  Codificación binaria del estado y de las órdenes
@@ -698,8 +233,8 @@ Para depurar, el objeto de la partida está disponible en la consola como
   fichas de `:root` (`--papel`, `--tinta`, `--tinta-2`, `--tinta-3`, `--borde`,
   `--gold`, `--gold-l`), así que se repinta todo desde ahí. Cada letra llega a
   4,5:1 contra su fondo y el borde de los controles a 3:1, que es lo que hace
-  falta para que un tema claro se lea. El arte del juego —el mapa, los sprites
-  y el lienzo verde del taller— no es interfaz y no cambia.
+  falta para que un tema claro se lea. El arte del juego —el mapa y los
+  sprites— no es interfaz y no cambia.
 - `theme-color` en blanco tiñe las barras del navegador y, con ellas, la franja
   del reloj y la batería del teléfono. Es sólo el tinte del navegador: no toca
   la pantalla completa ni las zonas seguras, que tienen su propia historia en
@@ -707,13 +242,21 @@ Para depurar, el objeto de la partida está disponible en la consola como
 - El terreno se dibuja una sola vez en un lienzo fuera de pantalla y se compone
   con transformaciones; la niebla se calcula a un quinto de resolución y sólo se
   rehace cuando cambian la cámara o la visibilidad.
-- Los sprites se hornean una vez por combinación de tipo, color, orientación y
-  fotograma, y se guardan en caché. Las unidades miran en ocho direcciones pero
-  sólo se hornean cinco: las otras tres salen volteando el mapa de bits, igual
-  que hacía el original con sus SLP.
-- El horneado rasteriza a 2× con sobremuestreo, endurece el borde y oscurece el
-  perfil: interior suave, silueta a un bit. Al acercar la cámara se ven los
+- Los sprites vienen en atlas: una hoja de unidades y otra de edificios por
+  color de jugador, y una de recursos. `indice.json` dice, para cada clave
+  (`u|tipo|color|orientación|fotograma`, `b|tipo|color|etapa`,
+  `r|tipo|variante|agotado`), en qué hoja está, dónde y por qué punto se ancla,
+  en píxeles de mundo. Cada sprite se recorta de su hoja la primera vez que se
+  pide y se guarda en caché.
+- Las unidades miran en ocho direcciones pero sólo hay cinco en las hojas: las
+  otras tres salen volteando el mapa de bits, igual que hacía el original con
+  sus SLP. Cada una tiene seis fotogramas: cuatro de andar y dos de golpe.
+- Las hojas están a 2× la resolución del mundo. Al acercar la cámara se ven los
   píxeles del sprite, como al ampliar el clásico.
+- Las hojas actuales salieron de los antiguos modelos 3D por código, horneados
+  una vez (`d04eac8`) antes de retirarlos. Para cambiar un dibujo se sustituye
+  su trozo en la hoja, con el mismo tamaño y anclaje, o se reempaqueta la hoja y
+  se actualiza el índice.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
 - En multijugador el anfitrión manda hasta diez instantáneas por segundo en
@@ -726,5 +269,6 @@ Para depurar, el objeto de la partida está disponible en la consola como
 ## Aviso legal
 
 Proyecto original de aficionados, sin relación alguna con Microsoft ni con
-Ensemble Studios. No contiene ningún recurso de *Age of Empires*: todo el
-contenido audiovisual se genera por código dentro de este repositorio.
+Ensemble Studios. No contiene ningún recurso de *Age of Empires*: los sprites
+son propios del proyecto y el resto del contenido audiovisual se genera por
+código dentro de este repositorio.

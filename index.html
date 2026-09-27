@@ -43,13 +43,6 @@
         <span class="hoja-texto">Catálogo del juego</span>
         <svg class="hoja-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6" /></svg>
       </button>
-      <button id="btn-studio" class="hoja-fila">
-        <span class="hoja-insignia" style="--insignia: #3478f6">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 21V5h2.5v2h2V5h3v2h2V5H18v16 M6 11h12 M4 21h16 M10.5 21v-4a1.5 1.5 0 0 1 3 0v4" /></svg>
-        </span>
-        <span class="hoja-texto">Taller de edificios</span>
-        <svg class="hoja-chevron" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6" /></svg>
-      </button>
       <button id="btn-fullscreen-menu" class="hoja-fila fs-toggle" title="Pantalla completa [F11]" aria-pressed="false">
         <span class="hoja-insignia" style="--insignia: #8e8e93">
           <svg class="fs-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -62,7 +55,7 @@
       </button>
     </div>
 
-    <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios. Todo el arte se genera por código.</p>
+    <p class="legal">Juego original de fans, sin relación con Microsoft ni Ensemble Studios.</p>
   </div>
 </div>
 
@@ -165,141 +158,11 @@
     </div>
 
     <p class="catalog-foot">
-      Cambia los valores y el aspecto de cada objeto: la vista previa se rehace
-      al momento. Los cambios se guardan en este navegador y se aplican a las
+      Cambia los valores de cada objeto y los colores del terreno: la vista
+      previa se rehace al momento. Los cambios se guardan en este navegador y se aplican a las
       partidas nuevas. En multijugador manda quien invita: sus valores se usan
       en los dos lados.
     </p>
-  </div>
-</div>
-
-<!-- ---------- Taller de edificios ---------- -->
-<div id="studio" class="overlay hidden">
-  <div class="studio-card" id="studio-card" data-vista="elegir" data-sheet="on">
-    <header class="catalog-top">
-      <h2>Taller de edificios</h2>
-      <div class="catalog-top-right">
-        <!-- Sólo sale cuando hay un proyecto de Supabase detrás: dice si lo que
-             se ve aquí es ya lo que ve todo el mundo. -->
-        <span id="studio-cloud" class="studio-cloud hidden"></span>
-        <span id="studio-status" class="catalog-changes"></span>
-        <button id="btn-studio-close" class="primary">Volver al menú</button>
-      </div>
-    </header>
-
-    <!-- Lo primero al entrar: a qué edificio se le cambia la cara. Hasta que
-         no se elige uno no hay nada que modelar. -->
-    <div id="studio-pick" class="studio-pick">
-      <p class="studio-pick-hint">
-        Elige a qué edificio le cambias la cara. Aquí sólo cambia su aspecto:
-        lo que cuesta y lo que hace se retoca en el catálogo.
-      </p>
-      <div id="studio-pick-grid" class="studio-pick-grid"></div>
-
-      <!-- Y las piezas con las que se visten, que también se hacen aquí. -->
-      <h3 class="studio-pick-h">Piezas del taller</h3>
-      <p class="studio-pick-hint">
-        Piezas nuevas, hechas con las del juego. Cambiar una cambia todos los
-        edificios que la lleven, para todo el que juegue.
-      </p>
-      <div id="studio-pick-pieces" class="studio-pick-grid"></div>
-
-      <!-- Y el catálogo de las del juego, que es con lo que se componen. -->
-      <h3 class="studio-pick-h">Las que trae el juego</h3>
-      <p class="studio-pick-hint">
-        Éstas son código y no se cambian. Toca una para empezar una pieza del
-        taller con ella dentro.
-      </p>
-      <div id="studio-pick-base" class="piece-grid pick-base"></div>
-    </div>
-
-    <div class="studio-body">
-
-      <section class="studio-main">
-        <div id="studio-tools" class="studio-tools"></div>
-        <div class="studio-stage" id="studio-stage">
-          <canvas id="studio-view"></canvas>
-          <!-- Las dos barras de la pieza elegida: arriba lo que se le hace
-               —deshacer, añadir, duplicar, color, borrar— y abajo dónde se
-               pone —mover, subir y bajar, estirar y encoger—. -->
-          <div id="studio-topbar" class="studio-pad studio-pad-top hidden"></div>
-          <div id="studio-pad" class="studio-pad hidden"></div>
-        </div>
-        <!-- La vista previa horneada se pliega: cuando estorba, se aparta. -->
-        <div class="studio-bake">
-          <div class="studio-bake-head">
-            <button id="btn-studio-preview" class="studio-fold">▾ Vista previa</button>
-            <span id="studio-info" class="studio-bake-info"></span>
-          </div>
-          <div id="studio-shots" class="studio-shots"></div>
-        </div>
-      </section>
-
-      <aside class="studio-props">
-        <div id="studio-tabs" class="catalog-tabs">
-          <button data-tab="part">Pieza</button>
-          <button data-tab="build" class="active">Edificio</button>
-          <button id="btn-studio-sheet" class="studio-sheet-toggle" title="Plegar el panel y ver el modelo entero">⌄</button>
-        </div>
-        <div id="studio-panel" class="studio-panel"></div>
-      </aside>
-    </div>
-
-    <p class="catalog-foot">
-      Elige un edificio del juego y hazle otro modelo: coloca piezas sobre su
-      huella y ve el resultado horneado como saldrá en la partida. Aquí sólo
-      cambia su aspecto —lo que cuesta y lo que hace se retoca en el catálogo— y
-      siempre se puede restablecer. Con el taller compartido, lo que hagas aquí
-      lo ve todo el mundo, en cualquier dispositivo. En multijugador se ven los
-      edificios de quien invita.
-    </p>
-  </div>
-</div>
-
-<!-- ---------- Piezas del modelo ---------- -->
-<!-- Media pantalla: se ven las piezas y, encima, el modelo con la elegida
-     señalada, que es de lo que sirve tenerla a medias. -->
-<div id="part-sheet" class="sheet sheet-half hidden">
-  <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="part-sheet-title">
-    <div class="sheet-grab" aria-hidden="true"></div>
-    <header class="sheet-top">
-      <h3 id="part-sheet-title">Piezas del modelo</h3>
-      <button id="btn-part-sheet-close" class="sheet-close" aria-label="Cerrar">Cerrar</button>
-    </header>
-    <div id="part-sheet-body" class="sheet-body"></div>
-  </div>
-</div>
-
-<!-- ---------- Catálogo de piezas ---------- -->
-<!-- Sube desde abajo, al modo de las hojas de iOS: cada pieza con su dibujo,
-     que es lo que se mira para decidir cuál se coloca. -->
-<div id="piece-sheet" class="sheet hidden">
-  <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="piece-sheet-title">
-    <div class="sheet-grab" aria-hidden="true"></div>
-    <header class="sheet-top">
-      <h3 id="piece-sheet-title">Añadir una pieza</h3>
-      <button id="btn-piece-sheet-close" class="sheet-close" aria-label="Cerrar">Cerrar</button>
-    </header>
-    <div id="piece-sheet-grid" class="piece-grid"></div>
-  </div>
-</div>
-
-<!-- ---------- Compartir el modelo de un edificio ---------- -->
-<div id="studio-share" class="overlay overlay-hoja hidden">
-  <div class="hoja">
-    <header class="hoja-cabecera">
-      <button id="btn-share-close" class="hoja-circulo" title="Cerrar" aria-label="Cerrar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
-      <h2 id="share-title" class="hoja-titulo">Compartir edificio</h2>
-    </header>
-    <p id="share-hint" class="hoja-nota"></p>
-    <textarea id="share-text" class="share-text" spellcheck="false" autocomplete="off"></textarea>
-    <div class="hoja-grupo hoja-trio">
-      <button id="btn-share-copy">Copiar</button>
-      <button id="btn-share-file">Descargar</button>
-      <button id="btn-share-paste">Pegar</button>
-    </div>
-    <p id="share-note" class="share-note"></p>
-    <button id="btn-share-apply" class="hoja-boton">Ponérselo a este edificio</button>
   </div>
 </div>
 
@@ -408,7 +271,6 @@
       <tr><td>Mayús + clic</td><td>Añadir o quitar de la selección</td></tr>
       <tr><td>WASD / flechas / borde</td><td>Mover la cámara</td></tr>
       <tr><td>Rueda del ratón o pellizco</td><td>Acercar y alejar. Alejando del todo cabe el mapa entero en pantalla</td></tr>
-      <tr><td>Ctrl+Z / Ctrl+Mayús+Z</td><td>En el taller, deshacer y rehacer</td></tr>
       <tr><td>Ctrl + 0-9 / 0-9</td><td>Guardar y recuperar grupos de control</td></tr>
       <tr><td>.</td><td>Ir al siguiente aldeano en reposo (o pulsa su ficha en la barra)</td></tr>
       <tr><td>Espacio</td><td>Centrar la cámara en la selección</td></tr>
@@ -416,8 +278,7 @@
       <tr><td>P / Esc o el botón ☰</td><td>Pausa y menú: edad, tiempo, velocidad, pantalla completa, volumen y ayuda</td></tr>
       <tr><td>F11 o el menú</td><td>Pantalla completa (oculta los menús del navegador)</td></tr>
       <tr><td>Multijugador</td><td>En Comenzar partida, modo «Con otra persona»: entra en la sala, elige a alguien e invítalo</td></tr>
-      <tr><td>Catálogo</td><td>Desde el menú principal: consulta y edita los valores y el aspecto de todo el juego</td></tr>
-      <tr><td>Taller de edificios</td><td>Desde el menú principal: primero eliges el edificio de la parrilla y luego le modelas otra cara con piezas y constrúyelos en la partida como uno más. Con el ratón, arrastra para mover y Mayús para subir y bajar; con el dedo, uno arrastra la pieza y dos acercan y mueven la vista. Al elegir una pieza salen sus dos barras: abajo la mueve, la sube y la baja, y la estira o la encoge de ancho, largo y alto; arriba, deshacer y rehacer, añadir y duplicar, y el color de la pieza y borrarla. Sin pieza elegida no hay barras. Al elegir un edificio se llega con todo plegado, sólo el modelo; cualquier pestaña saca las herramientas y el panel, y el botón de la esquina los vuelve a plegar. Las piezas del modelo se eligen en una hoja a media pantalla, para seguir viéndolo; las que se añaden, en otra que sube con el catálogo entero dibujado, partido en básicas —las de un solo cuerpo, con las que se hace todo lo demás— y compuestas, que ya traen varias en una. Algunas piezas no son un cuerpo sino varios —las almenas son un antepecho y sus merlones, la escalinata sus peldaños, la cerca postes y travesaños—: en su ficha sale «Descomponer en piezas sueltas», que las deshace en las que la forman para poder moverlas una a una. Se ve igual que antes y deshacer lo devuelve. Los controles de vista van en menús desplegables. En la pestaña Edificio están Compartir e Importar, con los que un edificio se copia como texto y se lleva a otro dispositivo o a otra persona, y Restablecer. En Guía se pone una imagen de referencia debajo del modelo para calcarla. Debajo de la parrilla de edificios están las piezas del taller: piezas nuevas que se componen con las del juego y se dan de alta en el catálogo, así que luego se ponen en cualquier edificio como una más. Debajo de ellas está el catálogo de las que trae el juego, que son código y no se cambian; tocar una empieza una pieza del taller con ella dentro, que es por donde se empieza casi siempre. Quedan enlazadas —rehacer una cambia de golpe todos los edificios que la lleven, y como todo se guarda en la nube, lo ve todo el que juegue—, y por eso al borrar una se avisa de cuántos edificios se quedan sin ella. Una pieza propia no lleva dentro otra pieza propia, y si un edificio menciona una pieza que todavía no ha llegado a este aparato, la guarda igual y vuelve a verse cuando llegue</td></tr>
+      <tr><td>Catálogo</td><td>Desde el menú principal: consulta y edita los valores de todo el juego y los colores del terreno</td></tr>
       <tr><td>Mayús al construir</td><td>Colocar varios edificios seguidos</td></tr>
       <tr><td>Toque en el mapa</td><td>Manda la selección y nada más: coge lo que toques, cambia de unidad o suelta lo que tuvieras al tocar el suelo. Un toque nunca da órdenes, así que fallar el dedo no manda a nadie a ninguna parte</td></tr>
       <tr><td>Mantener pulsado</td><td>El clic derecho del dedo: por aquí van todas las órdenes —moverse, recolectar, atacar, descargar en el centro urbano o un campamento, y plantar el punto de reunión de un cuartel—, y ninguna toca lo que tengas seleccionado</td></tr>

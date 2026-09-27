@@ -15,8 +15,7 @@
      Android, para ver que el castillo cabe entero en la zona segura. -->
 <canvas id="icon"></canvas>
 <script type="module">
-import { bake } from '../js/gfx3d/engine.js';
-import { buildingMesh } from '../js/gfx3d/buildings.js';
+import { prepareSprites, buildingSprite } from '../js/sprites.js';
 
 const q = new URLSearchParams(location.search);
 const N = +(q.get('size') || 512);
@@ -44,9 +43,9 @@ function drawIcon(canvas, N) {
   ctx.fillStyle = sol;
   ctx.fillRect(0, 0, N, N * 0.58);
 
-  // El castillo del juego, terminado y con los colores del jugador rojo,
-  // horneado a más resolución de la que usa el mapa para que no se pixele.
-  const s = bake(buildingMesh('castle', 1, 2), { res: 8, pad: 1 });
+  // El castillo del juego, terminado y con los colores del jugador rojo, tal
+  // como está en su atlas de sprites.
+  const s = buildingSprite('castle', 1, 2);
   // Cabe en el 68 % central: el círculo de Android recorta hasta el 80 %.
   const escala = Math.min((N * 0.68) / s.canvas.width, (N * 0.66) / s.canvas.height);
   const w = s.canvas.width * escala, h = s.canvas.height * escala;
@@ -63,6 +62,7 @@ function drawIcon(canvas, N) {
   }
 }
 
+await prepareSprites([1]);
 drawIcon(document.getElementById('icon'), N);
 window.__iconPNG = document.getElementById('icon').toDataURL('image/png');
 window.__iconReady = true; // para tools/make-icons.mjs

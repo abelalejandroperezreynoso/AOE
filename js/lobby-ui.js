@@ -14,7 +14,6 @@
 
 import { Lobby, Peer } from './net/lobby.js';
 import { exportOverrides } from './data/overrides.js';
-import { shareableDesigns } from './data/designs.js';
 import { MAX_PLAYERS } from './config.js';
 
 const el = (id) => document.getElementById(id);
@@ -416,10 +415,7 @@ export class LobbyUI {
     }
     // La señal de arranque lleva a quién no se pudo esperar, para que todos
     // monten exactamente el mismo mundo.
-    // Las caras que el anfitrión les haya hecho a los edificios viajan aquí:
-    // sus invitados verán en el mapa los mismos edificios que él.
-    const designs = shareableDesigns();
-    for (const m of connected) m.peer.send(JSON.stringify({ t: 'start', absent, designs }));
+    for (const m of connected) m.peer.send(JSON.stringify({ t: 'start', absent }));
 
     this.finish({
       role: 'host',
@@ -668,7 +664,6 @@ export class LobbyUI {
       localPlayer: this.gameOpts.slot,
       absent: msg.absent || [],
       overrides: this.hostOverrides,
-      designs: msg.designs || [],
     });
   }
 

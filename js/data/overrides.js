@@ -7,7 +7,6 @@
 
 import { UNITS, BUILDINGS, RESOURCE_NODES, GATHER_RATE, RES_NAME } from '../config.js';
 import { TERRAIN_COLORS, clearSpriteCaches } from '../sprites.js';
-import { LOOK, LOOK_FIELDS } from './appearance.js';
 
 const STORAGE_KEY = 'aor-overrides-v1';
 
@@ -76,22 +75,10 @@ export const RATE_LABELS = {
   berries: 'Recoger bayas', farm: 'Cultivar granja', sheep: 'Ovejas', deer: 'Caza',
 };
 
-/**
- * El aspecto se guarda en sus propios cajones ("unitLook", ...) porque cambia
- * cómo se dibuja un objeto, no cómo se comporta: así se puede restablecer el
- * aspecto sin tocar los números, y al revés.
- */
-export const LOOK_KINDS = { unitLook: 'unit', buildingLook: 'building', nodeLook: 'node' };
+const FIELDS_BY_KIND = { unit: UNIT_FIELDS, building: BUILDING_FIELDS, node: NODE_FIELDS };
 
-const FIELDS_BY_KIND = {
-  unit: UNIT_FIELDS, building: BUILDING_FIELDS, node: NODE_FIELDS,
-  unitLook: LOOK_FIELDS.unit, buildingLook: LOOK_FIELDS.building, nodeLook: LOOK_FIELDS.node,
-};
-
-/** El objeto cuyos valores edita un cajón: la ficha del juego o su aspecto. */
+/** El objeto cuyos valores edita un cajón. */
 export function targetFor(kind, type) {
-  const sub = LOOK_KINDS[kind];
-  if (sub) return LOOK[sub][type];
   if (kind === 'unit') return UNITS[type];
   if (kind === 'building') return BUILDINGS[type];
   if (kind === 'node') return RESOURCE_NODES[type];
@@ -126,7 +113,6 @@ function setPath(obj, path, value) {
 /** Un juego de cajones vacío, uno por cada familia de datos editables. */
 const emptyBuckets = () => ({
   unit: {}, building: {}, node: {}, rate: {}, terrain: {},
-  unitLook: {}, buildingLook: {}, nodeLook: {},
 });
 
 /** Valores originales, para poder restablecer y saber qué está cambiado. */
@@ -150,43 +136,6 @@ function capture() {
   }
   for (const [key, value] of Object.entries(GATHER_RATE)) defaults.rate[key] = value;
   for (const [key, value] of Object.entries(TERRAIN_COLORS)) defaults.terrain[key] = value;
-  for (const [kind, sub] of Object.entries(LOOK_KINDS)) {
-    for (const [type, def] of Object.entries(LOOK[sub])) defaults[kind][type] = { ...def };
-  }
-}
-
-/**
- * Vuelve a tomar los colores de fábrica de un edificio. Hace falta cuando el
- * taller le cambia la cara: su modelo y su paleta pasan a ser otros, mientras
- * que lo que cuesta y lo que aguanta sigue siendo lo suyo y no se vuelve a
- * tomar (si no, unos valores ya retocados en el catálogo pasarían por ser los
- * de fábrica).
- */
-export function captureBuildingLook(type) {
-  capture();
-  const l = LOOK.building[type];
-  if (l) defaults.buildingLook[type] = { ...l };
-}
-
-/**
- * Los edificios a los que el taller les acaba de cambiar la cara: sus colores
- * de fábrica pasan a ser los del modelo nuevo y se retiran los retoques que el
- * catálogo tuviera puestos sobre ellos, que eran para la cara anterior. Sus
- * cifras no se tocan, ni las suyas ni las del resto del juego.
- *
- * De paso deja los sprites por rehacer, así que quien llame no tiene que
- * acordarse de vaciar la caché.
- */
-export function rebaseBuildingLooks(types) {
-  if (!types || !types.length) return;
-  capture();
-  for (const type of types) {
-    captureBuildingLook(type);
-    delete overrides.buildingLook[type];
-  }
-  restoreDefaults();
-  applyAll();
-  save();
 }
 
 export function defaultValue(kind, type, key) {
@@ -229,7 +178,6 @@ function sanitize(kind, type, key, value) {
   if (!def) return null;
   const field = fieldsFor(kind, def).find((f) => f.key === key);
   if (!field) return null;
-  if (field.type === 'color') return isHexColor(value) ? String(value).toLowerCase() : null;
   if (field.type === 'text') {
     const s = String(value).replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 120);
     return s || null;
@@ -264,12 +212,7 @@ function applyAll() {
   for (const [key, value] of Object.entries(overrides.terrain)) {
     if (TERRAIN_COLORS[key] !== undefined) TERRAIN_COLORS[key] = value;
   }
-  for (const [kind, sub] of Object.entries(LOOK_KINDS)) {
-    for (const [type, values] of Object.entries(overrides[kind])) {
-      if (!LOOK[sub][type]) continue;
-      for (const [key, value] of Object.entries(values)) LOOK[sub][type][key] = value;
-    }
-  }
+  // El terreno se hornea con sus colores: si cambian, hay que rehacerlo.
   clearSpriteCaches();
 }
 
@@ -285,11 +228,6 @@ function restoreDefaults() {
   for (const [type, values] of Object.entries(defaults.node)) RESOURCE_NODES[type].amount = values.amount;
   for (const [key, value] of Object.entries(defaults.rate)) GATHER_RATE[key] = value;
   for (const [key, value] of Object.entries(defaults.terrain)) TERRAIN_COLORS[key] = value;
-  for (const [kind, sub] of Object.entries(LOOK_KINDS)) {
-    for (const [type, values] of Object.entries(defaults[kind])) {
-      if (LOOK[sub][type]) Object.assign(LOOK[sub][type], values);
-    }
-  }
 }
 
 function save() {

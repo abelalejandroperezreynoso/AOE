@@ -27,10 +27,16 @@ Los mensajes de commit van en español, y dicen qué se ha comprobado.
 ## Convenciones
 
 - Textos de interfaz, nombres de variables y comentarios: en español.
-- Todo el arte se genera por código: no hay imágenes de dibujo a mano. Los
-  sprites se hornean desde los modelos de `js/gfx3d/`.
-- El README documenta el juego, la estructura del código y las notas técnicas;
-  `js/gfx3d/GUIDE.md`, el sistema de arte.
+- Las unidades, los edificios y los recursos son sprites: atlas PNG en
+  `assets/sprites/` con su `indice.json` (hoja, posición y anclaje de cada uno).
+  Hay una hoja de unidades y otra de edificios por color de jugador, y una de
+  recursos. Un sprite nuevo o cambiado tiene que respetar ese formato: cinco
+  orientaciones (las otras tres se voltean), seis fotogramas por unidad, tres
+  etapas por edificio y los ocho colores. El terreno, los iconos de
+  tecnologías y el sonido siguen generándose por código.
+- Los modelos 3D por código y el taller de edificios se retiraron. El último
+  árbol que los tiene es `d04eac8`, con la herramienta que horneó las hojas.
+- El README documenta el juego, la estructura del código y las notas técnicas.
 
 ## Verificación
 
@@ -87,5 +93,5 @@ No hay suite de pruebas.
 
 - **IDs y funciones en archivos grandes.** Un `getElementById` que apunta a un
   elemento que ya no está revienta con `TypeError` y aborta el resto de la
-  función sin aviso visible. Al tocar el HUD o el taller conviene comprobar que
+  función sin aviso visible. Al tocar el HUD o el catálogo conviene comprobar que
   los ids referenciados existan.

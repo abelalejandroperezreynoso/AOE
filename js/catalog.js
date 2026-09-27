@@ -5,13 +5,12 @@ import {
 } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
-  drawSprite,
+  drawSprite, prepareSprites,
 } from './sprites.js';
 import {
   fieldsFor, getPath, setValue, reset, isChanged, defaultValue, countChanges,
   TERRAIN_LABELS, NODE_LABELS, RATE_LABELS,
 } from './data/overrides.js';
-import { LOOK } from './data/appearance.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -76,10 +75,12 @@ export class Catalog {
     btn.classList.remove('confirming');
   }
 
-  open() {
+  async open() {
     this.cancelResetConfirm();
     el('main-menu').classList.add('hidden');
     el('catalog').classList.remove('hidden');
+    // Las miniaturas salen de las hojas del primer color y de los recursos.
+    try { await prepareSprites([0]); } catch (err) { console.error(err); }
     this.renderList();
     this.updateChangeCount();
   }
@@ -164,7 +165,6 @@ export class Catalog {
 
   hasChanges(key) {
     if (this.tab === 'terrain') return isChanged('terrain', key);
-    if (this.lookChanged(key)) return true;
     if (this.tab === 'node') {
       const def = RESOURCE_NODES[key];
       if (fieldsFor('node', def).some((f) => isChanged('node', key, f.key))) return true;
@@ -175,38 +175,31 @@ export class Catalog {
     return def ? fieldsFor(this.tab, def).some((f) => isChanged(this.tab, key, f.key)) : false;
   }
 
-  /** ¿Tiene el objeto algún color o tamaño cambiado? */
-  lookChanged(key) {
-    const def = LOOK[this.tab]?.[key];
-    if (!def) return false;
-    const kind = `${this.tab}Look`;
-    return fieldsFor(kind, def).some((f) => isChanged(kind, key, f.key));
-  }
-
   // --- Vistas previas --------------------------------------------------------
 
   /**
-   * `real` dibuja a escala fija, de modo que una unidad a la que se le ha
-   * subido el tamaño se ve más grande. Las miniaturas de la lista, en cambio,
-   * encajan siempre en su hueco: allí interesa reconocer el objeto, no
-   * compararlo.
+   * `real` dibuja a escala fija, de modo que se comparan los tamaños de verdad.
+   * Las miniaturas de la lista, en cambio, encajan siempre en su hueco: allí
+   * interesa reconocer el objeto, no compararlo.
    */
   preview(key, size, real = false) {
     const c = makeCanvas(size, size);
     const ctx = c.getContext('2d');
-    // Deja sitio para el tamaño máximo que se puede elegir en el catálogo.
-    const MAX = 1.6;
+    const MAX = 1.2; // un poco de margen alrededor
     if (this.tab === 'unit') {
       const s = unitSprite(key, 0, 1, 0, false);
+      if (!s) return c;
       const sc = real ? size / (60 * MAX) : Math.min(size / (s.w - 4), size / (s.h - 4)) * 1.05;
       drawSprite(ctx, s, size / 2, size - 6, sc);
     } else if (this.tab === 'building') {
       const s = buildingSprite(key, 0, 2);
+      if (!s) return c;
       const sc = Math.min((size - 4) / s.w, (size - 4) / s.h);
       // Encuadrado por la caja del sprite, no por su anclaje.
       drawSprite(ctx, s, size / 2 - (s.w / 2 - s.ox) * sc, size - 2 - (s.h - s.oy) * sc, sc);
     } else if (this.tab === 'node') {
       const s = resourceSprite(key, 0);
+      if (!s) return c;
       const sc = real ? size / (96 * MAX) : Math.min(size / s.w, size / s.h) * 1.15;
       drawSprite(ctx, s, size / 2, size - 8, sc);
     } else {
@@ -248,7 +241,6 @@ export class Catalog {
       const def = RESOURCE_NODES[key];
       title.textContent = NODE_LABELS[key] || key;
       sub.textContent = `Da ${RES_NAME[def.res]}. ${def.blocking ? 'Bloquea el paso.' : 'No bloquea el paso.'}`;
-      box.appendChild(this.lookForm(key));
       box.appendChild(this.nodeForm(key, def));
     } else {
       const def = this.tab === 'unit' ? UNITS[key] : BUILDINGS[key];
@@ -257,7 +249,6 @@ export class Catalog {
         ? `${CLASS_NAMES[def.class] || def.class} · disponible en la ${AGES[def.age].name}`
         : `Disponible en la ${AGES[def.age].name}`;
       box.appendChild(this.extraInfo(def));
-      box.appendChild(this.lookForm(key));
       box.appendChild(this.form(this.tab, key, def));
     }
 
@@ -275,7 +266,6 @@ export class Catalog {
       } else {
         reset(this.tab, key);
       }
-      if (LOOK[this.tab]?.[key]) reset(`${this.tab}Look`, key);
       this.renderList();
       this.updateChangeCount();
     };
@@ -304,20 +294,6 @@ export class Catalog {
     if (def.req) add('Necesita', BUILDINGS[def.req].name);
     if (def.pierce) add('Tipo de daño', 'Proyectil');
     return wrap;
-  }
-
-  /**
-   * Sección "Aspecto": los colores con los que se dibuja el objeto y, cuando
-   * tiene sentido, su tamaño. Sólo salen los campos que ese objeto usa de
-   * verdad, así no se pregunta por la montura de un lancero.
-   */
-  lookForm(key) {
-    const def = LOOK[this.tab]?.[key];
-    if (!def) return document.createDocumentFragment();
-    const kind = `${this.tab}Look`;
-    const fields = fieldsFor(kind, def);
-    if (!fields.length) return document.createDocumentFragment();
-    return this.group('Aspecto', fields.map((f) => this.field(kind, key, def, f)));
   }
 
   /**

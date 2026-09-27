@@ -18,9 +18,8 @@ const unitIdx = new Map(UNIT_TYPES.map((t, i) => [t, i]));
 const resIdx = new Map(RES_LIST.map((t, i) => [t, i]));
 
 /*
- * La tabla de edificios es fija: el taller re-viste los que hay, no da de alta
- * ninguno nuevo, así que los dos lados ejecutan el mismo código y llegan a la
- * misma lista en el mismo orden.
+ * La tabla de edificios es fija: los dos lados ejecutan el mismo código y
+ * llegan a la misma lista en el mismo orden.
  */
 export const BUILD_TYPES = Object.keys(BUILDINGS);
 const buildIdx = new Map(BUILD_TYPES.map((t, i) => [t, i]));

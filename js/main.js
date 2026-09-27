@@ -8,36 +8,15 @@ import { Audio } from './audio.js';
 import { LobbyUI } from './lobby-ui.js';
 import { NetSession } from './net/session.js';
 import { Catalog } from './catalog.js';
-import { Studio } from './studio.js';
-import { loadOverrides, adoptOverrides, rebaseBuildingLooks } from './data/overrides.js';
-import { loadDesigns, adoptDesigns, syncDesigns } from './data/designs.js';
-import { loadPieces, syncPieces } from './data/pieces.js';
-import { clearSpriteCaches } from './sprites.js';
+import { loadOverrides, adoptOverrides } from './data/overrides.js';
+import { prepareSprites } from './sprites.js';
 
 const el = (id) => document.getElementById(id);
 
-// Primero las piezas que se hayan hecho en el taller: un edificio puede llevar
-// alguna puesta, y sin darlas de alta antes el validador de modelos la tiraría
-// por no existir. Después las caras de los edificios, porque fijan los colores
-// de partida de los que vista; encima de eso, los valores y los retoques del
-// catálogo.
-loadPieces();
-loadDesigns();
+// Los valores y los retoques del catálogo, antes de que nadie lea los datos.
 loadOverrides();
 
-/*
- * Y, si hay taller compartido, se pregunta qué hay en la nube. Va aparte y sin
- * esperarla: el menú sale con lo que había guardado aquí —al instante y aunque
- * no haya cobertura— y los edificios que hayan cambiado se repintan en cuanto
- * llega la respuesta. Se hace sólo aquí, con el menú delante: cambiar los
- * modelos a mitad de partida dejaría edificios que se dibujan de otra forma de
- * un fotograma al siguiente.
- */
-// Las piezas van delante también aquí: si en la nube hay una nueva y un modelo
-// que la lleva, el modelo tiene que leerse con la pieza ya de alta.
-syncPieces().then(() => syncDesigns()).then((r) => rebaseBuildingLooks(r.changed));
 const catalog = new Catalog();
-const studio = new Studio();
 
 const audio = new Audio();
 let game = null, renderer = null, ui = null, raf = 0;
@@ -53,9 +32,12 @@ function startGame(opts, net = null) {
   el('loading-text').textContent = net ? 'Sincronizando la partida...' : 'Generando el mundo...';
 
   // Un fotograma de respiro para que se vea la pantalla de carga.
-  requestAnimationFrame(() => setTimeout(() => {
+  requestAnimationFrame(() => setTimeout(async () => {
     try {
       game = new Game(opts);
+      // Las hojas de sprites de los colores que juegan: sin ellas no hay qué
+      // dibujar, así que se espera aquí, con la pantalla de carga delante.
+      await prepareSprites(game.players.map((p) => p.colorIdx));
       if (net) {
         const session = new NetSession(game, net.role, net.links);
         // Si el invitado pierde al anfitrión no hay ni ganador ni perdedor: la
@@ -102,13 +84,8 @@ function startGame(opts, net = null) {
 const lobbyUi = new LobbyUI((s) => {
   audio.ensure();
   // En multijugador mandan los valores del anfitrión: si un invitado tiene
-  // otros, se adoptan los del anfitrión mientras dure la partida. Lo mismo con
-  // los modelos del taller: se ven los suyos, y los propios vuelven al recargar
-  // la página.
-  if (s.role === 'guest') {
-    if (s.designs) { adoptDesigns(s.designs); clearSpriteCaches(); }
-    if (s.overrides) adoptOverrides(s.overrides);
-  }
+  // otros, se adoptan los del anfitrión mientras dure la partida.
+  if (s.role === 'guest' && s.overrides) adoptOverrides(s.overrides);
   startGame({
     playerCount: s.playerCount,
     difficulty: 'normal',
@@ -216,7 +193,6 @@ window.addEventListener('keydown', (e) => {
 });
 
 window.__lobbyUi = lobbyUi; // útil para depurar la conexión desde la consola
-window.__studio = studio;   // y el taller, para trastear con un diseño a mano
 
 // Si se cierra la pestaña estando en la sala, se avisa para no dejar un
 // jugador fantasma en la lista de los demás.
