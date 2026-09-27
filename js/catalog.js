@@ -16,6 +16,42 @@ import { marcaDeslizador } from './utils.js';
 
 const el = (id) => document.getElementById(id);
 
+/*
+ * Caja de lo sólido de un sprite, en píxeles de mundo desde su ancla: los
+ * píxeles casi opacos, sin la sombra translúcida. El ancla de un sprite son
+ * los pies (o la esquina de la huella), que es lo que necesita el mapa, pero
+ * el dibujo no está centrado en ella: la sombra se va a un lado, la zancada
+ * adelanta una pierna, el caballo y el ariete son largos. Las vistas del
+ * catálogo se centran por esta caja.
+ */
+const cajas = new WeakMap();
+function cajaSolida(s) {
+  let k = cajas.get(s);
+  if (k) return k;
+  const c = s.canvas, W = c.width, H = c.height, f = W / s.w;
+  const d = c.getContext('2d').getImageData(0, 0, W, H).data;
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      if (d[(y * W + x) * 4 + 3] > 200) {
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) { x0 = 0; y0 = 0; x1 = W - 1; y1 = H - 1; }
+  k = { x0: x0 / f - s.ox, x1: (x1 + 1) / f - s.ox, y0: y0 / f - s.oy, y1: (y1 + 1) / f - s.oy };
+  cajas.set(s, k);
+  return k;
+}
+const unir = (a, b) => (a ? {
+  x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1),
+} : b);
+/** Pinta un sprite con el centro de `caja` en (cx, cy). */
+function centrado(ctx, s, caja, cx, cy, sc) {
+  drawSprite(ctx, s, cx - ((caja.x0 + caja.x1) / 2) * sc, cy - ((caja.y0 + caja.y1) / 2) * sc, sc);
+}
+
 const CLASS_NAMES = {
   civilian: 'Civil', infantry: 'Infantería', archer: 'A distancia',
   cavalry: 'Caballería', siege: 'Asedio',
@@ -209,25 +245,18 @@ export class Catalog {
     const c = makeCanvas(size, size);
     const ctx = c.getContext('2d');
     const MAX = 1.2; // un poco de margen alrededor
-    if (this.tab === 'unit') {
-      const s = unitSprite(key, 0, 1, unitAnim(key).quieto);
+    if (this.tab !== 'terrain') {
+      const s = this.tab === 'unit' ? unitSprite(key, 0, 1, unitAnim(key).quieto)
+        : this.tab === 'building' ? buildingSprite(key, 0, 2) : resourceSprite(key, 0);
       if (!s) return c;
-      // A escala común para comparar tamaños, salvo que no quepa (el caballero).
-      const fit = Math.min(size / (s.w - 4), size / (s.h - 4)) * 1.05;
-      const sc = real ? Math.min(size / (60 * MAX), (size - 8) / s.h) : fit;
-      // Por los pies, dejando sitio a lo que asoma por debajo (patas, sombra).
-      drawSprite(ctx, s, size / 2, size - 4 - (s.h - s.oy) * sc, sc);
-    } else if (this.tab === 'building') {
-      const s = buildingSprite(key, 0, 2);
-      if (!s) return c;
-      const sc = Math.min((size - 4) / s.w, (size - 4) / s.h);
-      // Encuadrado por la caja del sprite, no por su anclaje.
-      drawSprite(ctx, s, size / 2 - (s.w / 2 - s.ox) * sc, size - 2 - (s.h - s.oy) * sc, sc);
-    } else if (this.tab === 'node') {
-      const s = resourceSprite(key, 0);
-      if (!s) return c;
-      const sc = real ? size / (96 * MAX) : Math.min(size / s.w, size / s.h) * 1.15;
-      drawSprite(ctx, s, size / 2, size - 8, sc);
+      // Centrado por lo que se ve, no por el ancla (ver `cajaSolida`).
+      const k = cajaSolida(s);
+      const fit = Math.min((size - 8) / (k.x1 - k.x0), (size - 8) / (k.y1 - k.y0));
+      // La grande de las unidades y los recursos va a escala común, para
+      // comparar tamaños, salvo que no quepa (el caballero).
+      const comun = this.tab === 'unit' ? size / (60 * MAX) : this.tab === 'node' ? size / (96 * MAX) : fit;
+      const sc = real ? Math.min(comun, fit) : fit;
+      centrado(ctx, s, k, size / 2, size / 2, sc);
     } else {
       // Terreno: un rombo con la misma textura que usa el mapa.
       ctx.save();
@@ -383,41 +412,39 @@ export class Catalog {
     const dpr = Math.min(3, window.devicePixelRatio || 1);
     const sprite = (face, f) => unitSprite(key, 0, face, f);
     /** Medidas que caben todas las poses, desde los pies, en píxeles de mundo. */
-    const medidas = () => {
-      let lado = 1, arriba = 1, abajo = 1;
-      for (const m of modos) {
-        for (const f of m.frames) {
-          for (const face of [0, 1, 5, 6, 7]) {
-            const s = sprite(face, f);
-            if (!s) continue;
-            lado = Math.max(lado, s.ox, s.w - s.ox);
-            arriba = Math.max(arriba, s.oy);
-            abajo = Math.max(abajo, s.h - s.oy);
-          }
-        }
-      }
-      return { lado, arriba, abajo };
-    };
-    const M = medidas();
+    /*
+     * Una caja por dirección, la de todos sus fotogramas juntos: centrar cada
+     * fotograma por la suya haría bailar la figura al andar. La escala sí es
+     * la misma para todas, la que hace caber la mayor.
+     */
+    const cajaDe = new Map();
+    let anchoMax = 1, altoMax = 1;
+    for (let face = 0; face < 8; face++) {
+      let k = null;
+      for (const m of modos) for (const f of m.frames) { const s = sprite(face, f); if (s) k = unir(k, cajaSolida(s)); }
+      if (!k) continue;
+      cajaDe.set(face, k);
+      anchoMax = Math.max(anchoMax, k.x1 - k.x0);
+      altoMax = Math.max(altoMax, k.y1 - k.y0);
+    }
     /** Prepara un lienzo de w×h CSS y la escala entera que le toca. */
     const prepara = (c, w, hh) => {
       c.width = Math.round(w * dpr); c.height = Math.round(hh * dpr);
       c.style.width = `${w}px`; c.style.height = `${hh}px`;
-      const fit = Math.min(w / (2 * M.lado), hh / (M.arriba + M.abajo));
+      const fit = Math.min((w - 6) / anchoMax, (hh - 6) / altoMax);
       // Un píxel del sprite (medio de mundo) en un número entero de píxeles de
       // pantalla, para que se vea nítido.
       const k = Math.max(1, Math.floor(fit * dpr / 2));
-      const esc = (k * 2) / dpr;
-      c._esc = esc;
-      c._x = w / 2;
-      c._y = M.arriba * esc + (hh - (M.arriba + M.abajo) * esc) / 2;
+      c._esc = (k * 2) / dpr;
+      c._w = w; c._h = hh;
     };
     const pinta = (c, face, f) => {
       const ctx = c.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, c.width, c.height);
       ctx.imageSmoothingEnabled = false;
-      drawSprite(ctx, sprite(face, f), c._x, c._y, c._esc);
+      const s = sprite(face, f), k = cajaDe.get(face);
+      if (s && k) centrado(ctx, s, k, c._w / 2, c._h / 2, c._esc);
     };
     for (const { canvas } of celdas) prepara(canvas, 96, 104);
 
