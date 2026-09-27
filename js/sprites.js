@@ -495,7 +495,8 @@ export function resourceSprite(kind, variant = 0, depleted = false) {
   const key = `${kind}|${variant}|${depleted ? 1 : 0}`;
   let s = resCache.get(key);
   if (s) return s;
-  s = slice(`r|${key}`);
+  // Lo agotado sólo se horneó para la variante 0: las demás usan esa.
+  s = slice(`r|${key}`) || (depleted && variant ? slice(`r|${kind}|0|1`) : null);
   if (s) resCache.set(key, s);
   return s;
 }

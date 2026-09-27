@@ -216,6 +216,7 @@ assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
 tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
 tools/importar-edificio.mjs  Mete en los atlas el dibujo de un edificio terminado
 tools/importar-terreno.mjs  Mete en los atlas losetas de terreno dibujadas
+tools/importar-arbol.mjs  Mete en los atlas el dibujo del árbol
 tools/dibujar-jinete.html  Dibuja por código al explorador (caballo y jinete)
 tools/dibujar-jinete.mjs   Escribe sus hojas de sprites
 assets/fuentes/     Las hojas dibujadas tal como llegaron, para reimportarlas
@@ -306,6 +307,11 @@ Para depurar, el objeto de la partida está disponible en la consola como
   la misma hierba algo más apagada; la frondosa lleva tréboles, flores y matas.
   El resto de terrenos sigue pintándose por código, y el color de la hierba ya
   no se edita en el catálogo.
+- El árbol viene de `assets/fuentes/arbol.jpg` con `tools/importar-arbol.mjs`:
+  se queda con la copa, el tronco y las raíces (lo unido al tronco), sin la
+  loseta en la que está plantado ni el fondo, anclado al pie del tronco y con
+  74 px de mundo de alto. Salen cuatro variantes (volteado, de otro tamaño y
+  otro verde) y, de cada una, la casi talada, más pequeña y apagada.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
 - En multijugador el anfitrión manda hasta diez instantáneas por segundo en
