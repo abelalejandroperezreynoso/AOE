@@ -214,6 +214,7 @@ js/render.js        Renderizador isométrico y niebla de guerra
 js/sprites.js       Sprites: carga de los atlas, terreno a mano e iconos
 assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
 tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
+tools/importar-edificio.mjs  Mete en los atlas el dibujo de un edificio terminado
 assets/fuentes/     Las hojas dibujadas tal como llegaron, para reimportarlas
 tools/icon.html     Dibujo del icono de la aplicación: el castillo al atardecer
 tools/make-icons.mjs  Saca de él los PNG de icons/ (necesita Playwright)
@@ -277,6 +278,15 @@ Para depurar, el objeto de la partida está disponible en la consola como
   `assets/fuentes/aldeano-andar.png`, con `--quieto 4 --andar 0,1,2,3,4`: el
   sexto fotograma de esa hoja es casi igual que el primero (difieren en un
   11 %) y, dejándolo, el aldeano se paraba un instante en cada zancada.
+- Un edificio dibujado entra con `tools/importar-edificio.mjs <tipo>
+  <dibujo.png>`: busca la base (desde la esquina de abajo el contorno sube en
+  pendiente 2:1 hasta donde las paredes se vuelven verticales), la escala a la
+  huella que ocupa en el mapa y la ancla por su esquina de arriba. Le pone
+  debajo una sombra suave y en lo más alto un banderín con el color de cada
+  jugador, y escribe `<tipo>-<color>.png`. Sólo cambia la etapa terminada:
+  los cimientos y la obra siguen con los de antes. Las barras de vida y de
+  producción se colocan encima de lo más alto de cada dibujo. Así entró el
+  centro urbano, desde `assets/fuentes/centro-urbano.png`.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
 - En multijugador el anfitrión manda hasta diez instantáneas por segundo en

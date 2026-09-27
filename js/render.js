@@ -461,7 +461,7 @@ export class Renderer {
     const dmg = b.hp < b.maxHp - 0.5;
     if (!b.built || dmg || this.showHealthFor(b)) {
       const [cx, cy] = this.worldToCanvas(b.cx, b.cy);
-      const topY = cy - (b.size * TILE_H) / 2 - (b.type === 'castle' ? 90 : b.type === 'tower' ? 58 : 46);
+      const topY = this.buildingTop(b, stage, my) ?? cy - (b.size * TILE_H) / 2 - 46;
       this.healthBar(ctx, cx, topY, 26 + b.size * 8, b.hp / b.maxHp, b.owner);
       if (!b.built) {
         ctx.fillStyle = 'rgba(0,0,0,.55)';
@@ -474,7 +474,7 @@ export class Renderer {
     if (b.queue.length && b.owner === g.human.id) {
       const [cx, cy] = this.worldToCanvas(b.cx, b.cy);
       const item = b.queue[0];
-      const topY = cy - (b.size * TILE_H) / 2 - 34;
+      const topY = (this.buildingTop(b, stage, my) ?? cy - (b.size * TILE_H) / 2 - 46) + 12;
       ctx.fillStyle = 'rgba(0,0,0,.5)';
       ctx.fillRect(cx - 18, topY, 36, 3);
       ctx.fillStyle = item.blocked ? '#ff3b30' : '#34c759';
@@ -510,6 +510,16 @@ export class Renderer {
     if (u.hp < u.maxHp - 0.5 || this.showHealthFor(u)) {
       this.healthBar(ctx, mx, my - 44, 22, u.hp / u.maxHp, u.owner);
     }
+  }
+
+  /**
+   * Dónde van las barras de un edificio: justo encima de lo más alto de su
+   * dibujo, que cada sprite trae medido (su ancla está a `oy` de su borde de
+   * arriba). Así valen igual para un edificio bajo que para uno con torre.
+   */
+  buildingTop(b, stage, my) {
+    const s = buildingSprite(b.type, this.game.players[b.owner].colorIdx, stage);
+    return s ? my - s.oy - 10 : null;
   }
 
   /**
