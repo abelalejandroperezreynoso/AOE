@@ -131,18 +131,18 @@
 </div>
 
 <!-- ---------- Catálogo ---------- -->
-<div id="catalog" class="overlay hidden">
-  <div class="catalog-card">
-    <header class="catalog-top">
-      <h2>Catálogo del juego</h2>
-      <div class="catalog-top-right">
-        <span id="catalog-changes" class="catalog-changes"></span>
-        <button id="btn-catalog-reset-all" class="secondary">Restablecer todo</button>
-        <button id="btn-catalog-close" class="primary">Volver al menú</button>
-      </div>
+<!-- Hoja como las demás. En pantallas anchas la lista y la ficha van lado a
+     lado; en el teléfono, como en iOS, la lista ocupa la hoja y al tocar un
+     elemento se entra en su ficha (data-vista), con la flecha para volver. -->
+<div id="catalog" class="overlay overlay-hoja hidden">
+  <div class="hoja catalogo" id="catalog-card" data-vista="lista">
+    <header class="hoja-cabecera">
+      <button id="btn-catalog-close" class="hoja-circulo catalogo-cerrar" title="Volver al menú" aria-label="Volver al menú"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      <button id="btn-catalog-back" class="hoja-circulo catalogo-atras" title="Volver a la lista" aria-label="Volver a la lista"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" /></svg></button>
+      <h2 class="hoja-titulo">Catálogo del juego</h2>
     </header>
 
-    <div id="catalog-tabs" class="catalog-tabs">
+    <div id="catalog-tabs" class="hoja-segmentos catalogo-pestanas">
       <button data-tab="unit" class="active">Unidades</button>
       <button data-tab="building">Edificios</button>
       <button data-tab="node">Recursos</button>
@@ -151,18 +151,18 @@
 
     <div class="catalog-body">
       <div class="catalog-side">
-        <input id="catalog-search" type="search" placeholder="Buscar por nombre..." autocomplete="off">
-        <ul id="catalog-list" class="catalog-list"></ul>
+        <input id="catalog-search" type="search" placeholder="Buscar" autocomplete="off">
+        <ul id="catalog-list" class="catalog-list hoja-grupo"></ul>
+        <p id="catalog-changes" class="hoja-nota catalog-changes"></p>
+        <button id="btn-catalog-reset-all" class="hoja-boton peligro">Restablecer todo</button>
+        <p class="hoja-nota">
+          Los cambios se guardan en este navegador y se aplican a las partidas
+          nuevas. En multijugador manda quien invita: sus valores se usan en
+          todos los dispositivos.
+        </p>
       </div>
       <div id="catalog-detail" class="catalog-detail"></div>
     </div>
-
-    <p class="catalog-foot">
-      Cambia los valores de cada objeto y los colores del terreno: la vista
-      previa se rehace al momento. Los cambios se guardan en este navegador y se aplican a las
-      partidas nuevas. En multijugador manda quien invita: sus valores se usan
-      en los dos lados.
-    </p>
   </div>
 </div>
 

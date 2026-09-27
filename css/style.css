@@ -209,149 +209,158 @@ button.danger { margin-top: 8px; width: 100%; background: linear-gradient(180deg
 
 /* ---------- Catálogo ---------- */
 
-.catalog-card {
-  width: min(1100px, 100%);
-  height: min(760px, 100%);
-  display: flex; flex-direction: column;
-  background: var(--panel);
-  border: 2px solid var(--panel-edge);
-  border-radius: 12px;
-  box-shadow: 0 14px 44px rgba(90, 70, 30, .16);
-  padding: 18px 20px 12px;
-}
+/*
+ * Una hoja como las de los menús (ver «Menús: hojas al estilo de iOS»). En el
+ * teléfono la hoja crece con lo que lleva y se desplaza entera; se ve la lista
+ * o la ficha según `data-vista`. En pantalla ancha, lista y ficha van lado a
+ * lado, cada una con su propio desplazamiento.
+ */
+.catalogo .catalogo-atras { display: none; }
+.catalogo[data-vista="ficha"] .catalogo-atras { display: grid; }
+.catalogo[data-vista="ficha"] .catalogo-cerrar,
+.catalogo[data-vista="ficha"] .catalogo-pestanas,
+.catalogo[data-vista="ficha"] .catalog-side { display: none; }
+.catalogo[data-vista="lista"] .catalog-detail { display: none; }
 
-.catalog-top {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 14px; flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-.catalog-top h2 {
-  margin: 0; font-size: 24px; color: var(--gold-l);
-  font-family: "Palatino Linotype", Palatino, Georgia, serif;
-}
-.catalog-top-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.catalog-top-right button { padding: 7px 14px; font-size: 13px; margin: 0; width: auto; }
-.catalog-changes { font-size: 12.5px; color: var(--tinta-3); }
-.catalog-changes.dirty { color: var(--gold-l); }
-#btn-catalog-reset-all.confirming {
-  background: linear-gradient(180deg, #c04638, #93291e);
-  border-color: #a53d2f; color: #fff;
-}
+.catalogo-pestanas { margin-bottom: 14px; }
+.catalogo-pestanas button { padding: 8px 2px; font-size: 14px; }
 
-.catalog-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-.catalog-tabs button { padding: 7px 16px; font-size: 14px; }
-.catalog-tabs button.active {
-  background: linear-gradient(180deg, #b8912f, #7c5c17);
-  border-color: #b8912f; color: #241a08; font-weight: bold;
-}
-
-.catalog-body { flex: 1; display: flex; gap: 14px; min-height: 0; }
-
-.catalog-side { width: 290px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+/* Buscador de iOS: gris, redondeado y con la lupa dentro. */
 #catalog-search {
-  background: var(--papel); color: var(--tinta);
-  border: 1px solid var(--borde); border-radius: 6px;
-  padding: 8px 10px; font-size: 14px; font-family: inherit;
+  display: block; width: 100%; box-sizing: border-box;
+  margin: 0 0 14px; padding: 9px 12px 9px 34px;
+  border: 0; border-radius: 10px; outline: 0;
+  background: rgba(118, 118, 128, .12) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6.5' cy='6.5' r='5' fill='none' stroke='%238a8a8e' stroke-width='1.8'/%3E%3Cpath d='M10.3 10.3L14.5 14.5' stroke='%238a8a8e' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") 11px center / 15px no-repeat;
+  color: #000; font: inherit; font-size: 17px;
+  -webkit-appearance: none; appearance: none;
 }
-#catalog-search:focus { outline: 2px solid var(--gold); }
+#catalog-search::placeholder { color: #8a8a8e; }
 
-.catalog-list {
-  list-style: none; margin: 0; padding: 0;
-  flex: 1; overflow-y: auto;
-  border: 1px solid #e0d4ba; border-radius: 8px;
-  background: rgba(150,120,55,.07);
-}
+.catalog-list { list-style: none; margin: 0; padding: 0; }
 .cat-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 10px;
-  border-bottom: 1px solid rgba(90,70,30,.12);
-  cursor: pointer;
   position: relative;
+  display: flex; align-items: center; gap: 12px;
+  min-height: 60px; padding: 6px 36px 6px 16px;
+  background: #fff;
+  cursor: pointer;
 }
-.cat-item:hover { background: rgba(201,162,39,.13); }
-.cat-item.active { background: rgba(201,162,39,.28); }
+/* Raya entre filas desde el texto, pasada la miniatura: 16 + 44 + 12. */
+.cat-item + .cat-item::before {
+  content: ""; position: absolute; top: 0; left: 72px; right: 0;
+  height: 1px; background: #c6c6c8; transform: scaleY(.5); transform-origin: top;
+}
+/* La flecha de «se entra»: en el teléfono cada fila abre su ficha. */
+.cat-item::after {
+  content: ""; position: absolute; right: 18px; top: 50%;
+  width: 8px; height: 8px; margin-top: -5px;
+  border: solid #c4c4c7; border-width: 2px 2px 0 0; transform: rotate(45deg);
+}
+.cat-item:active { background: #d1d1d6; }
 .cat-thumb { flex: none; }
 .cat-text { min-width: 0; }
-.cat-name { font-size: 14px; color: var(--tinta); }
-.cat-sub { font-size: 11.5px; color: var(--tinta-3); }
+.cat-name { font-size: 17px; color: #000; letter-spacing: -.2px; }
+.cat-sub { font-size: 13px; color: #8a8a8e; }
 .cat-dot {
-  position: absolute; right: 9px; top: 50%; transform: translateY(-50%);
-  width: 8px; height: 8px; border-radius: 50%;
+  position: absolute; right: 34px; top: 50%;
+  width: 8px; height: 8px; margin-top: -4px; border-radius: 50%;
   background: var(--gold);
 }
-.cat-empty { padding: 14px; color: var(--tinta-3); font-size: 13px; text-align: center; }
+.cat-empty { padding: 16px; color: #8a8a8e; font-size: 15px; text-align: center; background: #fff; }
 
+.catalog-changes { margin-bottom: 0; }
+.catalog-changes.dirty { color: var(--gold-l); }
+.catalogo #btn-catalog-reset-all { margin: 12px 0 0; }
+#btn-catalog-reset-all.confirming { background: #d70015; color: #fff; }
+#btn-catalog-reset-all:disabled { opacity: .4; }
 
-.catalog-detail {
-  flex: 1; overflow-y: auto;
-  border: 1px solid #e0d4ba; border-radius: 8px;
-  background: rgba(150,120,55,.06);
-  padding: 16px 18px;
+/* --- Ficha --- */
+
+.cat-head {
+  display: flex; gap: 16px; align-items: center;
+  margin-bottom: 20px; padding: 16px;
+  border-radius: 26px; background: #fff;
 }
-.cat-head { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; }
-.cat-big {
-  flex: none;
-  background: rgba(150,120,55,.08);
-  border: 1px solid var(--borde); border-radius: 8px;
+.cat-big { flex: none; border-radius: 18px; background: #f2f2f7; }
+.cat-head h3 { margin: 0 0 4px; font-size: 22px; font-weight: 700; letter-spacing: -.3px; color: #000; }
+.cat-detail-sub { margin: 0; font-size: 15px; line-height: 1.35; color: #8a8a8e; }
+
+.cat-extra {
+  margin: 0 0 20px; padding: 12px 16px;
+  border-radius: 18px; background: #fff;
+  font-size: 15px; line-height: 1.5; color: #3c3c43;
 }
-.cat-head h3 { margin: 0 0 4px; font-size: 20px; color: var(--gold-l); }
-.cat-detail-sub { margin: 0; font-size: 13px; color: #75654a; }
+.cat-extra:empty { display: none; }
+.cat-extra b { color: #000; font-weight: 600; }
 
-.cat-extra { font-size: 12.5px; color: #55462f; margin-bottom: 14px; line-height: 1.6; }
-.cat-extra b { color: var(--gold-l); }
-
-.cat-group { margin-bottom: 16px; }
+/* Cada grupo, una sección de iOS: título pequeño y gris, filas en tarjeta. */
+.cat-group { margin-bottom: 20px; }
 .cat-group h4 {
-  margin: 0 0 8px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
-  color: var(--tinta-3); border-bottom: 1px solid rgba(90,70,30,.12); padding-bottom: 4px;
+  margin: 0 16px 7px;
+  font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: uppercase;
+  color: #8a8a8e;
 }
-.cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px 14px; }
+.cat-grid { display: block; border-radius: 26px; overflow: hidden; background: #fff; }
 
-.cat-field { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.cat-field.wide { grid-column: 1 / -1; }
-.cat-label { font-size: 13px; color: var(--tinta-2); }
+.cat-field {
+  position: relative;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 50px; padding: 0 16px;
+  background: #fff;
+}
+.cat-field + .cat-field::before {
+  content: ""; position: absolute; top: 0; left: 16px; right: 0;
+  height: 1px; background: #c6c6c8; transform: scaleY(.5); transform-origin: top;
+}
+.cat-label { font-size: 17px; color: #000; letter-spacing: -.2px; }
 .cat-field input {
-  width: 96px; flex: none;
-  background: var(--papel); color: var(--tinta);
-  border: 1px solid var(--borde); border-radius: 5px;
-  padding: 5px 8px; font-size: 13px; font-family: inherit;
+  flex: 0 1 45%; min-width: 0; width: auto;
+  padding: 12px 0;
+  border: 0; outline: 0; background: transparent;
+  color: #8a8a8e; font: inherit; font-size: 17px;
   text-align: right;
+  -webkit-appearance: none; appearance: none; -moz-appearance: textfield;
 }
-.cat-field.wide input { width: auto; flex: 1; text-align: left; }
-.cat-field input[type="color"] { padding: 2px; height: 30px; width: 64px; cursor: pointer; }
-.cat-field input:focus { outline: 2px solid var(--gold); }
-.cat-field.changed input { border-color: var(--gold); background: #fff8e6; }
-.cat-field.changed .cat-label { color: var(--gold-l); }
-
-.cat-actions { margin-top: 6px; }
-.cat-actions button { width: auto; margin: 0; padding: 7px 14px; font-size: 13px; }
-
-.catalog-foot { margin: 10px 0 0; font-size: 11.5px; color: var(--tinta-3); text-align: center; }
-
-@media (max-width: 780px) {
-  .catalog-card { height: 100%; padding: 12px; }
-  .catalog-body { flex-direction: column; }
-  /* En columna, la lista se lleva una fracción del alto y la ficha el resto.
-     Sin `min-height: 0` la ficha no puede encogerse por debajo de su contenido
-     y se desbordaba por abajo de la tarjeta, encima del pie. */
-  .catalog-side { width: 100%; height: 38%; min-height: 110px; flex: none; }
-  .catalog-detail { min-height: 0; }
-  .cat-grid { grid-template-columns: 1fr; }
+/* Los números son cortos: les basta un hueco fijo y el rótulo cabe en una línea. */
+.cat-field input[type="number"] { flex: 0 0 5.5em; }
+.cat-label { flex: 1 1 auto; min-width: 0; }
+.cat-field input::-webkit-inner-spin-button,
+.cat-field input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.cat-field input:focus { color: #000; }
+/* La descripción no cabe a la derecha: va debajo de su rótulo, a lo ancho. */
+.cat-field.wide { flex-direction: column; align-items: stretch; gap: 0; padding-top: 12px; }
+.cat-field.wide input { flex: none; width: 100%; padding: 4px 0 12px; text-align: left; }
+.cat-field input[type="color"] {
+  flex: none; width: 34px; height: 34px; padding: 0;
+  border-radius: 50%; overflow: hidden; cursor: pointer;
 }
+.cat-field input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.cat-field input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 50%; }
+/* Lo cambiado, en dorado: el rótulo y el valor. */
+.cat-field.changed .cat-label, .cat-field.changed input { color: var(--gold-l); }
 
-@media (max-width: 480px) {
-  .catalog-card { padding: 9px 10px 8px; }
-  .catalog-top { gap: 8px; margin-bottom: 8px; }
-  .catalog-top h2 { font-size: 19px; }
-  .catalog-top-right button { padding: 6px 10px; font-size: 12.5px; }
-  .catalog-tabs { gap: 4px; margin-bottom: 8px; }
-  .catalog-tabs button { padding: 6px 11px; font-size: 13px; }
-  .catalog-detail { padding: 10px 12px; }
-  .cat-head { gap: 10px; margin-bottom: 10px; }
-  .cat-head h3 { font-size: 17px; }
-  /* El pie sólo explica cómo va el catálogo: en un móvil el sitio lo necesita
-     la lista, y lo mismo se cuenta en la ayuda. */
-  .catalog-foot { display: none; }
+.cat-actions .hoja-boton { margin: 0; }
+
+/* --- Pantalla ancha: lista y ficha lado a lado --- */
+@media (min-width: 780px) and (min-height: 600px) {
+  .overlay-hoja > .hoja.catalogo { margin: auto; }
+  .hoja.catalogo {
+    width: min(1100px, 100%); height: min(820px, 100%); min-height: 0;
+    display: flex; flex-direction: column;
+    border-radius: 38px; padding-bottom: 18px;
+  }
+  /* Con [data-vista] para ganar a las reglas del teléfono, sea cual sea. */
+  .catalogo[data-vista] .catalogo-atras { display: none; }
+  .catalogo[data-vista] .catalogo-cerrar { display: grid; }
+  .catalogo[data-vista] .catalogo-pestanas { display: flex; align-self: center; width: min(560px, 100%); }
+  .catalogo[data-vista] .catalog-side, .catalogo[data-vista] .catalog-detail { display: block; }
+  .catalog-body { flex: 1; min-height: 0; display: flex; gap: 20px; }
+  .catalog-side { width: 330px; flex: none; overflow-y: auto; padding-bottom: 8px; }
+  .catalog-detail { flex: 1; min-width: 0; overflow-y: auto; padding-bottom: 8px; }
+  /* Aquí la fila no navega, se elige: sin flecha y marcada la que se ve. */
+  .cat-item { padding-right: 16px; }
+  .cat-item::after { display: none; }
+  .cat-dot { right: 14px; }
+  .cat-item.active { background: rgba(160, 125, 30, .14); }
 }
 
 /* ---------- Sala de espera ---------- */

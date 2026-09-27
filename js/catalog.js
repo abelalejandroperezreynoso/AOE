@@ -30,6 +30,7 @@ export class Catalog {
   bind() {
     el('btn-catalog').onclick = () => this.open();
     el('btn-catalog-close').onclick = () => this.close();
+    el('btn-catalog-back').onclick = () => this.showList();
     el('catalog-search').addEventListener('input', (e) => {
       this.filter = e.target.value.toLowerCase();
       this.renderList();
@@ -38,6 +39,7 @@ export class Catalog {
       btn.onclick = () => {
         this.tab = btn.dataset.tab;
         this.selected = null;
+        this.showList();
         for (const b of document.querySelectorAll('#catalog-tabs button')) {
           b.classList.toggle('active', b === btn);
         }
@@ -63,7 +65,10 @@ export class Catalog {
       this.updateChangeCount();
     };
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !el('catalog').classList.contains('hidden')) this.close();
+      if (e.key !== 'Escape' || el('catalog').classList.contains('hidden')) return;
+      // Dentro de una ficha del teléfono, Escape vuelve a la lista, como la flecha.
+      if (el('catalog-card').dataset.vista === 'ficha' && el('btn-catalog-back').offsetParent) this.showList();
+      else this.close();
     });
   }
 
@@ -79,10 +84,25 @@ export class Catalog {
     this.cancelResetConfirm();
     el('main-menu').classList.add('hidden');
     el('catalog').classList.remove('hidden');
+    this.showList();
     // Las miniaturas salen de las hojas del primer color y de los recursos.
     try { await prepareSprites([0]); } catch (err) { console.error(err); }
     this.renderList();
     this.updateChangeCount();
+  }
+
+  /*
+   * En el teléfono la lista y la ficha no caben juntas: se ve una u otra, como
+   * en una navegación de iOS. En pantalla ancha la hoja las enseña a la vez y
+   * `data-vista` no cambia nada.
+   */
+  showList() {
+    el('catalog-card').dataset.vista = 'lista';
+  }
+
+  showDetail() {
+    el('catalog-card').dataset.vista = 'ficha';
+    el('catalog').scrollTop = 0;
   }
 
   close() {
@@ -157,7 +177,7 @@ export class Catalog {
         dot.title = 'Tiene valores modificados';
         li.appendChild(dot);
       }
-      li.onclick = () => { this.selected = item.key; this.renderList(); };
+      li.onclick = () => { this.selected = item.key; this.renderList(); this.showDetail(); };
       list.appendChild(li);
     }
     this.renderDetail();
@@ -255,7 +275,7 @@ export class Catalog {
     const actions = document.createElement('div');
     actions.className = 'cat-actions';
     const resetBtn = document.createElement('button');
-    resetBtn.className = 'secondary';
+    resetBtn.className = 'hoja-boton tenue';
     resetBtn.textContent = 'Restablecer este elemento';
     resetBtn.disabled = !this.hasChanges(key);
     resetBtn.onclick = () => {
