@@ -474,7 +474,8 @@ function slice(key) {
  * Espejo de orientaciones: como en los SLP del original, hay cinco vistas y
  * las tres que miran al otro lado salen volteadas. El volteo es sobre el eje
  * vertical de pantalla, que en el mundo intercambia u y v: la 2 sale de la 0,
- * la 3 de la 7 y la 4 de la 6.
+ * la 3 de la 7 y la 4 de la 6. Una unidad con dibujo propio de alguna de ellas
+ * (la milicia, en ← y ↖) lo tiene en el índice y se usa ése.
  */
 const MIRROR = { 2: 0, 3: 7, 4: 6 };
 
@@ -497,8 +498,9 @@ export function unitSprite(type, colorIdx, face = 1, f = 0) {
   const key = `${type}|${colorIdx}|${face}|${f}`;
   let s = unitCache.get(key);
   if (s) return s;
+  // Las que miran a la izquierda salen volteadas, salvo que tengan dibujo propio.
   const src = MIRROR[face];
-  if (src !== undefined) {
+  if (src !== undefined && !(index && index.sprites[`u|${key}`])) {
     const base = unitSprite(type, colorIdx, src, f);
     s = base && flipSprite(base);
   } else {

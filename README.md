@@ -231,6 +231,7 @@ tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
 tools/importar-edificio.mjs  Mete en los atlas el dibujo de un edificio terminado
 tools/importar-direcciones.mjs  Añade a una unidad las posturas de otras orientaciones
 tools/importar-fotogramas.mjs  Mete fotogramas sueltos como el andar (o la quieta) de una orientación
+tools/importar-posturas.mjs  Mete posturas sueltas de pixel art, una por orientación
 tools/importar-terreno.mjs  Mete en los atlas losetas de terreno dibujadas
 tools/importar-arbol.mjs  Mete en los atlas el dibujo del árbol
 tools/dibujar-jinete.html  Dibuja por código al explorador (caballo y jinete)
@@ -357,6 +358,15 @@ Para depurar, el objeto de la partida está disponible en la consola como
   cada píxel se ve de 4 o más. Como la armadura no lleva color de jugador, la
   herramienta escribe una sola hoja por orientación, `-comun.png`, que se
   carga siempre y sirve a los ocho colores.
+- **Milicia.** Cinco posturas de pixel art de 48×48 sobre fondo transparente
+  (`assets/fuentes/milicia/`), metidas con `tools/importar-posturas.mjs militia
+  --res 6 0=sur 1=sur 3=oeste 4=noroeste 5=noreste 6=noreste 7=este`: se
+  amplían con filtro hasta la altura de las unidades a pie (el dibujo mide 44
+  px, así que se ven suaves y no a bloques), llevan una sombra elíptica y, como
+  es una sola postura, al andar botan un píxel. Sin color de jugador, en una
+  hoja común. ← y ↖ tienen dibujo propio: `unitSprite` usa el de la
+  orientación si está en el índice y sólo si no lo voltea. Faltan ↘ (usa la de
+  frente) y ↑ (usa la de espaldas hacia ↗).
 - Un edificio dibujado entra con `tools/importar-edificio.mjs <tipo>
   <dibujo.png>`: busca la base (desde la esquina de abajo el contorno sube en
   pendiente 2:1 hasta donde las paredes se vuelven verticales), la escala a la
