@@ -1,6 +1,6 @@
 // Mete como ciclo de andar de una orientación varios fotogramas sueltos.
 //
-//   node tools/importar-fotogramas.mjs <tipo> <cara> [--espejo] [--quieto N] img1 img2 ...
+//   node tools/importar-fotogramas.mjs <tipo> <cara> [--espejo] [--quieto N] [--rellenar A,B] img1 img2 ...
 //
 // Cada imagen es un fotograma dibujado sobre fondo claro, aunque traiga
 // encima una cuadrícula (como las que salen del botón «Descargar PNG» de la
@@ -15,6 +15,12 @@
 // `cara` es la orientación del juego que ocupan (0 ↘, 1 ↓, 5 ↑, 6 ↗, 7 →);
 // con --espejo se voltean antes, para dibujos que miran al otro lado (↙ → ↘).
 // `--quieto N` dice qué fotograma (de 0) sirve de postura quieta.
+// `--rellenar A,B` tapa en esos fotogramas los huecos pequeños encerrados en la
+// figura que no son del blanco del fondo: brillos grises que no llegan a
+// sombra (como en la armadura verde).
+// No va por defecto porque los huecos del aldeano, entre brazo y cuerpo o
+// entre el pico y la pierna, son de verdad y tienen que dejar ver el suelo.
+// Un fotograma que apenas tiene azul no se pinta con el color del jugador.
 //
 // Necesita el servidor local en marcha (npm start) y Playwright.
 
@@ -33,10 +39,11 @@ const flag = (n) => { const i = args.indexOf(`--${n}`); if (i < 0) return false;
 const opt = (n, d) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args.splice(i, 2)[1] : d; };
 const espejo = flag('espejo');
 const quieto = Number(opt('quieto', '0'));
+const rellenar = opt('rellenar', '').split(',').filter(Boolean).map(Number);
 const [tipo, caraTxt, ...fuentes] = args;
 const cara = Number(caraTxt);
 if (!tipo || !fuentes.length || ![0, 1, 5, 6, 7].includes(cara)) {
-  console.error('Uso: node tools/importar-fotogramas.mjs <tipo> <cara 0|1|5|6|7> [--espejo] [--quieto N] img...');
+  console.error('Uso: node tools/importar-fotogramas.mjs <tipo> <cara 0|1|5|6|7> [--espejo] [--quieto N] [--rellenar A,B] img...');
   process.exit(1);
 }
 
@@ -58,7 +65,7 @@ const page = await browser.newPage();
 page.on('pageerror', (e) => console.error('ERROR EN PÁGINA:', e.message));
 await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
 
-const res = await page.evaluate(async ({ imagenes, altura, espejo, colores }) => {
+const res = await page.evaluate(async ({ imagenes, altura, espejo, rellenar, colores }) => {
   const luz = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
   const sat = (r, g, b) => (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(1, Math.max(r, g, b));
   const hsl = (r, g, b) => {
@@ -125,11 +132,13 @@ const res = await page.evaluate(async ({ imagenes, altura, espejo, colores }) =>
     const L0 = Math.min(l, sl), R0 = Math.max(r, sr), B0 = Math.max(bt, sb);
     const w = Math.ceil((R0 + 1 - L0) * esc) + 2, h = Math.ceil((B0 + 1 - t) * esc) + 2;
     const cuerpo = new Float32Array(w * h * 4), sombra = new Float32Array(w * h), total = new Float32Array(w * h);
+    const todo = new Float32Array(w * h * 3);
     for (let y = t; y <= B0; y++) {
       for (let x = L0; x <= R0; x++) {
         const o = Math.floor((y - t) * esc + 1) * w + Math.floor((x - L0) * esc + 1);
         total[o]++;
         const k = y * W + x;
+        todo[o * 3] += d[k * 4]; todo[o * 3 + 1] += d[k * 4 + 1]; todo[o * 3 + 2] += d[k * 4 + 2];
         if (cl[k] === 2) { cuerpo[o * 4] += d[k * 4]; cuerpo[o * 4 + 1] += d[k * 4 + 1]; cuerpo[o * 4 + 2] += d[k * 4 + 2]; cuerpo[o * 4 + 3]++; }
         else if (esSombra(x, y)) sombra[o]++;
       }
@@ -141,11 +150,45 @@ const res = await page.evaluate(async ({ imagenes, altura, espejo, colores }) =>
         px[o * 4] = cuerpo[o * 4] / m; px[o * 4 + 1] = cuerpo[o * 4 + 1] / m; px[o * 4 + 2] = cuerpo[o * 4 + 2] / m; px[o * 4 + 3] = 255;
       } else if (total[o] && (sombra[o] + m) / total[o] >= 0.5) px[o * 4 + 3] = 90;
     }
+    // Huecos pequeños encerrados en la figura (con --rellenar): brillos grises
+    // del dibujo que no llegan a sombra y dejarían ver el suelo. Se rellenan
+    // con su color. Lo que se alcanza desde el borde es fondo.
+    if (rellenar.includes(fotos.length)) {
+      const fuera = new Uint8Array(w * h), pila = [];
+      for (let o = 0; o < w * h; o++) if ((o % w === 0 || o % w === w - 1 || o < w || o >= w * (h - 1)) && px[o * 4 + 3] !== 255) { fuera[o] = 1; pila.push(o); }
+      while (pila.length) {
+        const o = pila.pop(), x = o % w;
+        for (const v of [x > 0 ? o - 1 : -1, x < w - 1 ? o + 1 : -1, o - w, o + w]) if (v >= 0 && v < w * h && !fuera[v] && px[v * 4 + 3] !== 255) { fuera[v] = 1; pila.push(v); }
+      }
+      const visto = new Uint8Array(w * h);
+      for (let o0 = 0; o0 < w * h; o0++) {
+        if (fuera[o0] || visto[o0] || px[o0 * 4 + 3] === 255) continue;
+        const hueco = [o0]; visto[o0] = 1;
+        for (let i = 0; i < hueco.length; i++) {
+          const o = hueco[i], x = o % w;
+          for (const v of [x > 0 ? o - 1 : -1, x < w - 1 ? o + 1 : -1, o - w, o + w]) if (v >= 0 && v < w * h && !visto[v] && px[v * 4 + 3] !== 255) { visto[v] = 1; hueco.push(v); }
+        }
+        if (hueco.length > 6) continue;
+        // Si es del blanco del fondo, es una rendija de verdad (entre el brazo
+        // y el cuerpo, por ejemplo): se deja abierta. Los brillos son grises.
+        let sr = 0, sg = 0, sb = 0, st = 0;
+        for (const o of hueco) { sr += todo[o * 3]; sg += todo[o * 3 + 1]; sb += todo[o * 3 + 2]; st += total[o]; }
+        if (!st || luz(sr / st, sg / st, sb / st) > 215) continue;
+        for (const o of hueco) if (total[o]) { for (let c = 0; c < 3; c++) px[o * 4 + c] = todo[o * 3 + c] / total[o]; px[o * 4 + 3] = 255; }
+      }
+    }
     fotos.push({ w, h, px, ox: (pies[0] - L0) * esc + 1, oy: (pies[1] - t) * esc + 1 });
   }
 
+  // Un fotograma que apenas tiene azul no lleva la ropa del aldeano (el de la
+  // armadura verde): sus pocos píxeles azulados no se pintan.
+  for (const f of fotos) {
+    let az = 0, op = 0;
+    for (let o = 0; o < f.w * f.h; o++) { const p = f.px; if (p[o * 4 + 3] !== 255) continue; op++; if (azul(p[o * 4], p[o * 4 + 1], p[o * 4 + 2])) az++; }
+    f.pintar = az > op * 0.03;
+  }
   const ls = [];
-  for (const f of fotos) for (let o = 0; o < f.w * f.h; o++) { const p = f.px; if (p[o * 4 + 3] === 255 && azul(p[o * 4], p[o * 4 + 1], p[o * 4 + 2])) ls.push(luz(p[o * 4], p[o * 4 + 1], p[o * 4 + 2])); }
+  for (const f of fotos) if (f.pintar) for (let o = 0; o < f.w * f.h; o++) { const p = f.px; if (p[o * 4 + 3] === 255 && azul(p[o * 4], p[o * 4 + 1], p[o * 4 + 2])) ls.push(luz(p[o * 4], p[o * 4 + 1], p[o * 4 + 2])); }
   ls.sort((a, b) => a - b);
   const lmin = ls[Math.floor(ls.length * 0.05)], lmax = ls[Math.floor(ls.length * 0.95)];
   const hex = (s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16));
@@ -159,7 +202,7 @@ const res = await page.evaluate(async ({ imagenes, altura, espejo, colores }) =>
     let x = 0; const sitios = [];
     for (const f of fotos) {
       const p = new Uint8ClampedArray(f.px);
-      for (let o = 0; o < f.w * f.h; o++) {
+      for (let o = 0; f.pintar && o < f.w * f.h; o++) {
         if (p[o * 4 + 3] !== 255 || !azul(p[o * 4], p[o * 4 + 1], p[o * 4 + 2])) continue;
         const k = Math.min(1, Math.max(0, (luz(p[o * 4], p[o * 4 + 1], p[o * 4 + 2]) - lmin) / (lmax - lmin)));
         const v = k < 0.5 ? mezcla(os, ba, k * 2) : mezcla(ba, cl, (k - 0.5) * 2);
@@ -172,7 +215,7 @@ const res = await page.evaluate(async ({ imagenes, altura, espejo, colores }) =>
     hojas.push({ url: c.toDataURL('image/png'), sitios });
   }
   return { hojas };
-}, { imagenes, altura: anim.altura, espejo, colores: PLAYER_COLORS });
+}, { imagenes, altura: anim.altura, espejo, rellenar, colores: PLAYER_COLORS });
 await browser.close();
 if (res.error) { console.error(res.error); process.exit(1); }
 
