@@ -68,6 +68,8 @@ function tileTones(terrain, level) {
  * los detalles va agrupado en un único trazado, no uno por brizna.
  */
 export function drawTerrainTile(ctx, sx, sy, terrain, rnd) {
+  // Si el terreno tiene losetas dibujadas (la hierba), va la suya.
+  if (drawTerrainBitmap(ctx, sx, sy, terrain, rnd)) return;
   const kind = TERRAIN_KIND[terrain] || 'grass';
   // Cinco escalones de tono: menos variación que antes (era el doble), porque
   // con textura encima ya no hace falta para que el suelo no parezca liso.
@@ -236,6 +238,33 @@ export function drawTerrainTile(ctx, sx, sy, terrain, rnd) {
 }
 
 /*
+ * Losetas dibujadas: las que trae terreno.png, una por variante, recortadas al
+ * rombo y un poco más grandes para solapar con las vecinas. Se pintan con el
+ * centro de su rombo en el del rombo del juego.
+ */
+const terrCache = new Map();
+
+/** ¿Tiene este terreno losetas dibujadas? (el catálogo no ofrece su color). */
+export function terrainHasBitmap(terrain) {
+  return !!(index && index.sprites[`t|${terrain}|0`]);
+}
+
+function drawTerrainBitmap(ctx, sx, sy, terrain, rnd) {
+  if (!terrainHasBitmap(terrain)) return false;
+  const i = Math.min(TILE_VARIANTS - 1, Math.floor(rnd * TILE_VARIANTS));
+  const key = `${terrain}|${i}`;
+  let s = terrCache.get(key);
+  if (!s) { s = slice(`t|${key}`); if (!s) return false; terrCache.set(key, s); }
+  // Al reducir, suavizado; al ampliar, píxel visto, como el resto de sprites.
+  const escala = ctx.getTransform().a * (s.w / s.canvas.width);
+  const sm = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = escala < 1;
+  ctx.drawImage(s.canvas, sx - s.ox, sy + HH - s.oy, s.w, s.h);
+  ctx.imageSmoothingEnabled = sm;
+  return true;
+}
+
+/*
  * Rombos horneados. El terreno se repite —ocho tipos y ocho variantes de azar
  * cada uno— así que en vez de volver a pintar las matas de hierba de cada rombo
  * se hornea uno por variante y se copia. Copiar un mapa de bits cuesta una
@@ -353,7 +382,10 @@ export async function prepareSprites(colors = [0]) {
     const m = n.match(/-(\d+)\.png$/);
     return !m || want.has(Number(m[1]));
   });
+  const nuevaLoseta = names.includes('terreno.png') && !loaded.has('terreno.png');
   await Promise.all(names.map(loadSheet));
+  // Los rombos horneados antes de tener las losetas eran los de código.
+  if (nuevaLoseta) { tileSheets.clear(); terrCache.clear(); }
 }
 
 /*
@@ -656,6 +688,7 @@ export function iconFor(kind, type, colorIdx = 0) {
 export function clearSpriteCaches() {
   tileCache.clear();
   tileSheets.clear();
+  terrCache.clear();
   resCache.clear();
   unitCache.clear();
   buildCache.clear();

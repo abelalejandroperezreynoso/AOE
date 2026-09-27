@@ -215,6 +215,7 @@ js/sprites.js       Sprites: carga de los atlas, terreno a mano e iconos
 assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
 tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
 tools/importar-edificio.mjs  Mete en los atlas el dibujo de un edificio terminado
+tools/importar-terreno.mjs  Mete en los atlas losetas de terreno dibujadas
 tools/dibujar-jinete.html  Dibuja por código al explorador (caballo y jinete)
 tools/dibujar-jinete.mjs   Escribe sus hojas de sprites
 assets/fuentes/     Las hojas dibujadas tal como llegaron, para reimportarlas
@@ -297,6 +298,14 @@ Para depurar, el objeto de la partida está disponible en la consola como
   y el camuflaje del color de cada jugador. Salen las cinco orientaciones con
   nueve fotogramas: seis de trote, dos de golpe y uno parado. Se regeneran con
   `node tools/dibujar-jinete.mjs`.
+- La hierba (los tres tipos) va con losetas dibujadas, de
+  `assets/fuentes/terreno-hierba.jpg` con `tools/importar-terreno.mjs`: de cada
+  loseta en bloque se toma sólo la cara de arriba, recortada al rombo del
+  juego y un 6 % más grande para que no se vea la junta, y se guardan ocho
+  variantes por terreno en `terreno.png` (claves `t|terreno|n`). La oscura es
+  la misma hierba algo más apagada; la frondosa lleva tréboles, flores y matas.
+  El resto de terrenos sigue pintándose por código, y el color de la hierba ya
+  no se edita en el catálogo.
 - Probado con unas 250 unidades combatiendo a la vez sin bajar de 60 fps en
   hardware normal.
 - En multijugador el anfitrión manda hasta diez instantáneas por segundo en

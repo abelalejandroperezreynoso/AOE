@@ -42,6 +42,9 @@ function startGame(opts, net = null) {
   // Un fotograma de respiro para que se vea la pantalla de carga.
   requestAnimationFrame(() => setTimeout(async () => {
     try {
+      // Las losetas del terreno antes de crear la partida: el mapa se hornea
+      // al crearla.
+      await prepareSprites([]);
       game = new Game(opts);
       // Las hojas de sprites de los colores que juegan: sin ellas no hay qué
       // dibujar, así que se espera aquí, con la pantalla de carga delante.

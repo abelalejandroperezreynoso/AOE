@@ -5,7 +5,7 @@ import {
 } from './config.js';
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
-  drawSprite, prepareSprites, unitAnim,
+  drawSprite, prepareSprites, unitAnim, terrainHasBitmap,
 } from './sprites.js';
 import {
   fieldsFor, getPath, setValue, reset, isChanged, defaultValue, countChanges,
@@ -291,7 +291,7 @@ export class Catalog {
 
     if (this.tab === 'terrain') {
       title.textContent = TERRAIN_LABELS[key] || key;
-      sub.textContent = 'Color con el que se pinta este terreno en el mapa.';
+      sub.textContent = terrainHasBitmap(key) ? 'Losetas dibujadas, ocho variantes.' : 'Color con el que se pinta este terreno en el mapa.';
       box.appendChild(this.terrainForm(key));
     } else if (this.tab === 'node') {
       const def = RESOURCE_NODES[key];
@@ -678,6 +678,13 @@ export class Catalog {
   }
 
   terrainForm(key) {
+    // Con losetas dibujadas el color no se aplica: no se ofrece.
+    if (terrainHasBitmap(key)) {
+      const nota = document.createElement('p');
+      nota.className = 'hoja-nota';
+      nota.textContent = 'Este terreno está dibujado con losetas, así que su color no se puede cambiar.';
+      return nota;
+    }
     const row = document.createElement('label');
     row.className = 'cat-field';
     const name = document.createElement('span');
