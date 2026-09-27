@@ -552,8 +552,10 @@ export class Catalog {
     card.appendChild(seg);
 
     // Rosa de las ocho orientaciones: 0 mira abajo a la derecha y van en el
-    // sentido de las agujas del reloj (ver `unitSprite`).
-    const ROSA = [[4, '↖'], [5, '↑'], [6, '↗'], [3, '←'], null, [7, '→'], [2, '↙'], [1, '↓'], [0, '↘']];
+    // sentido de las agujas del reloj (ver `unitSprite`). Cada una lleva su
+    // flecha y la sigla del punto cardinal, con el norte arriba.
+    const ROSA = [[4, '↖', 'NO'], [5, '↑', 'N'], [6, '↗', 'NE'], [3, '←', 'O'], null,
+      [7, '→', 'E'], [2, '↙', 'SO'], [1, '↓', 'S'], [0, '↘', 'SE']];
     const rosa = document.createElement('div');
     rosa.className = 'cat-anim-rosa';
     const celdas = [];
@@ -563,7 +565,7 @@ export class Catalog {
       if (r) {
         const c = document.createElement('canvas');
         const tag = document.createElement('span');
-        tag.textContent = r[1];
+        tag.textContent = `${r[1]} ${r[2]}`;
         cell.append(c, tag);
         celdas.push({ face: r[0], canvas: c });
       } else {

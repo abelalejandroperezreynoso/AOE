@@ -277,7 +277,7 @@ button:active { filter: brightness(.88); }
 .cat-anim-celda canvas { display: block; }
 .cat-anim-celda span {
   position: absolute; left: 8px; top: 5px;
-  font-size: 13px; color: #8a8a8e;
+  font-size: 13px; font-weight: 600; color: #8a8a8e;
 }
 .cat-anim-celda.centro { background: none; font-size: 15px; font-weight: 600; color: #3c3c43; }
 .cat-anim-vel {
