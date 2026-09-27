@@ -95,18 +95,24 @@ const res = await page.evaluate(async ({ imagenes, altura, espejo, colores }) =>
     // Gris denso (la sombra) frente a gris ralo (las líneas): proporción de
     // grises en una ventana, con una tabla de sumas.
     const R = Math.max(4, Math.round(W / 90));
-    const sum = new Int32Array((W + 1) * (H + 1));
-    for (let y = 0; y < H; y++) {
-      let fila = 0;
-      for (let x = 0; x < W; x++) { fila += cl[y * W + x] === 1 ? 1 : 0; sum[(y + 1) * (W + 1) + x + 1] = sum[y * (W + 1) + x + 1] + fila; }
-    }
-    const dens = (x, y) => {
-      const a = Math.max(0, x - R), b = Math.max(0, y - R), e = Math.min(W, x + R + 1), f = Math.min(H, y + R + 1);
-      return (sum[f * (W + 1) + e] - sum[b * (W + 1) + e] - sum[f * (W + 1) + a] + sum[b * (W + 1) + a]) / ((e - a) * (f - b));
+    const tabla = (clase) => {
+      const sum = new Int32Array((W + 1) * (H + 1));
+      for (let y = 0; y < H; y++) {
+        let fila = 0;
+        for (let x = 0; x < W; x++) { fila += cl[y * W + x] === clase ? 1 : 0; sum[(y + 1) * (W + 1) + x + 1] = sum[y * (W + 1) + x + 1] + fila; }
+      }
+      return (x, y) => {
+        const a = Math.max(0, x - R), b = Math.max(0, y - R), e = Math.min(W, x + R + 1), f = Math.min(H, y + R + 1);
+        return (sum[f * (W + 1) + e] - sum[b * (W + 1) + e] - sum[f * (W + 1) + a] + sum[b * (W + 1) + a]) / ((e - a) * (f - b));
+      };
     };
-    // Caja de la figura.
+    const dens = tabla(1);
+    // Caja de la figura. Cuenta sólo lo que tiene más figura alrededor: los
+    // cruces de la cuadrícula, que en un JPEG salen oscuros, quedan sueltos y
+    // agrandarían la caja, y con ella la altura, encogiendo el dibujo.
+    const densFigura = tabla(2);
     let t = H, bt = 0, l = W, r = 0;
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (cl[y * W + x] === 2) { if (y < t) t = y; if (y > bt) bt = y; if (x < l) l = x; if (x > r) r = x; }
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (cl[y * W + x] === 2 && densFigura(x, y) > 0.15) { if (y < t) t = y; if (y > bt) bt = y; if (x < l) l = x; if (x > r) r = x; }
     // Sombra: gris denso en el cuarto de abajo de la figura o por debajo.
     const esSombra = (x, y) => cl[y * W + x] === 1 && y > t + (bt - t) * 0.72 && dens(x, y) > 0.55;
     let sx = 0, sy = 0, n = 0, sb = bt, sl = l, sr = r;
