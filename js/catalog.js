@@ -47,6 +47,39 @@ function cajaSolida(s) {
 const unir = (a, b) => (a ? {
   x0: Math.min(a.x0, b.x0), x1: Math.max(a.x1, b.x1), y0: Math.min(a.y0, b.y0), y1: Math.max(a.y1, b.y1),
 } : b);
+// Las flechas de dirección, en palabras para el nombre del archivo.
+const NOMBRE_ARCHIVO = { '↘': 'sureste', '↓': 'sur', '↙': 'suroeste', '←': 'oeste', '↖': 'noroeste', '↑': 'norte', '↗': 'noreste', '→': 'este' };
+
+/**
+ * Descarga un lienzo como PNG con fondo gris claro. En el teléfono, donde un
+ * enlace de descarga abre la imagen suelta, usa el menú de compartir de iOS
+ * (desde él se guarda en Fotos o en Archivos).
+ */
+function descargarPNG(canvas, archivo) {
+  const c = document.createElement('canvas');
+  c.width = canvas.width; c.height = canvas.height;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#f2f2f7';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(canvas, 0, 0);
+  c.toBlob(async (blob) => {
+    if (!blob) return;
+    const file = new File([blob], archivo, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && matchMedia('(pointer: coarse)').matches) {
+      try { await navigator.share({ files: [file], title: archivo }); return; } catch (err) {
+        if (err && err.name === 'AbortError') return; // lo canceló el jugador
+      }
+    }
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = archivo;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }, 'image/png');
+}
+
 /** Pinta un sprite con el centro de `caja` en (cx, cy). */
 function centrado(ctx, s, caja, cx, cy, sc) {
   drawSprite(ctx, s, cx - ((caja.x0 + caja.x1) / 2) * sc, cy - ((caja.y0 + caja.y1) / 2) * sc, sc);
@@ -297,7 +330,7 @@ export class Catalog {
       const def = RESOURCE_NODES[key];
       title.textContent = NODE_LABELS[key] || key;
       sub.textContent = `Da ${RES_NAME[def.res]}. ${def.blocking ? 'Bloquea el paso.' : 'No bloquea el paso.'}`;
-      box.appendChild(this.lupaFija(resourceSprite(key, 0)));
+      box.appendChild(this.lupaFija(resourceSprite(key, 0), key));
       box.appendChild(this.nodeForm(key, def));
     } else {
       const def = this.tab === 'unit' ? UNITS[key] : BUILDINGS[key];
@@ -307,7 +340,7 @@ export class Catalog {
         : `Disponible en la ${AGES[def.age].name}`;
       box.appendChild(this.extraInfo(def));
       if (this.tab === 'unit') box.appendChild(this.animations(key, def));
-      else box.appendChild(this.lupaFija(buildingSprite(key, 0, 2)));
+      else box.appendChild(this.lupaFija(buildingSprite(key, 0, 2), key));
       box.appendChild(this.form(this.tab, key, def));
     }
     // Las cifras de las unidades sólo se miran: no hay nada que restablecer.
@@ -346,11 +379,18 @@ export class Catalog {
    * ({ l, t, r, b }): así el lienzo no cambia de tamaño entre fotogramas y la
    * figura no baila. `datos` son filas extra para la tarjeta ([rótulo, valor]).
    */
-  crearLupa() {
+  crearLupa(nombre = 'sprite') {
     const card = document.createElement('div');
     card.className = 'cat-lupa';
     const c = document.createElement('canvas');
     card.appendChild(c);
+    // Descargar lo que se ve: la imagen ampliada con su cuadrícula, sobre el
+    // mismo gris claro de la lupa.
+    const boton = document.createElement('button');
+    boton.className = 'hoja-boton tenue cat-lupa-descarga';
+    boton.textContent = 'Descargar PNG';
+    let sufijo = '';
+    boton.onclick = () => descargarPNG(c, `${nombre}${sufijo}.png`);
     const dpr = Math.min(3, window.devicePixelRatio || 1);
 
     const filas = new Map();
@@ -402,12 +442,13 @@ export class Catalog {
       for (let x = 0; x <= W; x++) ctx.fillRect(Math.min(x * k, c.width - 1), 0, 1, c.height);
       for (let y = 0; y <= H; y++) ctx.fillRect(0, Math.min(y * k, c.height - 1), c.width, 1);
 
+      sufijo = datos.map(([, v]) => `-${String(v).replace(/[^\w]+/g, '') || NOMBRE_ARCHIVO[v] || ''}`).join('');
       fila('Tamaño', `${s.canvas.width} × ${s.canvas.height} píxeles`);
       fila('Lienzo', `${W} × ${H} píxeles`);
       fila('Aumento', `× ${k}`);
       for (const [r, v] of datos) fila(r, v);
     };
-    return { card, info, pinta };
+    return { card, info, boton, pinta };
   }
 
   /** Marco común de varios sprites, en píxeles del sprite desde su ancla. */
@@ -423,11 +464,11 @@ export class Catalog {
     return m;
   }
 
-  lupaFija(s) {
-    const lupa = this.crearLupa();
+  lupaFija(s, nombre) {
+    const lupa = this.crearLupa(nombre);
     lupa.pinta(s);
     const frag = document.createDocumentFragment();
-    frag.append(this.group('Lupa', [lupa.card]), this.group('Imagen', [lupa.info]));
+    frag.append(this.group('Lupa', [lupa.card, lupa.boton]), this.group('Imagen', [lupa.info]));
     return frag;
   }
 
@@ -480,7 +521,7 @@ export class Catalog {
 
     // La lupa enseña la dirección elegida (se elige tocando su celda) con el
     // fotograma que toque, o el que se haya fijado tocándolo en la tira.
-    const lupa = this.crearLupa();
+    const lupa = this.crearLupa(key);
     let lupaCara = 0, fijo = null;
     const NOMBRE = { 0: '↘', 1: '↓', 2: '↙', 3: '←', 4: '↖', 5: '↑', 6: '↗', 7: '→' };
     const marcaCara = () => {
@@ -636,7 +677,7 @@ export class Catalog {
     this.animRaf = requestAnimationFrame(tick);
 
     const frag = document.createDocumentFragment();
-    frag.append(this.group('Lupa', [lupa.card]), this.group('Imagen', [lupa.info]), this.group('Animaciones', [card]));
+    frag.append(this.group('Lupa', [lupa.card, lupa.boton]), this.group('Imagen', [lupa.info]), this.group('Animaciones', [card]));
     return frag;
   }
 

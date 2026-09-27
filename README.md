@@ -112,7 +112,9 @@ de todos sus píxeles**, del tamaño de la imagen, y aparte una tarjeta con sus
 datos (tamaño, lienzo, aumento y, en las unidades, dirección y fotograma). El
 aumento nunca baja de ×3; los edificios grandes no caben y la lupa se desplaza.
 En las unidades sigue la animación: tocar una dirección la enseña en la lupa y
-tocar un fotograma de la tira lo deja fijo.
+tocar un fotograma de la tira lo deja fijo. **Descargar PNG** guarda lo que
+enseña la lupa, con su cuadrícula (en el teléfono, por el menú de compartir,
+desde el que se guarda en Fotos o en Archivos).
 
 Cada unidad enseña sus **animaciones** en marcha: moverse, quieta y
 atacar (trabajar, en el aldeano), a la vez en las ocho direcciones y con sus
