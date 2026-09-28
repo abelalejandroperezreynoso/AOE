@@ -135,32 +135,39 @@ venía de fábrica.
 ### Modelos 3D
 
 Las fichas de unidades, edificios y recursos tienen una sección **Modelo 3D**:
-**Importar modelo 3D** pide un `.obj` con su `.mtl` (o un `.zip` con los dos)
-y el juego lo pinta él mismo en su perspectiva isométrica y lo recorta en
-sprites, que sustituyen a los de lo que esté abierto:
+**Importar modelo 3D** pide un `.usdz` (como lo exporta Gravity Sketch) o
+`.obj` con su `.mtl` (sueltos o en un `.zip`), y el juego lo pinta él mismo en
+su perspectiva isométrica y lo recorta en sprites, que sustituyen a los de lo
+que esté abierto:
 
 - **Edificio**: se encaja en su huella y salen las tres etapas (cimientos,
   obra y terminado, cortando el modelo a distintas alturas) en los ocho
   colores.
 - **Unidad**: se ajusta a la altura de la que sustituye y sale en sus
-  direcciones. Un `.obj` no trae movimiento: andar, estar quieta y golpear son
-  el mismo dibujo.
+  direcciones, con una **pose por fotograma**. En un `.usdz`, cada capa es una
+  pose y su nombre dice cuál: `quieto`, `andar1`, `andar2`… y `golpe1`,
+  `golpe2` (con o sin `-` o `_` antes del número). Con `.obj`, un archivo por
+  pose con ese nombre; un `.obj` solo es la pose quieta. La escala y el punto
+  de los pies salen de la quieta y valen para todas, así que la figura no
+  crece ni resbala entre poses. Lo que falte se hace con la quieta.
 - **Recurso**: cabe en una casilla y salen cuatro variantes, girado de 90 en
   90 grados. Lo agotado sigue siendo lo de antes.
 
-Los materiales que se llamen *jugador* (o *equipo*, *player*, *team*) toman el
-color de cada bando. Si no hay ninguno, el color va en un banderín (edificios)
-o en un aro a los pies (unidades). Las texturas aún no se usan: cada material
-sale con su color liso. **Z arriba / Y arriba** elige qué eje del modelo es la
-vertical (Z en 3ds Max y Blender; con el otro sale tumbado) y **Girar 90°**
-lo orienta.
+Lo pintado en **magenta** (rojo y azul altos, poco verde), o los materiales
+que se llamen *jugador* (o *equipo*, *player*, *team*), toma el color de cada
+bando. Si no hay nada así, el color va en un banderín (edificios) o en un aro
+a los pies (unidades). Las texturas aún no se usan: cada material sale con su
+color liso. **Z arriba / Y arriba** elige qué eje del modelo es la vertical
+(un `.usdz` ya lo dice, y viene elegido; en un `.obj` de 3ds Max es Z y de
+Gravity Sketch, Y) y **Girar 90°** lo orienta.
 
 Debajo, **Poses que hay que modelar** lista lo que pide cada elemento, con el
-nombre de cada pose y su postura: una unidad, la quieta y tantas de andar y de
-golpe como fotogramas usa hoy su animación (el aldeano y la milicia, 4 y 2; el
-explorador, 6 de trote y 2); un edificio o un recurso, un solo modelo. Todas
-mirando hacia el mismo lado y con los pies en el mismo punto: el juego gira
-cada una para sacar las direcciones. Por ahora sólo se importa la quieta.
+nombre de cada pose y su postura: una unidad, la quieta, cuatro de paso (seis
+de trote a caballo) y dos de golpe; un edificio o un recurso, un solo modelo.
+Todas mirando hacia el mismo lado y con los pies en el mismo punto: el juego
+gira cada una para sacar las direcciones. En Gravity Sketch, cada pose en su
+capa con ese nombre, que empiece por letra y sin guiones ni espacios (USD
+cambia un nombre como «1» por `_`, y dos capas así se funden en una).
 
 Lo importado se ve al momento en el catálogo y en las partidas de esa sesión,
 sólo en ese aparato; al recargar vuelve lo de siempre. Para que quede en el
@@ -261,7 +268,8 @@ js/map.js           Generación del mapa y de los recursos
 js/path.js          Búsqueda de caminos A* sobre la rejilla
 js/render.js        Renderizador isométrico y niebla de guerra
 js/sprites.js       Sprites: carga de los atlas, terreno a mano e iconos
-js/modelo3d.js      Modelos 3D: lee .obj/.mtl/.zip y los pinta en sprites
+js/modelo3d.js      Modelos 3D: lee .usdz/.obj y los pinta en sprites, pose a pose
+js/usdz.js          Lector del USD binario que va dentro de un .usdz
 assets/sprites/     Atlas PNG de unidades, edificios y recursos, e indice.json
 tools/importar-unidad.mjs  Mete en los atlas una hoja de animación dibujada
 tools/importar-edificio.mjs  Mete en los atlas el dibujo de un edificio terminado
@@ -420,8 +428,17 @@ Para depurar, el objeto de la partida está disponible en la consola como
   los cimientos y la obra siguen con los de antes. Las barras de vida y de
   producción se colocan encima de lo más alto de cada dibujo. Así entró el
   centro urbano, desde `assets/fuentes/centro-urbano.png`.
+- El `.usdz` se lee sin librerías (`js/usdz.js`): es un `.zip` con la escena
+  en el USD binario de Pixar («Crate», versión 0.8 en lo de Gravity Sketch).
+  Se descomprimen sus secciones (LZ4 y la compresión de enteros de USD), se
+  rehace el árbol de rutas y se leen, de cada malla, vértices, caras,
+  normales, transformación y material, y de cada material su `diffuseColor`,
+  que va en luz lineal y se pasa a sRGB. Cada hijo del nodo principal es una
+  capa de Gravity Sketch. Comprobado contra la librería oficial de Pixar con
+  los archivos de prueba de Abel: mismos vértices y triángulos, sin
+  diferencia.
 - Un modelo 3D se pinta sin motor ni librerías (`js/modelo3d.js`): el `.zip`
-  se abre con `DecompressionStream`, los polígonos del `.obj` se parten en
+  se abre con `DecompressionStream`, los polígonos se parten en
   triángulos y se rasterizan con búfer de profundidad a triple resolución, con
   la misma proyección del mapa (`x = 45,25·e`, `y = −22,63·n − 39,19·h`
   píxeles de mundo por casilla). La luz viene de la derecha y de arriba, cada
@@ -437,9 +454,10 @@ Para depurar, el objeto de la partida está disponible en la consola como
   `tools/importar-modelo.mjs`. Es una sola pose, así que no mueve las piernas
   al andar, y el color del jugador va en el aro de los pies. Lo que se cuenta
   más abajo de sus dibujos a mano es historia: esas hojas se retiraron y
-  siguen en el historial de git. Gravity Sketch exporta un grupo por trazo,
-  con nombres automáticos (`g s.0027`…), sin los de sus grupos ni capas: las
-  poses de una animación tienen que ir en archivos separados.
+  siguen en el historial de git. En `.obj`, Gravity Sketch exporta un grupo
+  por trazo, con nombres automáticos (`g s.0027`…), sin los de sus grupos ni
+  capas; en `.usdz` sí van las capas con su nombre (no los grupos) y los
+  colores: por eso las poses van en capas y se exporta en USDZ.
 - El explorador está dibujado por código (`tools/dibujar-jinete.html`): caballo
   y jinete son piezas simples (elipsoides, cápsulas y cajas) con un esqueleto
   que anima el trote en pares diagonales y el golpe de espada. Se ven con la

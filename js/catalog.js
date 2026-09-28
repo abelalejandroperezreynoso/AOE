@@ -6,7 +6,7 @@ import {
 import {
   unitSprite, buildingSprite, resourceSprite, makeCanvas, drawTerrainTile, TERRAIN_COLORS,
   drawSprite, prepareSprites, unitAnim, terrainHasBitmap, terrainSprite,
-  sustituirSprites, quitarSustitucion, alturaDeUnidad, animDelIndice,
+  sustituirSprites, quitarSustitucion, alturaDeUnidad,
 } from './sprites.js';
 import { reunirArchivos, leerModelo, spritesDeModelo, escribirZip, RES_MODELO } from './modelo3d.js';
 import {
@@ -499,8 +499,8 @@ export class Catalog {
     const nota = document.createElement('p');
     nota.className = 'cat-modelo-nota';
     nota.textContent = estado
-      ? `${estado.nombre}: ${estado.modelo.tris.length} triángulos. Se ve así en esta sesión; para que quede en el juego, descarga el paquete y pásalo.`
-      : 'Sustituye su dibujo por el de un modelo .obj (con su .mtl, o todo en un .zip). Los materiales que se llamen «jugador» toman el color de cada bando.';
+      ? `${estado.nombre}: ${estado.modelo.tris} triángulos. Se ve así en esta sesión; para que quede en el juego, descarga el paquete y pásalo.`
+      : 'Sustituye su dibujo por el de un modelo: un .usdz de Gravity Sketch, con una capa por pose, o un .obj por pose (con su .mtl). Lo pintado en magenta toma el color de cada bando.';
     filas.push(nota);
     for (const aviso of estado?.avisos || []) {
       const p = document.createElement('p');
@@ -512,7 +512,7 @@ export class Catalog {
     const entrada = document.createElement('input');
     entrada.type = 'file';
     entrada.multiple = true;
-    entrada.accept = '.obj,.mtl,.zip';
+    entrada.accept = '.usdz,model/vnd.usdz+zip,.obj,.mtl,.zip';
     entrada.hidden = true;
     const elegir = document.createElement('button');
     elegir.className = 'hoja-boton' + (estado ? ' tenue' : '');
@@ -524,10 +524,10 @@ export class Catalog {
       elegir.textContent = 'Leyendo…';
       try {
         const archivos = await reunirArchivos([...entrada.files]);
-        const modelo = leerModelo(archivos);
+        const modelo = await leerModelo(archivos);
         const medida = tipo === 'building' ? { size: BUILDINGS[key].size }
           : tipo === 'unit' ? { altura: await alturaDeUnidad(key) } : {};
-        this.modelos.set(prefijo, { archivos, modelo, medida, nombre: modelo.nombre, eje: 'z', giro: 0 });
+        this.modelos.set(prefijo, { archivos, modelo, medida, nombre: modelo.nombre, eje: modelo.eje || 'z', giro: 0 });
         await this.aplicarModelo(tipo, key, prefijo);
       } catch (err) {
         console.error(err);
@@ -580,9 +580,9 @@ export class Catalog {
 
   /**
    * Las poses que hay que modelar para sustituir a este elemento, con el
-   * nombre que lleva cada una (el del archivo, `andar-1.obj`, o el del grupo
-   * dentro de un solo .obj) y qué postura es. Una unidad tiene tantas como
-   * fotogramas usa hoy su animación; un edificio o un recurso, una sola.
+   * nombre que lleva cada una (el de su capa en el .usdz, o el del archivo
+   * .obj) y qué postura es. Una unidad, las de su ciclo de paso o de trote y
+   * las dos de golpe; un edificio o un recurso, una sola.
    */
   posesDe(tipo, key, def) {
     if (tipo === 'building') {
@@ -591,7 +591,10 @@ export class Catalog {
     if (tipo === 'node') {
       return [['recurso', 'Entero, sin agotar. Las cuatro variantes del mapa salen solas, girándolo.']];
     }
-    const n = animDelIndice(key) || { andar: 4, golpe: 2 };
+    // Las que pide el juego, no las que tenga ahora (que pueden venir de un
+    // modelo de una sola pose): cuatro de paso, seis de trote a caballo, y
+    // dos de golpe, que son las que usa (ver render.js).
+    const n = { andar: def.class === 'cavalry' ? 6 : 4, golpe: 2 };
     const poses = [['quieto', 'De pie, en reposo. Es la pose de referencia: de ella salen la escala y el punto de los pies.']];
     const PASO = [
       'Pierna derecha delante, apoyando el talón; brazo izquierdo adelantado.',
@@ -614,13 +617,13 @@ export class Catalog {
       const texto = n.andar === 4 && ciclo === 'paso' ? PASO[i - 1]
         : n.andar === 6 && ciclo === 'trote' ? TROTE[i - 1]
         : `Fase ${i} de ${n.andar} del ${ciclo}${ciclo === 'trote' ? ', con las patas en pares diagonales' : ''}; la ${n.andar} enlaza otra vez con la 1.`;
-      poses.push([`andar-${i}`, texto]);
+      poses.push([`andar${i}`, texto]);
     }
     const trabaja = key === 'villager';
     const GOLPE = trabaja
       ? ['Trabajando: la herramienta arriba, a punto de bajar.', 'La herramienta abajo, en el momento del golpe.']
       : ['Atacando: el arma atrás o arriba, preparando el golpe.', 'El arma al final del golpe, con el brazo estirado.'];
-    for (let i = 1; i <= n.golpe; i++) poses.push([`golpe-${i}`, GOLPE[i - 1] || `Fase ${i} de ${n.golpe} del golpe.`]);
+    for (let i = 1; i <= n.golpe; i++) poses.push([`golpe${i}`, GOLPE[i - 1] || `Fase ${i} de ${n.golpe} del golpe.`]);
     return poses;
   }
 
@@ -630,8 +633,8 @@ export class Catalog {
     const nota = document.createElement('p');
     nota.className = 'cat-modelo-nota';
     nota.textContent = poses.length > 1
-      ? `${poses.length} poses, todas mirando hacia el mismo lado y con los pies en el mismo punto: el juego gira cada una para sacar todas las direcciones. Por ahora se importa una sola pose, la quieta; las demás entrarán cuando lo haga la importación por poses.`
-      : 'Un solo modelo.';
+      ? `${poses.length} poses, todas mirando hacia el mismo lado y con los pies en el mismo punto: el juego gira cada una para sacar todas las direcciones. En Gravity Sketch, una capa por pose con este nombre, y se exporta en USDZ (o un .obj por pose, con el nombre en el archivo). El nombre empieza por letra y va sin guiones ni espacios. Si falta alguna, se usa la quieta en su lugar.`
+      : 'Un solo modelo. En Gravity Sketch da igual cómo estén las capas: si hay varias, se usa la primera.';
     filas.push(nota);
     const lista = document.createElement('ol');
     lista.className = 'cat-poses';

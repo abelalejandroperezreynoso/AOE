@@ -49,9 +49,13 @@ Los mensajes de commit van en español, y dicen qué se ha comprobado.
   catálogo (sección Modelo 3D de la ficha abierta), que los enseña al momento
   sólo en esa sesión, y entran en el juego con
   `tools/importar-modelo.mjs <paquete.zip>`, el paquete que descarga el
-  catálogo con el modelo y sus ajustes. Gravity Sketch, con el que se modela, exporta con Y
-  arriba y un grupo por trazo con nombre automático: no conserva los nombres
-  de grupos ni capas, así que cada pose de una animación va en su archivo.
+  catálogo con el modelo y sus ajustes. Se modela en Gravity Sketch y se
+  exporta en **USDZ**, con cada pose de una unidad en una capa (`quieto`,
+  `andar1`…, `golpe1`…): el USDZ conserva los nombres de las capas (no los de
+  los grupos), los colores y el eje (Y arriba), y el `.obj` no (un grupo por
+  trazo con nombre automático). Un nombre de capa que empiece por número se
+  queda en `_` y dos así se funden. Lo magenta toma el color del jugador. El
+  lector del USD binario es `js/usdz.js`, sin librerías.
 - El README documenta el juego, la estructura del código y las notas técnicas.
 
 ## Verificación

@@ -419,20 +419,6 @@ export function quitarSustitucion(prefijo) {
 export const tieneSustitucion = (prefijo) => provisionales.has(prefijo);
 
 /**
- * Fotogramas de andar y de golpe de una unidad según el índice, sin contar lo
- * provisional: cuántas poses hay que modelar para sustituirla (ver el
- * catálogo). Null mientras no ha llegado el índice.
- */
-export function animDelIndice(type) {
-  if (!index) return null;
-  const a = index.anim?.[type];
-  return {
-    andar: Array.isArray(a?.andar) ? a.andar.length : (a?.andar || ANIM_DE_SERIE.andar.length),
-    golpe: a?.golpe ? a.golpe.length : ANIM_DE_SERIE.golpe.length,
-  };
-}
-
-/**
  * Altura de una unidad de los pies a la cabeza, en píxeles de mundo, según el
  * índice (no los provisionales): la medida a la que se ajusta un modelo que la
  * sustituya. La que apuntó tools/importar-unidad.mjs, o la del primer sprite.

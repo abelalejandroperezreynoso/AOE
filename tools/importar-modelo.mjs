@@ -1,11 +1,12 @@
 // Mete en los atlas los sprites de un modelo 3D importado en el catálogo.
 //
 //   node tools/importar-modelo.mjs <paquete.zip> [--eje z|y] [--giro N]
-//   node tools/importar-modelo.mjs <modelo.zip|modelo.obj> --tipo unit|building|node --clave <clave>
+//   node tools/importar-modelo.mjs <modelo.usdz|.zip|.obj> --tipo unit|building|node --clave <clave>
 //
 // El paquete es lo que descarga el catálogo con «Descargar paquete» en la
 // sección Modelo 3D: el .obj, su .mtl y `ajustes.json` con lo que se eligió
-// allí (qué sustituye, qué eje va arriba y cuánto se giró). Los sprites se
+// allí (qué sustituye, qué eje va arriba y cuánto se giró). El modelo puede
+// ser un .usdz, con una capa por pose, o uno o varios .obj, uno por pose. Los sprites se
 // pintan con el mismo js/modelo3d.js que usó el catálogo, así que salen igual
 // que en la vista previa. --eje y --giro pisan lo del paquete.
 //
@@ -45,7 +46,7 @@ const BASE = process.env.GAME_URL || 'http://localhost:8000';
 const DIR = 'assets/sprites';
 const indice = JSON.parse(await readFile(`${DIR}/indice.json`, 'utf8'));
 const bytes = await readFile(fuente);
-const esZip = /\.zip$/i.test(fuente);
+const esZip = /\.(zip|usdz)$/i.test(fuente);
 
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || undefined });
 const page = await browser.newPage();
@@ -61,19 +62,19 @@ const res = await page.evaluate(async ({ b64, esZip, nombre, forzado, indiceRes 
   const ajustes = archivos['ajustes.json'] ? JSON.parse(new TextDecoder().decode(archivos['ajustes.json'])) : {};
   for (const [k, v] of Object.entries(forzado)) if (v !== undefined) ajustes[k] = v;
   if (!ajustes.tipo || !ajustes.clave) return { error: 'Faltan el tipo y la clave: el paquete no trae ajustes.json, pásalos con --tipo y --clave' };
-  ajustes.eje = ajustes.eje || 'z';
+  const modelo = await m3.leerModelo(archivos);
+  ajustes.eje = ajustes.eje || modelo.eje || 'z';
   ajustes.giro = Number(ajustes.giro || 0);
   if (!ajustes.medida) {
     ajustes.medida = ajustes.tipo === 'building' ? { size: BUILDINGS[ajustes.clave]?.size }
       : ajustes.tipo === 'unit' ? { altura: await sp.alturaDeUnidad(ajustes.clave) } : {};
   }
-  const modelo = m3.leerModelo(archivos);
   const { sprites, anim, avisos } = m3.spritesDeModelo(modelo, ajustes);
   if (anim) anim.altura = Math.round(ajustes.medida.altura * indiceRes * 100) / 100;
   const hojas = m3.empaquetar(sprites, `${ajustes.clave}-modelo`).map((h) => ({
     nombre: h.nombre, url: h.canvas.toDataURL('image/png'), entradas: h.entradas,
   }));
-  return { ajustes, hojas, anim, avisos, resModelo: m3.RES_MODELO, tris: modelo.tris.length };
+  return { ajustes, hojas, anim, avisos, resModelo: m3.RES_MODELO, tris: modelo.tris };
 }, {
   b64: bytes.toString('base64'), esZip, nombre: fuente.split('/').pop(),
   forzado: { eje, giro: giro === undefined ? undefined : Number(giro), tipo: tipoArg, clave: claveArg },
@@ -121,8 +122,7 @@ if (huerfanas.length) {
   }
 }
 await writeFile(`${DIR}/indice.json`, JSON.stringify(indice));
-if (esZip) await copyFile(fuente, `assets/fuentes/${clave}-modelo.zip`);
-else await copyFile(fuente, `assets/fuentes/${clave}-modelo.obj`);
+await copyFile(fuente, `assets/fuentes/${clave}-modelo.${fuente.split('.').pop().toLowerCase()}`);
 
 console.log(`${clave} (${tipo}): ${res.tris} triángulos, eje ${res.ajustes.eje}, giro ${res.ajustes.giro}°, `
   + `${Object.values(res.hojas).reduce((n, h) => n + Object.keys(h.entradas).length, 0)} sprites en ${res.hojas.length} hojas`

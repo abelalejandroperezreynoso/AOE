@@ -1,5 +1,5 @@
-// Modelos 3D importados: de un .obj (con su .mtl, suelto o en un .zip) a los
-// sprites del juego.
+// Modelos 3D importados: de un .usdz (con una capa por pose) o de un .obj
+// (con su .mtl, suelto o en un .zip; uno por pose) a los sprites del juego.
 //
 // No hay motor 3D: el modelo se pinta una vez, con la misma perspectiva
 // isométrica 2:1 del mapa, y se recorta en sprites con el formato del índice
@@ -18,6 +18,7 @@
 // (e, n): u = (e − n)/√2, v = (−e − n)/√2.
 
 import { PLAYER_COLORS } from './config.js';
+import { leerUsdc } from './usdz.js';
 
 // --- Lectura de archivos ------------------------------------------------------
 
@@ -108,8 +109,9 @@ export function escribirZip(archivos) {
 }
 
 /**
- * Reúne los archivos que se hayan elegido (un .zip, o el .obj con su .mtl) en
- * { nombre: Uint8Array }, descomprimiendo los .zip que haya.
+ * Reúne los archivos que se hayan elegido (un .usdz, un .zip, o los .obj con
+ * su .mtl) en { nombre: Uint8Array }, descomprimiendo los .zip que haya. Un
+ * .usdz se queda tal cual: así va entero en el paquete.
  */
 export async function reunirArchivos(lista) {
   const archivos = {};
@@ -137,23 +139,26 @@ function leerMtl(src) {
 }
 
 /**
- * Un material es «del jugador» —se pinta con su color— si su nombre lo dice:
- * jugador, equipo, player o team. Es la forma de marcar en el modelo qué
- * partes llevan el color de cada bando.
+ * Un material es «del jugador» —se pinta con su color— si su nombre lo dice
+ * (jugador, equipo, player o team) o si es magenta: rojo y azul altos y poco
+ * verde, que en Gravity Sketch se pinta sin tener que poner nombres. Es la
+ * forma de marcar en el modelo qué partes llevan el color de cada bando.
  */
-export const esDelJugador = (nombre) => /jugador|equipo|player|team/i.test(nombre || '');
+export const esDelJugador = (nombre, kd) => /jugador|equipo|player|team/i.test(nombre || '')
+  || (!!kd && kd[0] > 0.7 && kd[2] > 0.7 && kd[1] < 0.35);
 
-/**
- * Lee el .obj (y su .mtl, si viene) de entre los archivos. Devuelve los
- * vértices, las normales y los triángulos, cada uno con su material.
- */
-export function leerModelo(archivos) {
-  const nombreObj = Object.keys(archivos).find((n) => /\.obj$/i.test(n));
-  if (!nombreObj) throw new Error('Falta el archivo .obj');
-  const src = texto(archivos[nombreObj]);
-  const mats = {};
-  for (const [n, d] of Object.entries(archivos)) if (/\.mtl$/i.test(n)) Object.assign(mats, leerMtl(texto(d)));
+/** Completa una pose con lo que se mira de sus materiales. */
+function pose(m) {
+  const mats = Object.entries(m.materiales);
+  return {
+    ...m,
+    texturas: mats.some(([, x]) => x.textura),
+    delJugador: mats.some(([n, x]) => esDelJugador(n, x.kd)),
+  };
+}
 
+/** Un .obj: vértices, normales y triángulos, cada uno con su material. */
+function leerObj(src, mats) {
   const V = [], N = [], tris = [];
   let mat = null;
   for (const linea of src.split(/\r?\n/)) {
@@ -163,23 +168,88 @@ export function leerModelo(archivos) {
     else if (t[0] === 'usemtl') mat = t.slice(1).join(' ');
     else if (t[0] === 'f') {
       // Índices 1..n, o negativos desde el final; el polígono se abanica.
-      const pts = t.slice(1).map((s) => {
-        const [vi, , ni] = s.split('/');
+      const pts = t.slice(1).map((x) => {
+        const [vi, , ni] = x.split('/');
         const a = parseInt(vi, 10), b = ni ? parseInt(ni, 10) : 0;
         return [a < 0 ? V.length + a : a - 1, b ? (b < 0 ? N.length + b : b - 1) : -1];
       });
       for (let i = 1; i + 1 < pts.length; i++) tris.push({ p: [pts[0], pts[i], pts[i + 1]], mat });
     }
   }
-  if (!tris.length) throw new Error('El .obj no tiene caras');
-  const usados = [...new Set(tris.map((t) => t.mat))];
   const materiales = {};
-  for (const m of usados) materiales[m] = mats[m] || { kd: [0.7, 0.7, 0.7] };
+  for (const m of new Set(tris.map((t) => t.mat))) materiales[m] = mats[m] || { kd: [0.7, 0.7, 0.7] };
+  return pose({ V, N, tris, materiales });
+}
+
+/**
+ * Lee el modelo de entre los archivos y lo devuelve por poses:
+ *
+ *   { nombre, eje, poses: { quieto: {…}, andar1: {…}, … }, tris,
+ *     texturas, delJugador }
+ *
+ *  - Un .usdz (o su .usdc): cada capa es una pose, con el nombre de la capa.
+ *    El eje vertical lo dice el propio archivo.
+ *  - Varios .obj: cada archivo es una pose, con el nombre del archivo.
+ *  - Un solo .obj: es la pose quieta, se llame como se llame.
+ *
+ * `eje` es null cuando el archivo no lo dice (los .obj).
+ */
+export async function leerModelo(archivos) {
+  const nombres = Object.keys(archivos);
+  const base = (n) => n.replace(/\.[^.]+$/, '');
+  const poses = {};
+  let eje = null, nombre;
+  let usdc = nombres.find((n) => /\.usdc$/i.test(n));
+  const usdz = nombres.find((n) => /\.usdz$/i.test(n));
+  if (usdz && !usdc) {
+    const dentro = await leerZip(archivos[usdz]);
+    usdc = Object.keys(dentro).find((n) => /\.usdc$/i.test(n));
+    if (!usdc) throw new Error('El .usdz no trae la escena en binario (.usdc), que es la que se sabe leer');
+    archivos = { ...archivos, [usdc]: dentro[usdc] };
+  }
+  if (usdc) {
+    const r = leerUsdc(archivos[usdc]);
+    eje = r.eje;
+    nombre = base(usdz || usdc);
+    for (const [capa, m] of Object.entries(r.capas)) poses[capa || 'quieto'] = pose(m);
+  } else {
+    const objs = nombres.filter((n) => /\.obj$/i.test(n));
+    if (!objs.length) throw new Error('Falta el modelo: un .usdz o un .obj');
+    const mats = {};
+    for (const n of nombres) if (/\.mtl$/i.test(n)) Object.assign(mats, leerMtl(texto(archivos[n])));
+    for (const n of objs) {
+      const p = leerObj(texto(archivos[n]), mats);
+      if (!p.tris.length) throw new Error(`${n} no tiene caras`);
+      poses[objs.length === 1 ? 'quieto' : base(n)] = p;
+    }
+    nombre = objs.length === 1 ? base(objs[0]) : objs.map(base).join(', ');
+  }
+  const lista = Object.values(poses);
   return {
-    nombre: nombreObj.replace(/\.obj$/i, ''), V, N, tris, materiales,
-    texturas: usados.some((m) => materiales[m].textura),
-    delJugador: usados.some(esDelJugador),
+    nombre, eje, poses,
+    tris: lista.reduce((t, p) => t + p.tris.length, 0),
+    texturas: lista.some((p) => p.texturas),
+    delJugador: lista.some((p) => p.delJugador),
   };
+}
+
+/**
+ * Qué es cada pose por su nombre: `quieto`, `andar1`… y `golpe1`…, con o sin
+ * guion o barra baja entre la palabra y el número (USD cambia los guiones por
+ * `_`). La de referencia es la quieta, o la primera si no hay. Lo que no
+ * encaja se ignora y se avisa.
+ */
+export function clasificarPoses(modelo) {
+  const quieto = [], andar = [], golpe = [], otras = [];
+  for (const n of Object.keys(modelo.poses)) {
+    const m = n.toLowerCase().match(/^(quieto|estatico|andar|golpe)[_-]?(\d*)$/);
+    if (!m) { otras.push(n); continue; }
+    const num = Number(m[2] || 0);
+    (m[1] === 'andar' ? andar : m[1] === 'golpe' ? golpe : quieto).push([num, n]);
+  }
+  const orden = (l) => l.sort((a, b) => a[0] - b[0]).map(([, n]) => n);
+  const ref = orden(quieto)[0] || Object.keys(modelo.poses)[0];
+  return { ref, andar: orden(andar), golpe: orden(golpe), otras: [...otras, ...orden(quieto).slice(1)] };
 }
 
 // --- Colocación ---------------------------------------------------------------
@@ -263,7 +333,7 @@ function pintar(modelo, P, NN, { res, corte = Infinity, color, sombra = true, ar
   // Color de cada material, con el del jugador si es suyo.
   const tonos = {};
   for (const [nombre, mat] of Object.entries(modelo.materiales)) {
-    if (esDelJugador(nombre) && color) {
+    if (esDelJugador(nombre, mat.kd) && color) {
       const lum = 0.3 * mat.kd[0] + 0.59 * mat.kd[1] + 0.11 * mat.kd[2];
       const [a, b] = [rgb(color.dark), rgb(color.main)];
       tonos[nombre] = a.map((x, i) => mezcla(x, b[i], Math.min(1, lum * 1.6)));
@@ -453,10 +523,12 @@ export function spritesDeModelo(modelo, { tipo, clave, medida = {}, eje = 'z', g
   const avisos = [];
   if (modelo.texturas) avisos.push('Las texturas aún no se usan: cada material sale con su color liso.');
   const final = (s) => ({ canvas: s.canvas, ox: s.ox / res, oy: s.oy / res });
+  const poses = clasificarPoses(modelo);
+  const ref = modelo.poses[poses.ref];
 
   if (tipo === 'building') {
     const size = medida.size || 2;
-    const { P, NN } = orientar(modelo, eje, giro);
+    const { P, NN } = orientar(ref, eje, giro);
     const k = caja(P);
     // Que quepa en la huella con un poco de aire, centrado en ella y con la
     // base en el suelo.
@@ -466,7 +538,6 @@ export function spritesDeModelo(modelo, { tipo, clave, medida = {}, eje = 'z', g
     const ce = 0, cn = -size / Math.SQRT2;
     const ce0 = (cu - cv) / Math.SQRT2, cn0 = -(cu + cv) / Math.SQRT2;
     const Q = P.map(([e, n, h]) => [(e - ce0) * esc + ce, (n - cn0) * esc + cn, (h - k.h0) * esc]);
-    const QN = NN;
     const alto = (k.h1 - k.h0) * esc;
     const anchoHuella = size * 64 * res;
     // Sin materiales del jugador, el edificio es igual para todos y sólo
@@ -474,44 +545,97 @@ export function spritesDeModelo(modelo, { tipo, clave, medida = {}, eje = 'z', g
     const pintados = new Map();
     PLAYER_COLORS.forEach((color, ci) => {
       [0.12, 0.55, Infinity].forEach((f, etapa) => {
-        const cual = `${etapa}|${modelo.delJugador ? ci : ''}`;
-        if (!pintados.has(cual)) pintados.set(cual, pintar(modelo, Q, QN, { res, corte: f === Infinity ? Infinity : alto * f, color }));
+        const cual = `${etapa}|${ref.delJugador ? ci : ''}`;
+        if (!pintados.has(cual)) pintados.set(cual, pintar(ref, Q, NN, { res, corte: f === Infinity ? Infinity : alto * f, color }));
         let s = pintados.get(cual);
-        if (etapa === 2 && !modelo.delJugador) s = banderin(s, color, anchoHuella);
+        if (etapa === 2 && !ref.delJugador) s = banderin(s, color, anchoHuella);
         sprites[`b|${clave}|${ci}|${etapa}`] = final(s);
       });
     });
-    if (!modelo.delJugador) avisos.push('Ningún material se llama «jugador»: el color de cada bando va en un banderín.');
+    if (Object.keys(modelo.poses).length > 1) avisos.push(`Un edificio es una sola pose: se usa «${poses.ref}».`);
+    if (!ref.delJugador) avisos.push('Nada va en magenta ni en un material «jugador»: el color de cada bando va en un banderín.');
   } else if (tipo === 'unit') {
     const alturaPx = medida.altura || 38;
-    PLAYER_COLORS.forEach((color, ci) => {
-      for (const cara of CARAS) {
-        // La cara 1 es el frente sin girar; cada cara más, 45° a la derecha.
-        const { P, NN } = orientar(modelo, eje, giro - (cara - 1) * 45);
-        const k = caja(P);
-        const esc = (alturaPx / PX_H) / Math.max(k.h1 - k.h0, 1e-9);
-        const ce0 = (k.e0 + k.e1) / 2, cn0 = (k.n0 + k.n1) / 2;
+    // Los fotogramas: la pose quieta es el 0, luego las de andar y las de
+    // golpe, por su número. Todas se colocan con la escala y el punto de los
+    // pies de la quieta: así la figura no crece ni resbala entre poses.
+    const fotos = [poses.ref, ...poses.andar, ...poses.golpe];
+    const iAndar = poses.andar.map((_, k) => 1 + k);
+    const iGolpe = poses.golpe.map((_, k) => 1 + poses.andar.length + k);
+    const delJugador = modelo.delJugador;
+    const aroDe = (r) => (delJugador ? null : { r: Math.max(6, Math.min(r, 20)) });
+    for (const cara of CARAS) {
+      // La cara 1 es el frente sin girar; cada cara más, 45° a la derecha.
+      const g = giro - (cara - 1) * 45;
+      const R = orientar(ref, eje, g);
+      const k = caja(R.P);
+      const esc = (alturaPx / PX_H) / Math.max(k.h1 - k.h0, 1e-9);
+      const ce0 = (k.e0 + k.e1) / 2, cn0 = (k.n0 + k.n1) / 2;
+      const r = Math.max(k.e1 - k.e0, k.n1 - k.n0) * esc * 0.5 * PX_E * 0.8;
+      fotos.forEach((nombre, f) => {
+        const p = modelo.poses[nombre];
+        const { P, NN } = f === 0 ? R : orientar(p, eje, g);
         const Q = P.map(([e, n, h]) => [(e - ce0) * esc, (n - cn0) * esc, (h - k.h0) * esc]);
-        const r = Math.max(k.e1 - k.e0, k.n1 - k.n0) * esc * 0.5 * PX_E * 0.8;
-        const s = pintar(modelo, Q, NN, { res, color, aro: modelo.delJugador ? null : { r: Math.max(6, Math.min(r, 20)) } });
-        sprites[`u|${clave}|${ci}|${cara}|0`] = final(s);
-      }
-    });
-    if (!modelo.delJugador) avisos.push('Ningún material se llama «jugador»: el color de cada bando va en un aro a los pies.');
+        if (delJugador) {
+          PLAYER_COLORS.forEach((color, ci) => {
+            sprites[`u|${clave}|${ci}|${cara}|${f}`] = final(pintar(p, Q, NN, { res, color }));
+          });
+        } else {
+          // Sólo el aro cambia de color: se pinta una vez y se recolorea.
+          const s = pintar(p, Q, NN, { res, color: PLAYER_COLORS[0], aro: aroDe(r) });
+          PLAYER_COLORS.forEach((color, ci) => {
+            sprites[`u|${clave}|${ci}|${cara}|${f}`] = final(ci ? recolorearAro(s, PLAYER_COLORS[0], color) : s);
+          });
+        }
+      });
+    }
+    const n = Object.keys(modelo.poses).length;
+    avisos.unshift(`${n} pose${n > 1 ? 's' : ''}: quieta «${poses.ref}»`
+      + (poses.andar.length ? `, andar ${poses.andar.map((x) => `«${x}»`).join(' ')}` : ', sin andar')
+      + (poses.golpe.length ? `, golpe ${poses.golpe.map((x) => `«${x}»`).join(' ')}.` : ', sin golpe.'));
+    if (poses.otras.length) avisos.push(`No se usan (el nombre no dice qué pose es): ${poses.otras.map((x) => `«${x}»`).join(', ')}.`);
+    if (poses.golpe.length > 2) avisos.push('El golpe usa dos poses: sobran las demás.');
+    if (!delJugador) avisos.push('Nada va en magenta ni en un material «jugador»: el color de cada bando va en un aro a los pies.');
+    // El juego usa dos fotogramas de golpe; con uno, se repite.
+    const golpe = iGolpe.length ? [iGolpe[0], iGolpe[1] ?? iGolpe[0]] : [0, 0];
+    const anim = { andar: iAndar.length ? iAndar : [0], quieto: 0, golpe, altura: alturaPx * 2 };
+    return { sprites, anim, avisos };
   } else {
     // Un recurso: cuatro variantes, girado de 90 en 90 grados.
     for (let variante = 0; variante < 4; variante++) {
-      const { P, NN } = orientar(modelo, eje, giro + variante * 90);
+      const { P, NN } = orientar(ref, eje, giro + variante * 90);
       const k = caja(P);
       const esc = 0.9 / Math.max(k.u1 - k.u0, k.v1 - k.v0, 1e-9);
       const ce0 = (k.e0 + k.e1) / 2, cn0 = (k.n0 + k.n1) / 2;
       const Q = P.map(([e, n, h]) => [(e - ce0) * esc, (n - cn0) * esc, (h - k.h0) * esc]);
-      sprites[`r|${clave}|${variante}|0`] = final(pintar(modelo, Q, NN, { res }));
+      sprites[`r|${clave}|${variante}|0`] = final(pintar(ref, Q, NN, { res }));
+    }
+    if (Object.keys(modelo.poses).length > 1) avisos.push(`Un recurso es una sola pose: se usa «${poses.ref}».`);
+  }
+  return { sprites, anim: null, avisos };
+}
+
+/**
+ * Cambia el aro de un color de jugador a otro: son los píxeles con su color
+ * y la opacidad del aro (ver `pintar`), que nada más en el sprite tiene.
+ */
+function recolorearAro(s, de, a) {
+  const c = document.createElement('canvas');
+  c.width = s.canvas.width; c.height = s.canvas.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(s.canvas, 0, 0);
+  const img = ctx.getImageData(0, 0, c.width, c.height), d = img.data;
+  const [r0, g0, b0] = rgb(de.main).map((x) => Math.round(Math.min(255, x * 255)));
+  const [r1, g1, b1] = rgb(a.main).map((x) => Math.round(Math.min(255, x * 255)));
+  for (let i = 0; i < d.length; i += 4) {
+    // Con margen: el lienzo guarda lo translúcido premultiplicado y al leerlo
+    // puede mover una unidad arriba o abajo.
+    if (Math.abs(d[i + 3] - 230) <= 2 && Math.abs(d[i] - r0) <= 3 && Math.abs(d[i + 1] - g0) <= 3 && Math.abs(d[i + 2] - b0) <= 3) {
+      d[i] = r1; d[i + 1] = g1; d[i + 2] = b1;
     }
   }
-  // Un modelo no se mueve: andar, estar quieto y golpear son el mismo dibujo.
-  const anim = tipo === 'unit' ? { andar: [0], quieto: 0, golpe: [0, 0], altura: (medida.altura || 38) * 2 } : null;
-  return { sprites, anim, avisos };
+  ctx.putImageData(img, 0, 0);
+  return { canvas: c, ox: s.ox, oy: s.oy };
 }
 
 // --- Hojas --------------------------------------------------------------------
