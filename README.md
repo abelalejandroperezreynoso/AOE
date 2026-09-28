@@ -450,9 +450,11 @@ Para depurar, el objeto de la partida está disponible en la consola como
   y retira las hojas que se quedan sin uso; el paquete se guarda en
   `assets/fuentes/<clave>-modelo.zip`.
 - **El aldeano es ahora un modelo 3D**: un maniquí hecho en Gravity Sketch
-  (`assets/fuentes/villager-modelo.zip`, con Y arriba), metido con
-  `tools/importar-modelo.mjs`. Es una sola pose, así que no mueve las piernas
-  al andar, y el color del jugador va en el aro de los pies. Lo que se cuenta
+  (`assets/fuentes/villager-modelo.zip`, el `Aldeano_3.usdz` de prueba con Y
+  arriba), metido con `tools/importar-modelo.mjs`. Trae dos poses: la quieta
+  en gris y una de andar, `andar2`, en amarillo y con los brazos abiertos, que
+  es la que enseña todo el rato mientras anda; no tiene golpe, así que
+  trabaja con la quieta. El color del jugador va en el aro de los pies. Lo que se cuenta
   más abajo de sus dibujos a mano es historia: esas hojas se retiraron y
   siguen en el historial de git. En `.obj`, Gravity Sketch exporta un grupo
   por trazo, con nombres automáticos (`g s.0027`…), sin los de sus grupos ni
