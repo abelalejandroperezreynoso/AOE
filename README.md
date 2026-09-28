@@ -432,6 +432,14 @@ Para depurar, el objeto de la partida está disponible en la consola como
   del índice lo que tenía ese elemento, escribe `<clave>-modelo-<color>.png`
   y retira las hojas que se quedan sin uso; el paquete se guarda en
   `assets/fuentes/<clave>-modelo.zip`.
+- **El aldeano es ahora un modelo 3D**: un maniquí hecho en Gravity Sketch
+  (`assets/fuentes/villager-modelo.zip`, con Y arriba), metido con
+  `tools/importar-modelo.mjs`. Es una sola pose, así que no mueve las piernas
+  al andar, y el color del jugador va en el aro de los pies. Lo que se cuenta
+  más abajo de sus dibujos a mano es historia: esas hojas se retiraron y
+  siguen en el historial de git. Gravity Sketch exporta un grupo por trazo,
+  con nombres automáticos (`g s.0027`…), sin los de sus grupos ni capas: las
+  poses de una animación tienen que ir en archivos separados.
 - El explorador está dibujado por código (`tools/dibujar-jinete.html`): caballo
   y jinete son piezas simples (elipsoides, cápsulas y cajas) con un esqueleto
   que anima el trote en pares diagonales y el golpe de espada. Se ven con la

@@ -30,8 +30,9 @@ Los mensajes de commit van en español, y dicen qué se ha comprobado.
 - Las unidades, los edificios y los recursos son sprites: atlas PNG en
   `assets/sprites/` con su `indice.json` (hoja, posición y anclaje de cada uno).
   Hay una hoja de unidades y otra de edificios por color de jugador, y una de
-  recursos, y las unidades dibujadas a mano llevan la suya por color
-  (`villager-<color>.png`). Un sprite nuevo o cambiado tiene que respetar ese
+  recursos, y las unidades dibujadas a mano o importadas llevan la suya por
+  color (`<tipo>-<color>.png`, `<tipo>-modelo-<color>.png`). El aldeano es un
+  modelo 3D de Gravity Sketch. Un sprite nuevo o cambiado tiene que respetar ese
   formato: cinco orientaciones (las otras tres se voltean), tres etapas por
   edificio y los ocho colores. Los fotogramas de cada unidad los dice `anim`
   en el índice (por defecto, cuatro de andar y dos de golpe). Una hoja
@@ -48,7 +49,9 @@ Los mensajes de commit van en español, y dicen qué se ha comprobado.
   catálogo (sección Modelo 3D de la ficha abierta), que los enseña al momento
   sólo en esa sesión, y entran en el juego con
   `tools/importar-modelo.mjs <paquete.zip>`, el paquete que descarga el
-  catálogo con el modelo y sus ajustes.
+  catálogo con el modelo y sus ajustes. Gravity Sketch, con el que se modela, exporta con Y
+  arriba y un grupo por trazo con nombre automático: no conserva los nombres
+  de grupos ni capas, así que cada pose de una animación va en su archivo.
 - El README documenta el juego, la estructura del código y las notas técnicas.
 
 ## Verificación
